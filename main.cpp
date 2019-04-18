@@ -6,7 +6,16 @@
 #include "fasttree/Utils.h"
 #include <iostream>
 #include <cmath>
+
+#if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
+#include <io.h>
+#define isWindows() true
+bool checkOut(){return _isatty( _fileno( stdout ) );}
+#else
 #include <unistd.h>
+#define isWindows() false
+bool checkOut() { return isatty(STDIN_FILENO); }
+#endif
 
 void cli(CLI::App &app, std::string &name, std::string &version, std::string &flags, fasttree::Options &options,
          std::vector<std::string> &args) {
@@ -45,7 +54,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     auto io = "Input/output options";
 
     app.add_option("-out", options.outFileName,
-                   " output file instead of stdout")->type_name("file")->
+                   "output file instead of stdout")->type_name("file")->
             check(CLI::isNotEmpty)->group(io);
 
     app.add_option("-n", options.nAlign,
@@ -69,7 +78,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
         return "";
     })->group(io);
 
-    app.add_option("-verbose", options.verbose, " level of details during normal operation")->type_name("lvl")->
+    app.add_option("-verbose", options.verbose, "level of details during normal operation")->type_name("lvl")->
             group(io);
 
     app.add_flag_function("-quiet", [&options](size_t) {
@@ -208,7 +217,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-gtrrates", [&args, &options](CLI::results_t in) {
         options.bUseGtr = true;
         options.bUseGtrRates = true;
-        for (int i = 0; i < in.size(); i++) {
+        for (size_t i = 0; i < in.size(); i++) {
             if (!CLI::detail::lexical_cast(in[i], options.gtrrates[i])) {
                 throw CLI::ConversionError(in[i], "-gtrrates");
             }
@@ -220,7 +229,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
         options.bUseGtr = true;
         options.bUseGtrFreq = true;
         double sum = 0;
-        for (int i = 0; i < in.size(); i++) {
+        for (size_t i = 0; i < in.size(); i++) {
             if (!CLI::detail::lexical_cast(in[i], options.gtrfreq[i])) {
                 throw CLI::ConversionError(in[i], "-gtrfreq");
             }
@@ -229,7 +238,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
         if (std::fabs(1.0 - sum) > 0.01) {
             throw CLI::ValidationError("-gtrfreq", "values do not sum to 1");
         }
-        for (int i = 0; i < in.size(); i++) {
+        for (size_t i = 0; i < in.size(); i++) {
             options.gtrfreq[i] /= sum;
         }
         return true;
@@ -302,7 +311,8 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                           "search the visible set (the top hit for each node) only Unlike the original fast"
                           " neighbor-joining, -fastest updates visible(C) after joining A and B if join(AB,C)"
                           " is better than join(C,visible(C)) -fastest also updates out-distances in a very lazy way,"
-                          " -fastest sets -2nd on as well, use -fastest -no2nd to avoid this")->group(search);
+                          " -fastest sets -2nd on as well, use -fastest -no2nd to avoid this")->
+            group(search)->excludes("-slow");
 
     std::stringstream heuristics_description;
     heuristics_description << "Top-hit heuristics:" << std::endl;
@@ -465,13 +475,13 @@ int main(int argc, char *argv[]) {
     CLI::App app;
 
     cli(app, name, version, flags, options, args);
-    if (isatty(STDIN_FILENO) && argc == 1) {
-        CLI11_PARSE(app, "-h", false);
-#if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
-        std::cerr <<"Windows users: Please remember to run this inside a command shell" <<std::endl;
-        std::cerr << "Hit return to continue"  <<std::endl;
-        std::cin.ignore(1);
-#endif
+    if (checkOut() && argc == 1) {
+        std::cout << app.help() << std::endl;
+        if (isWindows()) {
+            std::cerr << "Windows users: Please remember to run this inside a command shell" << std::endl;
+            std::cerr << "Hit return to continue" << std::endl;
+            std::cin.ignore(1);
+        }
         return EXIT_SUCCESS;
     }
 
@@ -516,7 +526,7 @@ int main(int argc, char *argv[]) {
     fasttree::FastTree fastTree(options);
     std::ostream &applog = log ? teelog : clog;
     applog << "Command: ";
-    std::copy (argv, argv + argc - 1, std::ostream_iterator<char*>(applog, ", "));
+    std::copy(argv, argv + argc - 1, std::ostream_iterator<char *>(applog, ", "));
     applog << argv[argc - 1] << std::endl;
 
     fastTree.run(

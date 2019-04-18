@@ -61,19 +61,21 @@ namespace fasttree {
         /* Exact or approximate posterior distributions for a.a.s */
         bool exactML = true;
 
+        std::string codesString;/* Protein character */
+
         int nAlign = 1; /* number of alignments to read */
         std::string matrixPrefix;
         bool make_matrix = false;
         std::string constraintsFile;
         std::string intreeFile;
-        bool intree1 = false;		/* the same starting tree each round */
-        int nni = -1;			/* number of rounds of NNI, defaults to 4*log2(n) */
-        int spr = 2;			/* number of rounds of SPR */
-        int maxSPRLength = 10;	/* maximum distance to move a node */
-        int MLnni = -1;		/* number of rounds of ML NNI, defaults to 2*log2(n) */
-        bool MLlen = false;		/* optimize branch lengths; no topology changes */
-        int nBootstrap = 1000;		/* If set, number of replicates of local bootstrap to do */
-        int nRateCats;// = nDefaultRateCats;
+        bool intree1 = false;        /* the same starting tree each round */
+        int nni = -1;            /* number of rounds of NNI, defaults to 4*log2(n) */
+        int spr = 2;            /* number of rounds of SPR */
+        int maxSPRLength = 10;    /* maximum distance to move a node */
+        int MLnni = -1;        /* number of rounds of ML NNI, defaults to 2*log2(n) */
+        bool MLlen = false;        /* optimize branch lengths; no topology changes */
+        int nBootstrap = 1000;        /* If set, number of replicates of local bootstrap to do */
+        int nRateCats = Constants::nDefaultRateCats;
         bool bUseGtr = false;
         bool bUseLg = false;
         bool bUseWag = false;
@@ -88,7 +90,7 @@ namespace fasttree {
         std::string logFileName;
         bool safeLog = false;
         bool expert = false;
-        long seed = std::time(nullptr);
+        long seed = static_cast<long>(std::time(nullptr));
 
     };
 }

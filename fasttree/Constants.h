@@ -2,6 +2,8 @@
 #ifndef FASTTREE_CONSTANTS_H
 #define FASTTREE_CONSTANTS_H
 
+#include <string>
+
 namespace fasttree {
 
     namespace Constants {
@@ -42,6 +44,10 @@ namespace fasttree {
         const double approxMLminratio = 2 / 3.0;/* Ratio of approximated/true posterior values must be at least this high */
         const double approxMLnearT = 0.2;    /* 2nd component of near-constant posterior distribution uses this time scale */
         const int nDefaultRateCats = 20;
+
+        /* Protein character set */
+        const std::string codesStringAA = "ARNDCQEGHILKMFPSTWYV";
+        const std::string codesStringNT = "ACGT";
     };
 
 }
