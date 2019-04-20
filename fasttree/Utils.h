@@ -23,5 +23,13 @@ namespace fasttree {
         std::ostream &os2;
     };
 
+    template<typename ... Args>
+    std::string strformat(const std::string &format, Args ... args) {
+        size_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1;//\0'
+        char buf[size];
+        snprintf(buf, size, format.c_str(), args ...);
+        return std::string(buf, buf + size - 1);
+    }
+
 }
 #endif

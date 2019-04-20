@@ -3,9 +3,10 @@ project(FastTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
+ADD_SUBDIRECTORY("libs/CLI11")
+ADD_SUBDIRECTORY("libs/robin-map")
+
 set(SOURCE_FILES
-        libs/CLI11/CLI11.hpp
-        libs/CLI11/Validators.h
         fasttree/Options.h
         fasttree/Constants.h
         fasttree/DebugVars.h
@@ -15,4 +16,12 @@ set(SOURCE_FILES
         main.cpp
         )
 
-add_executable(FastTree ${SOURCE_FILES})
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "/W4 /O2")
+else()
+    set(CMAKE_CXX_FLAGS "-Wall")#-O3
+endif()
+
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+target_link_libraries(${PROJECT_NAME} CLI11 robin-map)
+

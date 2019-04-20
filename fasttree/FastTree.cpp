@@ -1,12 +1,12 @@
 
-
 #include "FastTree.h"
+#include "Utils.h"
 
 using namespace fasttree;
 
-FastTree::FastTree(const Options &options) : options(options) {}
+FastTree::FastTree(const Options &options) : options(options),fpIn() {}
 
-void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
+void FastTree::prepare(std::istream &in, std::ostream &log) {
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
     if (options.nCodes == 4 && options.matrixPrefix.size() == 0)
@@ -19,93 +19,155 @@ void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
     if (!options.make_matrix) {        /* Report settings */
         std::string tophitString = "no";
         std::string tophitsCloseStr = "default";
-/*
-
-
-
-
-
-        char tophitString[100] = "no";
-        char tophitsCloseStr[100] = "default";
-        if (tophitsClose > 0) sprintf(tophitsCloseStr, "%.2f", tophitsClose);
-        if (tophitsMult > 0)
-            sprintf(tophitString, "%.2f*sqrtN close=%s refresh=%.2f",
-                    tophitsMult, tophitsCloseStr, tophitsRefresh);
-        char supportString[100] = "none";
-        if (nBootstrap > 0) {
-            if (MLnni != 0 || MLlen)
-                sprintf(supportString, "SH-like %d", nBootstrap);
-            else
-                sprintf(supportString, "Local boot %d", nBootstrap);
+        if (options.tophitsClose > 0) {
+            tophitsCloseStr = strformat("%.2f", options.tophitsClose);
         }
-        char nniString[100] = "(no NNI)";
-        if (nni > 0)
-            sprintf(nniString, "+NNI (%d rounds)", nni);
-        if (nni == -1)
-            strcpy(nniString, "+NNI");
-        char sprString[100] = "(no SPR)";
-        if (spr > 0)
-            sprintf(sprString, "+SPR (%d rounds range %d)", spr, maxSPRLength);
-        char mlnniString[100] = "(no ML-NNI)";
-        if (MLnni > 0)
-            sprintf(mlnniString, "+ML-NNI (%d rounds)", MLnni);
-        else if (MLnni == -1)
-            sprintf(mlnniString, "+ML-NNI");
-        else if (MLlen)
-            sprintf(mlnniString, "+ML branch lengths");
-        if ((MLlen || MLnni != 0) && !exactML)
-            strcat(mlnniString, " approx");
-        if (MLnni != 0)
-            sprintf(mlnniString + strlen(mlnniString), " opt-each=%d", mlAccuracy);
+        if (options.tophitsMult > 0) {
+            tophitString = strformat("%.2f*sqrtN close=%s refresh=%.2f", options.tophitsMult, tophitsCloseStr,
+                                     options.tophitsRefresh);
+        }
 
-        for (i = 0; i < nFPs; i++) {
-            FILE *fp = fps[i];
-            fprintf(fp, "FastTree Version %s %s%s\nAlignment: %s",
-                    FT_VERSION, SSE_STRING, OpenMPString(), fileName != NULL ? fileName : "standard input");
-            if (nAlign > 1)
-                fprintf(fp, " (%d alignments)", nAlign);
-            fprintf(fp, "\n%s distances: %s Joins: %s Support: %s\n",
-                    nCodes == 20 ? "Amino acid" : "Nucleotide",
-                    matrixPrefix ? matrixPrefix : (useMatrix ? "BLOSUM45"
-                                                             : (nCodes == 4 && logdist ? "Jukes-Cantor"
-                                                                                       : "%different")),
-                    bionj ? "weighted" : "balanced",
-                    supportString);
-            if (intreeFile == NULL)
-                fprintf(fp, "Search: %s%s %s %s %s\nTopHits: %s\n",
-                        slow ? "Exhaustive (slow)" : (fastest ? "Fastest" : "Normal"),
-                        useTopHits2nd ? "+2nd" : "",
-                        nniString, sprString, mlnniString,
-                        tophitString);
+        std::string supportString = "none";
+        if (options.nBootstrap > 0) {
+            if (options.MLnni != 0 || options.MLlen)
+                supportString = strformat("SH-like %d", options.nBootstrap);
             else
-                fprintf(fp, "Start at tree from %s %s %s\n", intreeFile, nniString, sprString);
+                supportString = strformat("Local boot %d", options.nBootstrap);
+        }
+        std::string nniString = "(no NNI)";
+        if (options.nni > 0) {
+            nniString = strformat("+NNI (%d rounds)", options.nni);
+        }
+        if (options.nni == -1) {
+            nniString = "+NNI";
+        }
+        std::string sprString = "(no SPR)";
+        if (options.spr > 0) {
+            sprString = strformat("+SPR (%d rounds range %d)", options.spr, options.maxSPRLength);
+        }
+        std::string mlnniString = "(no ML-NNI)";
+        if (options.MLnni > 0) {
+            mlnniString = strformat("+ML-NNI (%d rounds)", options.MLnni);
+        } else if (options.MLnni == -1) {
+            mlnniString = "+ML-NNI";
+        } else if (options.MLlen) {
+            mlnniString = "+ML branch lengths";
+        }
+        if ((options.MLlen || options.MLnni != 0) && !options.exactML) {
+            mlnniString += " approx";
+        }
+        if (options.MLnni != 0) {
+            mlnniString += strformat(" opt-each=%d", options.mlAccuracy);
+        }
 
-            if (MLnni != 0 || MLlen) {
-                fprintf(fp, "ML Model: %s,",
-                        (nCodes == 4) ?
-                        (bUseGtr ? "Generalized Time-Reversible" : "Jukes-Cantor") :
-                        (bUseLg ? "Le-Gascuel 2008" : (bUseWag ? "Whelan-And-Goldman" : "Jones-Taylor-Thorton"))
+        log << "FastTree Version " << Constants::version << " " << Constants::compileFlags << std::endl;
+        log << "Alignment: " << (&in == &std::cin ? "standard input" : options.inFileName);
 
-                );
-                if (nRateCats == 1)
-                    fprintf(fp, " No rate variation across sites");
-                else
-                    fprintf(fp, " CAT approximation with %d rate categories", nRateCats);
-                fprintf(fp, "\n");
-                if (nCodes == 4 && bUseGtrRates)
-                    fprintf(fp, "GTR rates(ac ag at cg ct gt) %.4f %.4f %.4f %.4f %.4f %.4f\n",
-                            gtrrates[0], gtrrates[1], gtrrates[2], gtrrates[3], gtrrates[4], gtrrates[5]);
-                if (nCodes == 4 && bUseGtrFreq)
-                    fprintf(fp, "GTR frequencies(A C G T) %.4f %.4f %.4f %.4f\n",
-                            gtrfreq[0], gtrfreq[1], gtrfreq[2], gtrfreq[3]);
+        if (options.nAlign > 1) {
+            log << strformat(" (%d alignments)", options.nAlign) << std::endl;
+        }
+        log << (options.nCodes == 20 ? "Amino acid" : "Nucleotide ");
+        log << "distances: " << (options.matrixPrefix.size() > 0 ? options.matrixPrefix :
+                                 (options.useMatrix ? "BLOSUM45" : (options.nCodes == 4 && options.logdist
+                                                                    ? "Jukes-Cantor"
+                                                                    : "%different")));
+        log << "Joins: " << (options.bionj ? "weighted" : "balanced");
+        log << "Support: " << supportString << std::endl;
+
+
+        if (options.intreeFile.size() == 0) {
+            log << "Search: ";
+            log << (options.slow ? "Exhaustive (slow)" : (options.fastest ? "Fastest" : "Normal"));
+            log << (options.useTopHits2nd ? "+2nd" : "") << "";
+            log << nniString << " " << sprString << " " << mlnniString;
+            log << "TopHits: " << tophitString << std::endl;
+
+        } else {
+            log << "Start at tree from ";
+            log << options.intreeFile << " ";
+            log << nniString << " ";
+            log << sprString << " ";
+            log << std::endl;
+        }
+
+        if (options.MLnni != 0 || options.MLlen) {
+            log << "ML Model: ",
+                    log << ((options.nCodes == 4) ?
+                            (options.bUseGtr ? "Generalized Time-Reversible" : "Jukes-Cantor") :
+                            (options.bUseLg ? "Le-Gascuel 2008" : (options.bUseWag ? "Whelan-And-Goldman"
+                                                                                   : "Jones-Taylor-Thorton")));
+            log << ",";
+            if (options.nRateCats == 1) {
+                log << " No rate variation across sites";
+            } else {
+                log << strformat(" CAT approximation with %d rate categories", options.nRateCats);
             }
-            if (constraintsFile != NULL)
-                fprintf(fp, "Constraints: %s Weight: %.3f\n", constraintsFile, constraintWeight);
-            if (pseudoWeight > 0)
-                fprintf(fp, "Pseudocount weight for comparing sequences with little overlap: %.3lf\n", pseudoWeight);
-            fflush(fp);
-        }*/
+            log << std::endl;
+            if (options.nCodes == 4 && options.bUseGtrRates) {
+                log << strformat("GTR rates(ac ag at cg ct gt) %.4f %.4f %.4f %.4f %.4f %.4f",
+                                 options.gtrrates[0], options.gtrrates[1], options.gtrrates[2],
+                                 options.gtrrates[3], options.gtrrates[4], options.gtrrates[5]) << std::endl;
+            }
+            if (options.nCodes == 4 && options.bUseGtrFreq) {
+                log << strformat("GTR frequencies(A C G T) %.4f %.4f %.4f %.4f",
+                                 options.gtrfreq[0], options.gtrfreq[1], options.gtrfreq[2], options.gtrfreq[3])
+                    << std::endl;
+            }
+        }
+        if (options.constraintsFile.size() > 0) {
+            log << "Constraints: " << options.constraintsFile;
+            log << strformat(" Weight: %.3f", options.constraintWeight) <<
+                std::endl;
+        }
+        if (options.pseudoWeight > 0) {
+            log << strformat("Pseudocount weight for comparing sequences with little overlap: %.3lf",
+                             options.pseudoWeight) << std::endl;
+        }
+        log.flush();
     }
+
+/**
+    if (options.matrixPrefix.size()>0) {
+        if (!options.useMatrix) {
+            throw std::invalid_argument("Cannot use both -matrix and -nomatrix arguments!");
+        }
+        distance_matrix = ReadDistanceMatrix(matrixPrefix);
+    } else if (options.useMatrix) {   // use default matrix
+        assert(options.nCodes == 20);
+        distance_matrix = &matrixBLOSUM45;
+        SetupDistanceMatrix(distance_matrix);
+    } else {
+        distance_matrix = NULL;
+    }
+
+    int iAln;
+    FILE *fpIn = fileName != NULL ? fopen(fileName, "r") : stdin;
+    if (fpIn == NULL) {
+        fprintf(stderr, "Cannot read %s\n", fileName);
+        exit(1);
+    }
+    FILE *fpConstraints = NULL;
+    if (constraintsFile != NULL) {
+        fpConstraints = fopen(constraintsFile, "r");
+        if (fpConstraints == NULL) {
+            fprintf(stderr, "Cannot read %s\n", constraintsFile);
+            exit(1);
+        }
+    }
+
+    FILE *fpInTree = NULL;
+    if (intreeFile != NULL) {
+        fpInTree = fopen(intreeFile, "r");
+        if (fpInTree == NULL) {
+            fprintf(stderr, "Cannot read %s\n", intreeFile);
+            exit(1);
+        }
+    }**/
+
+
+}
+
+void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
 
 
 }

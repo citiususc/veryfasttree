@@ -4,11 +4,17 @@
 
 #include "Options.h"
 #include <iostream>
+#include <fstream>
 
 namespace fasttree {
     class FastTree {
     private:
         Options options;
+        std::ifstream fpIn;
+        std::ifstream fpConstraints;
+        std::ifstream fpInTree;
+
+        void prepare(std::istream &in, std::ostream &log);
 
     public:
         FastTree(const Options &options);

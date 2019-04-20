@@ -92,6 +92,11 @@ namespace fasttree {
         bool expert = false;
         long seed = static_cast<long>(std::time(nullptr));
 
+        /*Optimizations*/
+        std::size_t threads = 1;
+        bool doublePrecision = false;
+        bool sse = false;
+
     };
 }
 

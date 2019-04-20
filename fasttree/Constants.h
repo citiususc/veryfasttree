@@ -48,6 +48,9 @@ namespace fasttree {
         /* Protein character set */
         const std::string codesStringAA = "ARNDCQEGHILKMFPSTWYV";
         const std::string codesStringNT = "ACGT";
+
+        const std::string version = "x.x.x";
+        const std::string compileFlags = "";//TODO set with pragma
     };
 
 }

@@ -1,10 +1,8 @@
 
-#include "libs/CLI11/CLI11.hpp"
-#include "libs/CLI11/Validators.h"
+#include "CLI11.hpp"
 #include "fasttree/Options.h"
 #include "fasttree/FastTree.h"
 #include "fasttree/Utils.h"
-#include <iostream>
 #include <cmath>
 
 #if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
@@ -12,10 +10,44 @@
 #define isWindows() true
 bool checkOut(){return _isatty( _fileno( stdout ) );}
 #else
+
 #include <unistd.h>
 #define isWindows() false
 bool checkOut() { return isatty(STDIN_FILENO); }
 #endif
+
+std::string isNotEmpty(const std::string &input) {
+    if (input.size() == 0) {
+        return "Value is empty";
+    }
+    return std::string();
+}
+
+struct Min : CLI::Validator {
+
+    template<typename T>
+    Min(T min, bool equals = true) {
+        func = [min, equals](std::string input) {
+            T val;
+            CLI::detail::lexical_cast(input, val);
+            if (val < min)
+                return "Min value " + std::to_string(min);
+
+            if (!equals && val == min)
+                return "Min value greater than " + std::to_string(min);
+
+            return std::string();
+        };
+    }
+
+};
+
+void setDeprecated(CLI::Option *op) {
+    op->check([&op](const std::string &in) {
+        std::cerr << "Warning: " << op->get_name() << " is a deprecated option and it has no effect" << std::endl;
+        return "";
+    });
+}
 
 void cli(CLI::App &app, std::string &name, std::string &version, std::string &flags, fasttree::Options &options,
          std::vector<std::string> &args) {
@@ -48,19 +80,19 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.description(description.str());
     app.set_help_flag("-h,-help,--help", "Print this help message and exit")->group("");
     app.add_option("protein_alignment", options.inFileName, "input file instead of stdin")->
-            type_name("")->check(CLI::isNotEmpty);
+            type_name("")->check(isNotEmpty);
 
 
     auto io = "Input/output options";
 
     app.add_option("-out", options.outFileName,
                    "output file instead of stdout")->type_name("file")->
-            check(CLI::isNotEmpty)->group(io);
+            check(isNotEmpty)->group(io);
 
     app.add_option("-n", options.nAlign,
                    "read in multiple alignments in. This only works with phylip interleaved format. For example,"
                    " you can use it with the output from phylip's seqboot. If you use -n, FastTree will write 1"
-                   " tree per line to standard output.")->type_name("<number>")->check(CLI::Min(1))->group(io);
+                   " tree per line to standard output.")->type_name("<number>")->check(Min(1))->group(io);
 
     app.add_flag_function("-nt", [&options](size_t) {
                               options.nCodes = 4;
@@ -70,10 +102,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-intree", options.intreeFile,
                    "read the starting tree in from newickfile. Any branch lengths in the starting trees are ignored."
                    " -intree with -n will read a separate starting tree for each alignment.")->
-            type_name("newick_file")->check(CLI::isNotEmpty)->group(io);
+            type_name("newick_file")->check(isNotEmpty)->group(io);
 
     app.add_option("-intree1", options.intreeFile, "read the same starting tree for each alignment")->
-            type_name("newick_file")->check(CLI::isNotEmpty)->check([&options](const std::string &) {
+            type_name("newick_file")->check(isNotEmpty)->check([&options](const std::string &) {
         options.intree1 = true;
         return "";
     })->group(io);
@@ -95,7 +127,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-log", options.logFileName,
                    "save intermediate trees so you can extract the trees and restart long-running jobs if they crash"
                    " -log also reports the per-site rates (1 means slowest category)")->type_name("logfile")->
-            check(CLI::isNotEmpty)->group(io);
+            check(isNotEmpty)->group(io);
 
     app.add_flag("-safelog", options.safeLog, "to write log directly without using buffer, useful when the application"
                                               " instantly crash")->group(io);
@@ -121,11 +153,11 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             ->group(dist);
 
     app.add_option("-matrix", options.matrixPrefix, "to specify a different matrix")->type_name("file")->
-            check(CLI::isNotEmpty)->group(dist);
+            check(isNotEmpty)->group(dist);
 
     app.add_flag_function("-nomatrix", [&options](size_t) { options.useMatrix = false; },
                           "use %different as the uncorrected distance")->type_name("file")->check(
-            CLI::isNotEmpty)->group(dist);
+            isNotEmpty)->group(dist);
 
 
     app.add_option("-pseudo", [&args, &options](CLI::results_t in) {
@@ -139,7 +171,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "Use pseudocounts to estimate distances between sequences with little or no overlap. "
                    "(Off by default.) Recommended if analyzing the alignment has sequences with little or no overlap."
                    " If the weight is not specified, it is 1.0")->add_result("1.0")->
-            multi_option_policy(CLI::MultiOptionPolicy::TakeLast)->check(CLI::Min(0.0))->group(dist);
+            multi_option_policy(CLI::MultiOptionPolicy::TakeLast)->check(Min(0.0))->group(dist);
 
 
     std::stringstream topo_description;
@@ -179,7 +211,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     app.add_option("-mlacc", options.mlAccuracy, "Use -mlacc 2 or -mlacc 3 to always optimize all 5 branches at each"
                                                  " NNI, and to optimize all 5 branches in 2 or 3 rounds")->
-            check(CLI::Min(1))->group(topo);
+            check(Min(1))->group(topo);
 
     app.add_flag_function("-mllen", [&options](size_t) {
                               options.MLnni = 0;
@@ -223,7 +255,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             }
         }
         return true;
-    }, " set the gtr rates")->check(CLI::Min(1e-5))->type_size(-1)->expected(6)->group(model);
+    }, " set the gtr rates")->check(Min(1e-5))->type_size(-1)->expected(6)->group(model);
 
     app.add_option("-gtrfreq", [&args, &options](CLI::results_t in) {
         options.bUseGtr = true;
@@ -242,10 +274,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             options.gtrfreq[i] /= sum;
         }
         return true;
-    }, " set the gtr frequences")->check(CLI::Min(1e-5))->type_size(-1)->expected(4)->group(model);
+    }, " set the gtr frequences")->check(Min(1e-5))->type_size(-1)->expected(4)->group(model);
 
     app.add_option("-cat", options.nRateCats, "specify the number of rate categories of sites (default 20)")->
-            type_name("n")->check(CLI::Min(1))->group(model);
+            type_name("n")->check(Min(1))->group(model);
 
     app.add_flag_function("-nocat", [&options](size_t) {
         options.nRateCats = 1;
@@ -389,22 +421,33 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-constraints", options.constraintsFile,
                    "an alignment with values of 0, 1, and Not all sequences need be present. A column of 0s and 1s"
                    " defines a constrained split. Some constraints may be violated (see 'violating constraints:' in"
-                   " standard error).")->type_name("alignmentfile")->check(CLI::isNotEmpty)->group(constrains);
+                   " standard error).")->type_name("alignmentfile")->check(isNotEmpty)->group(constrains);
 
     app.add_option("-constraintWeight", options.constraintWeight,
                    "how strongly to weight the constraints. A value of 1 means a penalty of 1 in tree length for"
-                   " violating a constraint Default: 100.0")->type_name("w")->check(CLI::Min(0.0, false))->
+                   " violating a constraint Default: 100.0")->type_name("w")->check(Min(0.0, false))->
             group(constrains);
+
+    auto optimizations = "Optimizations";
+
+    app.add_option("-threads", options.threads, "to use a parallel version with multiple threads")->
+            type_name("n")->check(Min(1))->group(constrains);
+
+    app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
+            group(optimizations);
+    app.add_flag("-sse", options.doublePrecision, "compute multiple processing elements with one operation")->
+            group(optimizations);
+
 
     auto deprecated = "Deprecated";
 
-    CLI::deprecated(app.add_flag("-logdist", "use logarithmic distances, now on by default and obsolete")->
+    setDeprecated(app.add_flag("-logdist", "use logarithmic distances, now on by default and obsolete")->
             group(deprecated));
 
-    CLI::deprecated(app.add_flag("-exactml", "Exact  posterior distributions, now on by default and obsolete")->
+    setDeprecated(app.add_flag("-exactml", "Exact  posterior distributions, now on by default and obsolete")->
             group(deprecated));
 
-    CLI::deprecated(app.add_flag("-mlexact", "Exact posterior distributions, now on by default and obsolete")->
+    setDeprecated(app.add_flag("-mlexact", "Exact posterior distributions, now on by default and obsolete")->
             group(deprecated));
 
     app.footer(
@@ -469,8 +512,8 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
 int main(int argc, char *argv[]) {
     fasttree::Options options;
     std::string name = "FastTree";
-    std::string version = "vx.x.x";
-    std::string flags = "";
+    std::string version = fasttree::Constants::version;
+    std::string flags = fasttree::Constants::compileFlags;
     std::vector<std::string> args(argv + 1, argv + argc);
     CLI::App app;
 
@@ -529,10 +572,16 @@ int main(int argc, char *argv[]) {
     std::copy(argv, argv + argc - 1, std::ostream_iterator<char *>(applog, ", "));
     applog << argv[argc - 1] << std::endl;
 
-    fastTree.run(
-            input ? input : std::cin,
-            output ? output : std::cout,
-            applog);
+    try {
+        fastTree.run(
+                input ? input : std::cin,
+                output ? output : std::cout,
+                applog);
+
+    } catch (std::invalid_argument &ex) {
+        std::cerr << ex.what() << std::endl;
+        return EXIT_FAILURE;
+    }
 
     return EXIT_SUCCESS;
 }
