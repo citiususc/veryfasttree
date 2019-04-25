@@ -15,14 +15,17 @@ set(SOURCE_FILES
         fasttree/Constants.h
         fasttree/Debug.h
         fasttree/Utils.h
-        fasttree/Alignment.h
+        fasttree/DistanceMatrix.tcc
+        fasttree/DistanceMatrix.h
+        fasttree/NeighbourJoining.tcc
+        fasttree/NeighbourJoining.h
         fasttree/Alignment.cpp
+        fasttree/Alignment.h
         fasttree/FastTreeImpl.tcc
-        fasttree/FastTreeImpl.h
         fasttree/FastTree.cpp
         fasttree/FastTree.h
         main.cpp
-         )
+           )
 
 if(MSVC)
     set(CMAKE_CXX_FLAGS "/W4 /O2")

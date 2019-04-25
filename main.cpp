@@ -5,17 +5,6 @@
 #include "fasttree/Utils.h"
 #include <cmath>
 
-#if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
-#include <io.h>
-#define isWindows() true
-bool checkOut(){return _isatty( _fileno( stdout ) );}
-#else
-
-#include <unistd.h>
-#define isWindows() false
-bool checkOut() { return isatty(STDIN_FILENO); }
-#endif
-
 std::string isNotEmpty(const std::string &input) {
     if (input.size() == 0) {
         return "Value is empty";
@@ -518,9 +507,9 @@ int main(int argc, char *argv[]) {
     CLI::App app;
 
     cli(app, name, version, flags, options, args);
-    if (checkOut() && argc == 1) {
+    if (fasttree::isattyIn() && argc == 1) {
         std::cout << app.help() << std::endl;
-        if (isWindows()) {
+        if (fasttree::isWindows()) {
             std::cerr << "Windows users: Please remember to run this inside a command shell" << std::endl;
             std::cerr << "Hit return to continue" << std::endl;
             std::cin.ignore(1);

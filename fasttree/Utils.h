@@ -4,10 +4,37 @@
 #define FASTTREE_UTILS_H
 
 #include <iostream>
+#include <chrono>
 
+#if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
+
+#include <io.h>
 
 namespace fasttree {
+    inline bool isWindows(){return true;}
 
+    inline bool isattyIn(){return ::_isatty( _fileno( stdin ) );}
+
+    inline bool isattyOut(){return ::_isatty( _fileno( stdout ) );}
+
+    inline bool isattyErr(){return ::_isatty( _fileno( stderr ) );}
+}
+#else
+
+#include <unistd.h>
+
+namespace fasttree {
+    inline bool isWindows() { return false; }
+
+    inline bool isattyIn() { return ::isatty(STDIN_FILENO); }
+
+    inline bool isattyOut() { return ::isatty(STDOUT_FILENO); }
+
+    inline bool isattyErr() { return ::isatty(STDERR_FILENO); }
+}
+#endif
+
+namespace fasttree {
     class TeeStream : public std::streambuf {
     public:
         TeeStream(std::ostream &os1, std::ostream &os2) : os1(os1), os2(os2) {}
@@ -25,11 +52,15 @@ namespace fasttree {
     };
 
     template<typename ... Args>
-    std::string strformat(const std::string &format, Args ... args) {
+    inline std::string strformat(const std::string &format, Args ... args) {
         size_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1;//\0'
         char buf[size];
         snprintf(buf, size, format.c_str(), args ...);
         return std::string(buf, buf + size - 1);
+    }
+
+    inline std::string strformat(const std::string &format) {
+        return std::string(format);
     }
 
     template<typename _CharT, typename _Traits, typename _Alloc>
@@ -40,6 +71,43 @@ namespace fasttree {
         }
         return !__is.eof();
     }
+
+    class ProgressReport {
+
+    public:
+
+        typedef std::chrono::high_resolution_clock Clock;
+        const Clock::time_point clockStart;
+
+        ProgressReport(const Options &options) : options(options) {}
+
+        template<typename ... Args>
+        inline void print(const std::string &format, Args ... args) {
+            if (!options.showProgress) {
+                return;
+            }
+
+            auto timeNow = Clock::now();
+
+            if (std::chrono::duration_cast<std::chrono::seconds>(timeNow - timeLast).count() > 1) {
+                size_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count();
+                std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
+                std::cerr << strformat(format, args...);
+                if (options.verbose > 1 || !isattyErr()) {
+                    std::cerr << std::endl;
+                } else {
+                    std::cerr << "   \r" << std::flush;
+                }
+                timeLast = timeNow;
+            }
+        }
+
+    private:
+
+        Clock::time_point timeLast;
+        const Options &options;
+
+    };
 
 }
 #endif
