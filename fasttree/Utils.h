@@ -5,6 +5,7 @@
 
 #include <iostream>
 
+
 namespace fasttree {
 
     class TeeStream : public std::streambuf {
@@ -29,6 +30,15 @@ namespace fasttree {
         char buf[size];
         snprintf(buf, size, format.c_str(), args ...);
         return std::string(buf, buf + size - 1);
+    }
+
+    template<typename _CharT, typename _Traits, typename _Alloc>
+    inline bool readline(std::basic_istream<_CharT, _Traits> &__is, std::basic_string<_CharT, _Traits, _Alloc> &__str) {
+        std::getline(__is, __str);
+        if (__str.back() == '\r') {
+            __str.resize(__str.size() - 1);
+        }
+        return !__is.eof();
     }
 
 }

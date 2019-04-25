@@ -2,15 +2,17 @@
 #include "FastTree.h"
 #include "Utils.h"
 #include "Debug.h"
+#include "operations/BasicOperations.h"
+#include "operations/SEEOperations.h"
 
 using namespace fasttree;
 
 FastTree::FastTree(const Options &options) : options(options) {}
 
-void FastTree::prepare(std::istream &in, std::ostream &log) {
+void FastTree::prepare(std::istream &input, std::ostream &log) {
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
-    if (options.nCodes == 4 && options.matrixPrefix.size() == 0)
+    if (options.nCodes == 4 && options.matrixPrefix.empty())
         options.useMatrix = false;        /* no default nucleotide matrix */
 
     if (options.slow && options.tophitsMult > 0) {
@@ -62,33 +64,35 @@ void FastTree::prepare(std::istream &in, std::ostream &log) {
         }
 
         log << "FastTree Version " << Constants::version << " " << Constants::compileFlags << std::endl;
-        log << "Alignment: " << (&in == &std::cin ? "standard input" : options.inFileName);
+        log << "Alignment: " << (&input == &std::cin ? "standard input" : options.inFileName);
 
         if (options.nAlign > 1) {
             log << strformat(" (%d alignments)", options.nAlign) << std::endl;
         }
-        log << (options.nCodes == 20 ? "Amino acid" : "Nucleotide ");
-        log << "distances: " << (options.matrixPrefix.size() > 0 ? options.matrixPrefix :
-                                 (options.useMatrix ? "BLOSUM45" : (options.nCodes == 4 && options.logdist
-                                                                    ? "Jukes-Cantor"
-                                                                    : "%different")));
-        log << "Joins: " << (options.bionj ? "weighted" : "balanced");
-        log << "Support: " << supportString << std::endl;
+        log << strformat(
+                "%s distances: %s Joins: %s Support: %s",
+                options.nCodes == 20 ? "Amino acid" : "Nucleotide",
+                !options.matrixPrefix.empty() ? options.matrixPrefix :
+                (options.useMatrix ? "BLOSUM45" : (options.nCodes == 4 && options.logdist
+                                                   ? "Jukes-Cantor"
+                                                   : "%different")),
+                options.bionj ? "weighted" : "balanced",
+                supportString.c_str()
+        ) << std::endl;
 
-
-        if (options.intreeFile.size() == 0) {
-            log << "Search: ";
-            log << (options.slow ? "Exhaustive (slow)" : (options.fastest ? "Fastest" : "Normal"));
-            log << (options.useTopHits2nd ? "+2nd" : "") << "";
-            log << nniString << " " << sprString << " " << mlnniString;
-            log << "TopHits: " << tophitString << std::endl;
-
+        if (!options.intreeFile.empty()) {
+            log << strformat(
+                    "Search: %s%s %s %s %s",
+                    (options.slow ? "Exhaustive (slow)" : (options.fastest ? "Fastest" : "Normal")),
+                    (options.useTopHits2nd ? "+2nd" : ""),
+                    nniString.c_str(), sprString.c_str(), mlnniString.c_str()
+            ) << std::endl;
+            log << strformat("TopHits: %s", tophitString.c_str()) << std::endl;
         } else {
-            log << "Start at tree from ";
-            log << options.intreeFile << " ";
-            log << nniString << " ";
-            log << sprString << " ";
-            log << std::endl;
+            log << strformat("Start at tree from %s %s %s",
+                             options.intreeFile.c_str(), nniString.c_str(), sprString.c_str()
+
+            ) << std::endl;
         }
 
         if (options.MLnni != 0 || options.MLlen) {
@@ -115,7 +119,7 @@ void FastTree::prepare(std::istream &in, std::ostream &log) {
                     << std::endl;
             }
         }
-        if (options.constraintsFile.size() > 0) {
+        if (!options.constraintsFile.empty()) {
             log << "Constraints: " << options.constraintsFile;
             log << strformat(" Weight: %.3f", options.constraintWeight) <<
                 std::endl;
@@ -129,7 +133,7 @@ void FastTree::prepare(std::istream &in, std::ostream &log) {
 }
 
 void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
-    FastTreeImpl<double,DebugAllocator,DebugAllocator> impl(options);
-
+    FastTreeImpl<double, BasicOperations> impl(options, in, out, log);
+    impl.run();
 
 }

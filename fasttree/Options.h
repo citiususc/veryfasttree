@@ -63,7 +63,7 @@ namespace fasttree {
 
         std::string codesString;/* Protein character */
 
-        int nAlign = 1; /* number of alignments to read */
+        size_t nAlign = 1; /* number of alignments to read */
         std::string matrixPrefix;
         bool make_matrix = false;
         std::string constraintsFile;

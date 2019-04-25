@@ -542,7 +542,7 @@ int main(int argc, char *argv[]) {
     fasttree::TeeStream tee(log, clog);
     std::ostream teelog(&tee);
 
-    if (options.inFileName.size() > 0) {
+    if (!options.inFileName.empty()) {
         input.open(options.inFileName);
         if (input.fail()) {
             std::cerr << "Couldn't open the input file! " << options.inFileName << std::endl;
@@ -550,7 +550,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (options.outFileName.size() > 0) {
+    if (!options.outFileName.empty()) {
         output.open(options.outFileName);
         if (output.fail()) {
             std::cerr << "Couldn't open the output file! " << options.outFileName << std::endl;
@@ -558,7 +558,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (options.logFileName.size() > 0) {
+    if (!options.logFileName.empty()) {
         log.open(options.logFileName, std::ios::out | std::ios::app);
         if (log.fail()) {
             std::cerr << "Couldn't open the log file! " << options.logFileName << std::endl;

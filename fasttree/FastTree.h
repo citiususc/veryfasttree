@@ -10,7 +10,7 @@ namespace fasttree {
     private:
         Options options;
 
-        void prepare(std::istream &in, std::ostream &log);
+        void prepare(std::istream &input, std::ostream &log);
 
     public:
         FastTree(const Options &options);

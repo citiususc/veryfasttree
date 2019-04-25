@@ -15,6 +15,8 @@ set(SOURCE_FILES
         fasttree/Constants.h
         fasttree/Debug.h
         fasttree/Utils.h
+        fasttree/Alignment.h
+        fasttree/Alignment.cpp
         fasttree/FastTreeImpl.tcc
         fasttree/FastTreeImpl.h
         fasttree/FastTree.cpp
