@@ -4,12 +4,13 @@
 #include "Debug.h"
 #include "operations/BasicOperations.h"
 #include "operations/SEEOperations.h"
+#include <omp.h>
 
 using namespace fasttree;
 
 FastTree::FastTree(const Options &options) : options(options) {}
 
-void FastTree::prepare(std::istream &input, std::ostream &log) {
+void FastTree::settings(std::istream &input, std::ostream &log) {
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
     if (options.nCodes == 4 && options.matrixPrefix.empty())
@@ -26,7 +27,7 @@ void FastTree::prepare(std::istream &input, std::ostream &log) {
             tophitsCloseStr = strformat("%.2f", options.tophitsClose);
         }
         if (options.tophitsMult > 0) {
-            tophitString = strformat("%.2f*sqrtN close=%s refresh=%.2f", options.tophitsMult, tophitsCloseStr,
+            tophitString = strformat("%.2f*sqrtN close=%s refresh=%.2f", options.tophitsMult, tophitsCloseStr.c_str(),
                                      options.tophitsRefresh);
         }
 
@@ -72,7 +73,7 @@ void FastTree::prepare(std::istream &input, std::ostream &log) {
         log << strformat(
                 "%s distances: %s Joins: %s Support: %s",
                 options.nCodes == 20 ? "Amino acid" : "Nucleotide",
-                !options.matrixPrefix.empty() ? options.matrixPrefix :
+                !options.matrixPrefix.empty() ? options.matrixPrefix.c_str() :
                 (options.useMatrix ? "BLOSUM45" : (options.nCodes == 4 && options.logdist
                                                    ? "Jukes-Cantor"
                                                    : "%different")),
@@ -132,7 +133,13 @@ void FastTree::prepare(std::istream &input, std::ostream &log) {
     }
 }
 
+void FastTree::configOpenMP(){
+    omp_set_num_threads(options.threads);
+}
+
 void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
+    //settings(in,out); //TODO remove comment
+    configOpenMP();
     FastTreeImpl<double, BasicOperations> impl(options, in, out, log);
     impl.run();
 

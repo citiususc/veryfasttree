@@ -6,14 +6,15 @@
 #include <vector>
 #include "FastTreeImpl.h"
 #include "Alignment.h"
+#include "NeighbourJoining.h"
 #include "assert.h"
 
-#define AbsFastTreeImpl(Tp) \
+#define AbsFastTreeImpl(...) \
 template<typename Precision, template<typename> typename Operations> \
-Tp fasttree::FastTreeImpl<Precision, Operations>
+__VA_ARGS__ fasttree::FastTreeImpl<Precision, Operations>
 
 
-AbsFastTreeImpl()::FastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log) :
+AbsFastTreeImpl()::FastTreeImpl(const Options &options, std::istream &input, std::ostream &output, std::ostream &log) :
         options(options), input(input), output(output), log(log), progressReport(options) {
     if (!options.matrixPrefix.empty()) {
         if (!options.useMatrix) {
@@ -47,12 +48,12 @@ AbsFastTreeImpl(void)::run() {
     for (size_t iAln = 0; iAln < options.nAlign; iAln++) {
         aln.readAlignment();
 
-        if (aln.nSeq() < 1) {
+        if (aln.seqs.empty()) {
             throw new std::invalid_argument("No alignment sequences");
         }
 
         if (!options.logFileName.empty()) {
-            log << strformat("Read %d sequences, %d positions", aln.nSeq(), aln.nPos()) << std::endl;
+            log << strformat("Read %d sequences, %d positions", aln.seqs.size(), aln.nPos) << std::endl;
         }
 
         progressReport.print("Read alignment");
@@ -71,7 +72,9 @@ AbsFastTreeImpl(void)::run() {
         /* Make a list of unique sequences -- note some lists are bigger than required */
         progressReport.print("Hashed the names");
         if (options.make_matrix) {
-            //TODO InitNJ
+            std::vector<std::string> constraintSeqs;
+            NeighbourJoining<Precision> nj(options, log, aln.seqs, aln.nPos, constraintSeqs, distanceMatrix, transmat);
+
         }
 
 

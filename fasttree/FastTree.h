@@ -10,7 +10,8 @@ namespace fasttree {
     private:
         Options options;
 
-        void prepare(std::istream &input, std::ostream &log);
+        void settings(std::istream &input, std::ostream &log);
+        void configOpenMP();
 
     public:
         FastTree(const Options &options);

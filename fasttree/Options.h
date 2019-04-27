@@ -93,7 +93,7 @@ namespace fasttree {
         long seed = static_cast<long>(std::time(nullptr));
 
         /*Optimizations*/
-        std::size_t threads = 1;
+        int threads = 1;
         bool doublePrecision = false;
         bool sse = false;
 

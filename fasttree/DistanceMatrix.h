@@ -46,9 +46,10 @@ namespace fasttree {
 
         const static DistanceMatrix<Precision> _matrixBLOSUM45;
 
-        void readMatrix(const Options &options, const std::string &filename, numeric_t **codes, bool checkCodes);
+        void
+        readMatrix(const Options &options, const std::string &filename, numeric_t codes[][MAXCODES], bool checkCodes);
 
-        void readVector(const Options &options, const std::string &filename, numeric_t *codes);
+        void readVector(const Options &options, const std::string &filename, numeric_t codes[]);
 
     };
 

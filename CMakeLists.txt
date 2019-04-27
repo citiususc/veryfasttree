@@ -17,6 +17,7 @@ set(SOURCE_FILES
         fasttree/Utils.h
         fasttree/DistanceMatrix.tcc
         fasttree/DistanceMatrix.h
+        fasttree/TransitionMatrix.h
         fasttree/NeighbourJoining.tcc
         fasttree/NeighbourJoining.h
         fasttree/Alignment.cpp
@@ -25,12 +26,12 @@ set(SOURCE_FILES
         fasttree/FastTree.cpp
         fasttree/FastTree.h
         main.cpp
-           )
+        )
 
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "/W4 /O2")
+    set(CMAKE_CXX_FLAGS "/W4 /O2 /openmp /EHsc /wd4100")
 else()
-    set(CMAKE_CXX_FLAGS "-Wall")#-O3
+    set(CMAKE_CXX_FLAGS "-Wall -fopenmp")#-O3
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})

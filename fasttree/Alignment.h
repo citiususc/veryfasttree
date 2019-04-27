@@ -9,15 +9,15 @@
 namespace fasttree {
     class Alignment {
     private:
-        const Options& options;
+        const Options &options;
         std::istream &fp;
         std::ostream &log;
 
-        size_t _nPos;
-        size_t _nSeq;
+    public:
+        size_t nPos;
         std::vector<std::string> names;
         std::vector<std::string> seqs;
-    public:
+
         Alignment(const Options &options, std::istream &fp, std::ostream &log);
 
         void readAlignment();
@@ -25,10 +25,6 @@ namespace fasttree {
         void clearAlignmentSeqs();
 
         void clearAlignment();
-
-        const size_t& nPos() const;
-
-        const size_t& nSeq() const;
 
     };
 }

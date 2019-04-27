@@ -12,6 +12,7 @@ Alignment::Alignment(const Options &options, std::istream &fp, std::ostream &log
 
 void Alignment::readAlignment() {
     std::string buf;
+    size_t nSeq = 0;
 
     readline(fp, buf);
     if (buf[0] == '>') {
@@ -34,7 +35,7 @@ void Alignment::readAlignment() {
                 }
                 names.push_back(buf);
                 names.back().shrink_to_fit();
-                _nSeq++;
+                nSeq++;
             } else {
                 /* count non-space characters and append to sequence */
                 auto nKeep = buf.find_first_of(seqSkip);
@@ -43,8 +44,8 @@ void Alignment::readAlignment() {
                 }
                 auto &seq = seqs[names.size() - 1];
                 seq.append(buf.begin(), buf.begin() + nKeep);
-                if (seq.size() > _nPos) {
-                    _nPos = seq.size();
+                if (seq.size() > nPos) {
+                    nPos = seq.size();
                 }
             }
         } while (readline(fp, buf));
@@ -65,20 +66,20 @@ void Alignment::readAlignment() {
             }
         }
         std::stringstream aux(buf);
-        aux >> _nSeq;
-        aux >> _nPos;
-        if (_nSeq < 1 || _nPos < 1) {
+        aux >> nSeq;
+        aux >> nPos;
+        if (nSeq < 1 || nPos < 1) {
             throw new std::invalid_argument("Error parsing header line: " + buf);
         }
 
-        for (size_t i = 0; i < _nSeq; i++) {
+        for (size_t i = 0; i < nSeq; i++) {
             names[i] = "";
-            seqs[i].reserve(_nPos);
+            seqs[i].reserve(nPos);
         }
 
         size_t iSeq = 0;
         while (readline(fp, buf)) {
-            if (buf.empty() && (iSeq == _nSeq || iSeq == 0)) {
+            if (buf.empty() && (iSeq == nSeq || iSeq == 0)) {
                 iSeq = 0;
             } else {
                 size_t j = 0; /* character just past end of name */
@@ -91,7 +92,7 @@ void Alignment::readAlignment() {
                     if (j != std::string::npos || j == 0) {
                         throw new std::invalid_argument("No sequence in phylip line: " + buf);
                     }
-                    if (iSeq >= _nSeq) {
+                    if (iSeq >= nSeq) {
                         throw new std::invalid_argument(
                                 "No empty line between sequence blocks (is the sequence count wrong?)");
                     }
@@ -107,12 +108,12 @@ void Alignment::readAlignment() {
                 }
                 for (; j < buf.size(); j++) {
                     if (buf[j] != ' ') {
-                        if (seqs[iSeq].size() >= _nPos) {
+                        if (seqs[iSeq].size() >= nPos) {
                             throw new std::invalid_argument(strformat(
                                     "Too many characters (expected %d) for sequence named %s\\nSo far have:\\n%s",
-                                    _nPos, names[iSeq].c_str(), seqs[iSeq].c_str()));
+                                    nPos, names[iSeq].c_str(), seqs[iSeq].c_str()));
                         }
-                        seqs[iSeq] += std::toupper(buf[j]);
+                        seqs[iSeq] += static_cast<char>(std::toupper(buf[j]));
                     }
                 }
                 if (options.verbose > 10) {
@@ -120,28 +121,29 @@ void Alignment::readAlignment() {
                                      iSeq, names[iSeq].c_str(), seqs[iSeq].c_str());
                 }
                 iSeq++;
-                if (iSeq == _nSeq && seqs[0].size() == _nPos) {
+                if (iSeq == nSeq && seqs[0].size() == nPos) {
                     break; /* finished alignment */
                 }
             }/* end else non-empty phylip line */
         }
-        if (iSeq != _nSeq && iSeq != 0) {
-            throw new std::invalid_argument(strformat("Wrong number of sequences: expected %d", _nSeq));
+        if (iSeq != nSeq && iSeq != 0) {
+            throw new std::invalid_argument(strformat("Wrong number of sequences: expected %d", nSeq));
         }
     }
     /* Check lengths of sequences */
-    for (size_t i = 0; i < _nSeq; i++) {
-        if (seqs[i].size() != _nPos) {
+    for (size_t i = 0; i < nSeq; i++) {
+        if (seqs[i].size() != nPos) {
             throw new std::invalid_argument(strformat(
                     "Wrong number of characters for %s: expected %d but have %d instead.\n"
                     "This sequence may be truncated, or another sequence may be too long.",
-                    names[i], _nPos, seqs[i].size()));
+                    names[i].c_str(), nPos, seqs[i].size()));
         }
     }
     /* Replace "." with "-" and warn if we find any */
     /* If nucleotide sequences, replace U with T and N with X */
     bool findDot = false;
-    for (size_t i = 0; i < _nSeq; i++) {//TODO OpenMP
+    #pragma omp parallel for schedule(static), reduction(||:findDot)
+    for (size_t i = 0; i < nSeq; i++) {
         for (size_t j = 0; j < seqs[i].size(); j++) {
             if (seqs[i][j] == '.') {
                 seqs[i][j] = '-';
@@ -171,14 +173,5 @@ void Alignment::clearAlignmentSeqs() {
 void Alignment::clearAlignment() {
     names.clear();
     clearAlignmentSeqs();
-    _nSeq = 0;
-    _nPos = 0;
-}
-
-const size_t &Alignment::nPos() const {
-    return _nPos;
-}
-
-const size_t &Alignment::nSeq() const {
-    return _nSeq;
+    nPos = 0;
 }

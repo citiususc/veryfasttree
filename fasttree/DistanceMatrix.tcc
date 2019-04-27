@@ -7,9 +7,9 @@
 #include <sstream>
 #include <cmath>
 
-#define AbsDistanceMatrix(Tp) \
+#define AbsDistanceMatrix(...) \
 template<typename Precision> \
-Tp fasttree::DistanceMatrix<Precision>
+__VA_ARGS__ fasttree::DistanceMatrix<Precision>
 
 
 AbsDistanceMatrix(void)::readDistanceMatrix(const Options &options, std::ostream &log) {
@@ -17,15 +17,15 @@ AbsDistanceMatrix(void)::readDistanceMatrix(const Options &options, std::ostream
 
     buffer = options.matrixPrefix;
     buffer += ".inverses";
-    //readMatrix(options, buffer, this->distances, true);
+    readMatrix(options, buffer, this->distances, true);
 
     buffer = options.matrixPrefix;
     buffer += ".distances";
-    //readMatrix(options, buffer, this->eigeninv, false);
+    readMatrix(options, buffer, this->eigeninv, false);
 
     buffer = options.matrixPrefix;
     buffer += ".eigenvalues";
-    //readVector(options, buffer, this->eigenval);
+    readVector(options, buffer, this->eigenval);
 
     if (options.verbose > 1) {
         log << "Read distance matrix from " << options.matrixPrefix << std::endl;
@@ -42,7 +42,7 @@ AbsDistanceMatrix()::operator bool(){
     return setted;
 }
 
-AbsDistanceMatrix(void)::readMatrix(const Options &options, const std::string &filename, numeric_t **codes,
+AbsDistanceMatrix(void)::readMatrix(const Options &options, const std::string &filename, numeric_t codes[][MAXCODES],
                                     bool checkCodes) {
     std::string line;
     std::ifstream fp(filename);
@@ -90,7 +90,7 @@ AbsDistanceMatrix(void)::readMatrix(const Options &options, const std::string &f
 
 }
 
-AbsDistanceMatrix(void)::readVector(const Options &options, const std::string &filename, numeric_t *codes) {
+AbsDistanceMatrix(void)::readVector(const Options &options, const std::string &filename, numeric_t codes[]) {
     std::ifstream fp(filename);
     if (fp.fail()) {
         throw new std::invalid_argument("Cannot read " + filename);
@@ -141,11 +141,11 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
     }
     /* And gapFreq */
     for (int code = 0; code < options.nCodes; code++) {
-        double gapFreq = 0.0;
+        double gapFreqSum = 0.0;
         for (int k = 0; k < options.nCodes; k++) {
-            gapFreq += codeFreq[k][code];
+            gapFreqSum += codeFreq[k][code];
         }
-        this->gapFreq[code] = gapFreq / options.nCodes;
+        gapFreq[code] = gapFreqSum / options.nCodes;
     }
 
     if (options.verbose > 10) {

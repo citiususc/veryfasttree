@@ -54,9 +54,11 @@ namespace fasttree {
     template<typename ... Args>
     inline std::string strformat(const std::string &format, Args ... args) {
         size_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1;//\0'
-        char buf[size];
-        snprintf(buf, size, format.c_str(), args ...);
-        return std::string(buf, buf + size - 1);
+        std::string buf;
+        buf.resize(size);
+        snprintf(&buf.front(), size, format.c_str(), args ...);
+        buf.resize(size - 1);
+        return std::move(buf);
     }
 
     inline std::string strformat(const std::string &format) {
