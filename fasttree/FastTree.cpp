@@ -10,7 +10,7 @@ using namespace fasttree;
 
 FastTree::FastTree(const Options &options) : options(options) {}
 
-void FastTree::settings(std::istream &input, std::ostream &log) {
+void FastTree::settings(std::ostream &log) {
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
     if (options.nCodes == 4 && options.matrixPrefix.empty())
@@ -79,7 +79,7 @@ void FastTree::settings(std::istream &input, std::ostream &log) {
         }
 
         log << "FastTree Version " << Constants::version << " " << Constants::compileFlags << std::endl;
-        log << "Alignment: " << (&input == &std::cin ? "standard input" : options.inFileName);
+        log << "Alignment: " << (options.inFileName.empty() ? "standard input" : options.inFileName);
 
         if (options.nAlign > 1) {
             log << strformat(" (%d alignments)", options.nAlign) << std::endl;
@@ -152,7 +152,7 @@ void FastTree::configOpenMP() {
 }
 
 void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
-    settings(in, out);
+    settings(out);
     configOpenMP();
     FastTreeImpl<double, BasicOperations> impl(options, in, out, log);
     impl.run();

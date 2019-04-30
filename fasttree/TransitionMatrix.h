@@ -3,6 +3,7 @@
 #define FASTTREE_TRANSITIONMATRIX_H
 
 #include "DistanceMatrix.h"
+
 #define NOCODE 127
 
 /* A transition matrix gives the instantaneous rate of change of frequencies
@@ -72,7 +73,45 @@ namespace fasttree {
         /* These are for approximate posteriors (off by default) */
         numeric_t nearP[MAXCODES][MAXCODES]; /* nearP[i][j] = P(parent=j | both children are i, both lengths are 0.1 */
         numeric_t nearFreq[MAXCODES][MAXCODES]; /* rotation of nearP/stat */
+
+        TransitionMatrix();
+
+        void createTransitionMatrixJTT92(const Options &options);
+
+        void createTransitionMatrixWAG01(const Options &options);
+
+        void createTransitionMatrixLG08(const Options &options);
+
+        void createGTR(const Options &options, double gtrrates[]/*ac,ag,at,cg,ct,gt*/, double gtrfreq[]/*ACGT*/);
+
+        operator bool();
+
+    private:
+
+        bool setted;
+
+        /* Takes as input the transpose of the matrix V, with i -> j
+           This routine takes care of setting the diagonals
+        */
+        void createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAXCODES],
+                                    const double stat[MAXCODES]);
+
+        /* Numerical recipes code for eigen decomposition (actually taken from RAxML rev_functions.c) */
+        void tred2(double a[], const int n, const int np, double d[], double e[]);
+
+        void tqli(double d[], double e[], int n, int np, double z[]);
+
+        inline double pythag(double a, double b);
+
+        static const double statJTT92[MAXCODES];
+        static const double matrixJTT92[MAXCODES][MAXCODES];
+        static const double statWAG01[MAXCODES];
+        static const double matrixWAG01[MAXCODES][MAXCODES];
+        static const double statLG08[MAXCODES];
+        static const double matrixLG08[MAXCODES][MAXCODES];
     };
 }
+
+#include "TransitionMatrix.tcc"
 
 #endif

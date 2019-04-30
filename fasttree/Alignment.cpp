@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include <iostream>
 #include <sstream>
+#include "HashTable.h"
 
 using namespace fasttree;
 
@@ -176,4 +177,37 @@ void Alignment::clearAlignment() {
     names.clear();
     clearAlignmentSeqs();
     nPos = 0;
+}
+
+Uniquify::Uniquify(const Alignment &aln) {
+    int64_t nUniqueSeq = 0;
+    HashTable hashseqs(aln.seqs);
+
+    uniqueSeq.resize(hashseqs.size());     /* iUnique -> seq */
+    uniqueFirst.resize(aln.seqs.size());   /* iUnique -> iFirst in aln */
+    alnNext.resize(aln.seqs.size(), -1);   /* i in aln -> next, or -1 */
+    alnToUniq.resize(aln.seqs.size(), -1); /* i in aln -> iUnique; many -> -1 */
+
+    for (size_t i = 0; i < aln.seqs.size(); i++) {
+        assert(hashseqs.find(aln.seqs[i]) != nullptr);
+        size_t first = hashseqs[aln.seqs[i]];
+        if (first == i) {
+            /* table uses a pointer to the last repeated sequence as key so if it is affected when move is used,
+             * it will not be accessed again */
+            uniqueSeq[nUniqueSeq] = std::move(aln.seqs[i]);
+            uniqueFirst[nUniqueSeq] = i;
+            alnToUniq[i] = nUniqueSeq;
+            nUniqueSeq++;
+        } else {
+            int last = first;
+            while (alnNext[last] != -1) {
+                last = alnNext[last];
+            }
+            assert(last >= 0);
+            alnNext[last] = i;
+            assert(alnToUniq[last] >= 0 && alnToUniq[last] < nUniqueSeq);
+            alnToUniq[i] = alnToUniq[last];
+        }
+    }
+    assert((size_t)nUniqueSeq == uniqueSeq.size());
 }

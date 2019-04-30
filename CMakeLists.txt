@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")
+ADD_SUBDIRECTORY("libs/xxhash")
 
 set(SOURCE_FILES
         fasttree/operations/BasicOperations.tcc
@@ -18,6 +19,7 @@ set(SOURCE_FILES
         fasttree/HashTable.h
         fasttree/DistanceMatrix.tcc
         fasttree/DistanceMatrix.h
+        fasttree/TransitionMatrix.tcc
         fasttree/TransitionMatrix.h
         fasttree/NeighbourJoining.tcc
         fasttree/NeighbourJoining.h
@@ -36,5 +38,5 @@ else()
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} CLI11 robin-map)
+target_link_libraries(${PROJECT_NAME} CLI11 robin-map xxhash)
 
