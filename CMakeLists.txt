@@ -7,14 +7,15 @@ ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")
 
 set(SOURCE_FILES
-        fasttree/operations/BasicOperations.cpp
+        fasttree/operations/BasicOperations.tcc
         fasttree/operations/BasicOperations.h
-        fasttree/operations/SEEOperations.cpp
-        fasttree/operations/SEEOperations.h
+        fasttree/operations/SSEOperations.tcc
+        fasttree/operations/SSEOperations.h
         fasttree/Options.h
         fasttree/Constants.h
         fasttree/Debug.h
         fasttree/Utils.h
+        fasttree/HashTable.h
         fasttree/DistanceMatrix.tcc
         fasttree/DistanceMatrix.h
         fasttree/TransitionMatrix.h

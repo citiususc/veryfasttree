@@ -3,7 +3,7 @@
 #include "Utils.h"
 #include "Debug.h"
 #include "operations/BasicOperations.h"
-#include "operations/SEEOperations.h"
+#include "operations/SSEOperations.h"
 #include <omp.h>
 
 using namespace fasttree;
@@ -20,7 +20,21 @@ void FastTree::settings(std::istream &input, std::ostream &log) {
         options.tophitsMult = 0.0;
     }
 
-    if (!options.make_matrix) {        /* Report settings */
+    if (options.doublePrecision) {
+        options.MLMinBranchLengthTolerance = Constants::MLMinBranchLengthToleranceDouble;
+        options.MLFTolBranchLength = Constants::MLFTolBranchLengthDouble;
+        options.MLMinBranchLength = Constants::MLMinBranchLengthDouble;
+        options.MLMinRelBranchLength = Constants::MLMinRelBranchLengthDouble;
+        options.fPostTotalTolerance = Constants::fPostTotalToleranceDouble;
+    } else {
+        options.MLMinBranchLengthTolerance = Constants::MLMinBranchLengthTolerance;
+        options.MLFTolBranchLength = Constants::MLFTolBranchLength;
+        options.MLMinBranchLength = Constants::MLMinBranchLength;
+        options.MLMinRelBranchLength = Constants::MLMinRelBranchLength;
+        options.fPostTotalTolerance = Constants::fPostTotalTolerance;
+    }
+
+    if (!options.makeMatrix) {        /* Report settings */
         std::string tophitString = "no";
         std::string tophitsCloseStr = "default";
         if (options.tophitsClose > 0) {
@@ -133,12 +147,12 @@ void FastTree::settings(std::istream &input, std::ostream &log) {
     }
 }
 
-void FastTree::configOpenMP(){
+void FastTree::configOpenMP() {
     omp_set_num_threads(options.threads);
 }
 
 void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
-    //settings(in,out); //TODO remove comment
+    settings(in, out);
     configOpenMP();
     FastTreeImpl<double, BasicOperations> impl(options, in, out, log);
     impl.run();

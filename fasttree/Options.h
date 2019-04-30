@@ -3,6 +3,7 @@
 #define FASTTREE_OPTIONS_H
 
 #include "Constants.h"
+#include "Debug.h"
 #include <string>
 #include <ctime>
 
@@ -65,7 +66,7 @@ namespace fasttree {
 
         size_t nAlign = 1; /* number of alignments to read */
         std::string matrixPrefix;
-        bool make_matrix = false;
+        bool makeMatrix = false;
         std::string constraintsFile;
         std::string intreeFile;
         bool intree1 = false;        /* the same starting tree each round */
@@ -97,6 +98,15 @@ namespace fasttree {
         bool doublePrecision = false;
         bool sse = false;
 
+        /*Precision*/
+        double MLMinBranchLengthTolerance;
+        double MLFTolBranchLength;
+        double MLMinBranchLength;
+        double MLMinRelBranchLength;
+        double fPostTotalTolerance;
+
+        /*Debug*/
+        Debug debug;
     };
 }
 

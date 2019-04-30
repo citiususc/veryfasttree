@@ -39,12 +39,23 @@ namespace fasttree {
     public:
         TeeStream(std::ostream &os1, std::ostream &os2) : os1(os1), os2(os2) {}
 
-        virtual std::streamsize xsputn(const char_type *__s, std::streamsize __n) {
+        virtual std::streamsize xsputn(const char_type *__s, std::streamsize __n) override{
             os1 << __s;
             os2 << __s;
             return __n;
         }
 
+        int sync() override {
+            return os1.rdbuf()->pubsync() | os2.rdbuf()->pubsync();
+        }
+
+        int overflow(int c ) {
+            if (c != EOF) {
+                os1 << (char)c;
+                os2 << (char)c;
+            }
+            return c;
+        }
 
     private:
         std::ostream &os1;
@@ -81,7 +92,7 @@ namespace fasttree {
         typedef std::chrono::high_resolution_clock Clock;
         const Clock::time_point clockStart;
 
-        ProgressReport(const Options &options) : options(options) {}
+        ProgressReport(const Options &options) : clockStart(Clock::now()), options(options) {}
 
         template<typename ... Args>
         inline void print(const std::string &format, Args ... args) {

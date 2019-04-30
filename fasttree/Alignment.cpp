@@ -12,7 +12,6 @@ Alignment::Alignment(const Options &options, std::istream &fp, std::ostream &log
 
 void Alignment::readAlignment() {
     std::string buf;
-    size_t nSeq = 0;
 
     readline(fp, buf);
     if (buf[0] == '>') {
@@ -21,6 +20,7 @@ void Alignment::readAlignment() {
         auto seqSkip = " \t";    /* skip these characters in the sequence */
         names.reserve(100);
         seqs.reserve(100);
+        nPos = 0;
 
         do {
             /* loop over lines */
@@ -35,7 +35,7 @@ void Alignment::readAlignment() {
                 }
                 names.push_back(buf);
                 names.back().shrink_to_fit();
-                nSeq++;
+                seqs.resize(seqs.size() + 1);
             } else {
                 /* count non-space characters and append to sequence */
                 auto nKeep = buf.find_first_of(seqSkip);
@@ -51,7 +51,7 @@ void Alignment::readAlignment() {
         } while (readline(fp, buf));
 
         if (names.size() != seqs.size()) {
-            throw new std::invalid_argument("No sequence data for last entry " + names.back());
+            throw std::invalid_argument("No sequence data for last entry " + names.back());
         }
 
     } else {
@@ -60,22 +60,21 @@ void Alignment::readAlignment() {
            Allow multiple alignments, either separated by a single empty line (e.g. seqboot output)
            or not.
          */
+        size_t nSeq = 0;
         if (buf.empty()) {
             if (readline(fp, buf)) {
-                throw new std::invalid_argument("Empty header line followed by EOF");
+                throw std::invalid_argument("Empty header line followed by EOF");
             }
         }
         std::stringstream aux(buf);
         aux >> nSeq;
         aux >> nPos;
         if (nSeq < 1 || nPos < 1) {
-            throw new std::invalid_argument("Error parsing header line: " + buf);
+            throw std::invalid_argument("Error parsing header line: " + buf);
         }
 
-        for (size_t i = 0; i < nSeq; i++) {
-            names[i] = "";
-            seqs[i].reserve(nPos);
-        }
+        names.resize(nSeq);
+        seqs.resize(nSeq);
 
         size_t iSeq = 0;
         while (readline(fp, buf)) {
@@ -85,15 +84,15 @@ void Alignment::readAlignment() {
                 size_t j = 0; /* character just past end of name */
                 if (buf[0] == ' ') {
                     if (names[iSeq].empty()) {
-                        throw new std::invalid_argument("No name in phylip line: " + buf);
+                        throw std::invalid_argument("No name in phylip line: " + buf);
                     }
                 } else {
                     j = buf.find_first_of(' ');
-                    if (j != std::string::npos || j == 0) {
-                        throw new std::invalid_argument("No sequence in phylip line: " + buf);
+                    if (j == std::string::npos || j == 0) {
+                        throw std::invalid_argument("No sequence in phylip line: " + buf);
                     }
                     if (iSeq >= nSeq) {
-                        throw new std::invalid_argument(
+                        throw std::invalid_argument(
                                 "No empty line between sequence blocks (is the sequence count wrong?)");
                     }
                     if (names[iSeq].empty()) {
@@ -101,7 +100,7 @@ void Alignment::readAlignment() {
                     } else {
                         /* check the name */
                         if (buf.compare(0, j, names[iSeq]) == 0) {
-                            throw new std::invalid_argument(
+                            throw std::invalid_argument(
                                     "Wrong name in phylip line " + buf + "\\nExpected " + names[iSeq]);
                         }
                     }
@@ -109,9 +108,12 @@ void Alignment::readAlignment() {
                 for (; j < buf.size(); j++) {
                     if (buf[j] != ' ') {
                         if (seqs[iSeq].size() >= nPos) {
-                            throw new std::invalid_argument(strformat(
+                            throw std::invalid_argument(strformat(
                                     "Too many characters (expected %d) for sequence named %s\\nSo far have:\\n%s",
                                     nPos, names[iSeq].c_str(), seqs[iSeq].c_str()));
+                        }
+                        if (seqs[iSeq].empty()) {
+                            seqs[iSeq].reserve(nPos);
                         }
                         seqs[iSeq] += static_cast<char>(std::toupper(buf[j]));
                     }
@@ -127,13 +129,13 @@ void Alignment::readAlignment() {
             }/* end else non-empty phylip line */
         }
         if (iSeq != nSeq && iSeq != 0) {
-            throw new std::invalid_argument(strformat("Wrong number of sequences: expected %d", nSeq));
+            throw std::invalid_argument(strformat("Wrong number of sequences: expected %d", nSeq));
         }
     }
     /* Check lengths of sequences */
-    for (size_t i = 0; i < nSeq; i++) {
+    for (size_t i = 0; i < seqs.size(); i++) {
         if (seqs[i].size() != nPos) {
-            throw new std::invalid_argument(strformat(
+            throw std::invalid_argument(strformat(
                     "Wrong number of characters for %s: expected %d but have %d instead.\n"
                     "This sequence may be truncated, or another sequence may be too long.",
                     names[i].c_str(), nPos, seqs[i].size()));
@@ -143,7 +145,7 @@ void Alignment::readAlignment() {
     /* If nucleotide sequences, replace U with T and N with X */
     bool findDot = false;
     #pragma omp parallel for schedule(static), reduction(||:findDot)
-    for (size_t i = 0; i < nSeq; i++) {
+    for (size_t i = 0; i < seqs.size(); i++) {
         for (size_t j = 0; j < seqs[i].size(); j++) {
             if (seqs[i][j] == '.') {
                 seqs[i][j] = '-';
@@ -162,7 +164,7 @@ void Alignment::readAlignment() {
     }
 
     if (fp.fail() && !fp.eof()) {
-        throw new std::invalid_argument("Error reading input file");
+        throw std::invalid_argument("Error reading input file");
     }
 }
 

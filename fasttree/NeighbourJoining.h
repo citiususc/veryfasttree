@@ -10,9 +10,16 @@
 
 namespace fasttree {
 
-    template<typename Precision>
+    template<typename Precision, template<typename> typename Operations>
     class NeighbourJoining {
     public:
+        NeighbourJoining(Options &options, std::ostream &log, std::vector<std::string> &seqs, size_t nPos,
+                         std::vector<std::string> &constraintSeqs,
+                         DistanceMatrix<Precision> &distanceMatrix, TransitionMatrix<Precision> &transmat);
+
+        void printDistances(std::vector<std::string>& names, std::ostream &out);
+
+    private:
         typedef Precision numeric_t;
 
         struct Profile {
@@ -23,8 +30,8 @@ namespace fasttree {
             std::vector<numeric_t> codeDist;        /* Optional -- distance to each code at each position */
 
             /* constraint profile */
-            std::vector<bool> nOn;
-            std::vector<bool> nOff;
+            std::vector<size_t> nOn;
+            std::vector<size_t> nOff;
 
             numeric_t nGaps; /*precalculated in construction*/
 
@@ -35,7 +42,7 @@ namespace fasttree {
 
         struct Rates {
             std::vector<numeric_t> rates;    /* 1 per rate category */
-            std::vector<size_t>  ratecat;    /* 1 category per position */
+            std::vector<size_t> ratecat;    /* 1 category per position */
 
             /* Allocate or reallocate the rate categories, and set every position
                to category 0 and every category's rate to 1.0
@@ -49,23 +56,41 @@ namespace fasttree {
             size_t child[3];
         };
 
-        NeighbourJoining(const Options &options, std::ostream &log, const std::vector<std::string> &seqs, size_t nPos,
-                         const std::vector<std::string> &constraintSeqs,
-                         DistanceMatrix<Precision> &distanceMatrix, TransitionMatrix<Precision> &transmat);
+        /* A visible node is a pair of nodes i, j such that j is the best hit of i,
+           using the neighbor-joining criterion, at the time the comparison was made,
+           or approximately so since then.
 
-    private:
+           Note that variance = dist because in BIONJ, constant factors of variance do not matter,
+           and because we weight ungapped sequences higher naturally when averaging profiles,
+           so we do not take this into account in the computation of "lambda" for BIONJ.
+
+           For the top-hit list heuristic, if the top hit list becomes "too short",
+           we store invalid entries with i=j=-1 and dist/criterion very high.
+        */
+        struct Besthit {
+            int64_t i, j;
+            numeric_t weight;        /* Total product of weights (maximum value is nPos)
+                                           This is needed for weighted joins and for pseudocounts,
+                                           but not in most other places.
+                                           For example, it is not maintained by the top hits code */
+            numeric_t dist;            /* The uncorrected distance (includes diameter correction) */
+            numeric_t criterion;    /* changes when we update the out-profile or change nActive */
+        };
+
+
+        Operations<Precision> operations;
         std::ostream &log;
-        const Options &options;
+        Options &options;
         /* The input */
         size_t nPos;
-        const std::vector<std::string> &seqs;    /* the aligment sequences array (not reallocated) */
+        std::vector<std::string> &seqs;    /* the aligment sequences array (not reallocated) */
         DistanceMatrix<Precision> &distanceMatrix; /* a ref, not set if using %identity distance */
         TransitionMatrix<Precision> &transmat; /* a ref, not set for Jukes-Cantor */
         /* Topological constraints are represented for each sequence as binary characters
            with values of '0', '1', or '-' (for missing data)
            Sequences that have no constraint may have a NULL string
         */
-        const std::vector<std::string> &constraintSeqs;
+        std::vector<std::string> &constraintSeqs;
 
         /* The profile data structures */
         size_t maxnode;            /* The next index to allocate */
@@ -97,10 +122,9 @@ namespace fasttree {
         /* auxilliary data for maximum likelihood (defaults to 1 category of rate=1.0) */
         Rates rates;
 
-        uint8_t charToCode[256];
+        double logCorrect(double dist);
 
-        void
-        seqToProfile(size_t i, Profile &profile, const std::string &seq, const std::string &constraintSeq);
+        void seqsToProfiles();
 
         /* outProfile() computes the out-profile */
         void outProfile(Profile &out);
@@ -110,10 +134,49 @@ namespace fasttree {
            Note "IN/UPDATE" for NJ always means that we may update out-distances but otherwise
            make no changes.
         */
-        void setOutDistance(size_t i, size_t nActive);
+        void setOutDistance(size_t iNode, size_t nActive);
 
         /* only handles leaf sequences */
         size_t nGaps(size_t i);
+
+        /* E.g. GET_FREQ(profile,iPos,iVector)
+           Gets the next element of the vectors (and updates iVector), or
+           returns NULL if we didn't store a vector
+        */
+        inline numeric_t *getFreq(Profile &p, size_t &i, size_t &ivector);
+
+        /* Adds (or subtracts, if weight is negative) fIn/codeIn from fOut
+           fOut is assumed to exist (as from an outprofile)
+           do not call unless weight of input profile > 0
+         */
+        void addToFreq(numeric_t fOut[], double weight, size_t codeIn, numeric_t fIn[]);
+
+        /* Divide the vector (of length nCodes) by a constant
+           so that the total (unrotated) frequency is 1.0
+        */
+        void normalizeFreq(numeric_t freq[]);
+
+        /* Allocate, if necessary, and recompute the codeDist*/
+        void setCodeDist(Profile &profile);
+
+        /* f1 can be NULL if code1 != NOCODE, and similarly for f2
+           Or, if (say) weight1 was 0, then can have code1==NOCODE *and* f1==NULL
+           In that case, returns an arbitrary large number.
+        */
+        double profileDistPiece(size_t code1, size_t code2, numeric_t f1[], numeric_t f2[], numeric_t codeDist2[]);
+
+        /* ProfileDist and SeqDist only set the dist and weight fields
+           If using an outprofile, use the second argument of ProfileDist
+           for better performance.
+
+           These produce uncorrected distances.
+        */
+        void profileDist(Profile& profile1, Profile& profile2, Besthit &hit);
+
+        void seqDist(std::string& codes1, std::string& codes2, Besthit &hit);
+
+
+
     };
 }
 

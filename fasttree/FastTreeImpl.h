@@ -15,7 +15,7 @@ namespace fasttree {
     template<typename Precision, template<typename> typename Operations>
     class FastTreeImpl {
     private:
-        const Options &options;
+        Options &options;
         std::istream &input;
         std::ostream &output;
         std::ostream &log;
@@ -28,7 +28,7 @@ namespace fasttree {
         ProgressReport progressReport;
 
     public:
-        FastTreeImpl(const Options &options, std::istream &input, std::ostream &output, std::ostream &log);
+        FastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log);
 
         void run();
     };

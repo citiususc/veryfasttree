@@ -75,7 +75,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     auto io = "Input/output options";
 
     app.add_option("-out", options.outFileName,
-                   "output file instead of stdout")->type_name("file")->
+                   "print tree in output file instead of stdout")->type_name("file")->
             check(isNotEmpty)->group(io);
 
     app.add_option("-n", options.nAlign,
@@ -135,8 +135,8 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     auto dist = dist_description.str();
 
-    app.add_flag_function("-makematrix", [&options](size_t) { options.make_matrix = true; },
-                          "obtain log-corrected distances")->group(dist);
+    app.add_flag_function("-makematrix", [&options](size_t) { options.makeMatrix = true; },
+                          "print distance matrix")->group(dist);
 
     app.add_flag_function("-rawdist", [&options](size_t) { options.logdist = false; }, "to turn the log-correction off")
             ->group(dist);

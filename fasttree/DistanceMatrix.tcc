@@ -47,7 +47,7 @@ AbsDistanceMatrix(void)::readMatrix(const Options &options, const std::string &f
     std::string line;
     std::ifstream fp(filename);
     if (fp.fail()) {
-        throw new std::invalid_argument("Cannot read " + filename);
+        throw std::invalid_argument("Cannot read " + filename);
     }
     fp >> line;
 
@@ -56,23 +56,23 @@ AbsDistanceMatrix(void)::readMatrix(const Options &options, const std::string &f
         int iBufPos;
         for (iBufPos = 0, i = 0; i < options.nCodes; i++, iBufPos++) {
             if (line[iBufPos] != options.codesString[i]) {
-                throw new std::invalid_argument(
+                throw std::invalid_argument(
                         strformat("Header line\n%s\nin file %s does not have expected code %c # %d in %s",
                                   line.c_str(), filename.c_str(), options.codesString[i], i,
                                   options.codesString.c_str()));
             }
             iBufPos++;
             if (line[iBufPos] != '\n' && line[iBufPos] != '\r' && line[iBufPos] != '\0' && line[iBufPos] != '\t') {
-                throw new std::invalid_argument(
+                throw std::invalid_argument(
                         strformat("Header line in %s should be tab-delimited", filename.c_str()));
             }
             if (line[iBufPos] == '\0' && i < options.nCodes - 1) {
-                throw new std::invalid_argument(strformat("Header line in %s ends prematurely", filename.c_str()));
+                throw std::invalid_argument(strformat("Header line in %s ends prematurely", filename.c_str()));
             }
         } /* end loop over codes */
         /* Should be at end, but allow \n because of potential DOS \r\n */
         if (line[iBufPos] != '\0' && line[iBufPos] != '\n' && line[iBufPos] != '\r') {
-            throw new std::invalid_argument(strformat("Header line in %s has too many entries", filename.c_str()));
+            throw std::invalid_argument(strformat("Header line in %s has too many entries", filename.c_str()));
         }
     }
 
@@ -93,7 +93,7 @@ AbsDistanceMatrix(void)::readMatrix(const Options &options, const std::string &f
 AbsDistanceMatrix(void)::readVector(const Options &options, const std::string &filename, numeric_t codes[]) {
     std::ifstream fp(filename);
     if (fp.fail()) {
-        throw new std::invalid_argument("Cannot read " + filename);
+        throw std::invalid_argument("Cannot read " + filename);
     }
 
     for (int i = 0; i < options.nCodes; i++) {
@@ -108,7 +108,7 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
     for (int i = 0; i < options.nCodes; i++) {
         for (int j = 0; j < options.nCodes; j++) {
             if (std::fabs(distances[i][j] - distances[j][i]) > 1e-6) {
-                throw new std::invalid_argument(strformat(
+                throw std::invalid_argument(strformat(
                         "Distance matrix not symmetric for %d,%d: %f vs %f",
                         i + 1, j + 1,
                         distances[i][j],
@@ -119,7 +119,7 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
                 total += eigenval[k] * eigeninv[k][i] *
                          eigeninv[k][j];
             if (fabs(total - distances[i][j]) > 1e-6) {
-                throw new std::invalid_argument(strformat(
+                throw std::invalid_argument(strformat(
                         "Distance matrix entry %d,%d should be %f but eigen-representation gives %f",
                         i + 1, j + 1, distances[i][j], total));
             }
