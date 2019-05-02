@@ -39,7 +39,7 @@ namespace fasttree {
     public:
         TeeStream(std::ostream &os1, std::ostream &os2) : os1(os1), os2(os2) {}
 
-        virtual std::streamsize xsputn(const char_type *__s, std::streamsize __n) override{
+        virtual std::streamsize xsputn(const char_type *__s, std::streamsize __n) override {
             os1 << __s;
             os2 << __s;
             return __n;
@@ -49,10 +49,10 @@ namespace fasttree {
             return os1.rdbuf()->pubsync() | os2.rdbuf()->pubsync();
         }
 
-        int overflow(int c ) {
+        int overflow(int c) {
             if (c != EOF) {
-                os1 << (char)c;
-                os2 << (char)c;
+                os1 << (char) c;
+                os2 << (char) c;
             }
             return c;
         }
@@ -74,6 +74,15 @@ namespace fasttree {
 
     inline std::string strformat(const std::string &format) {
         return std::string(format);
+    }
+
+    inline std::ostream &quotes(std::ostream &s, const std::string str, bool bQuote) {
+        if (bQuote) {
+            s << '\'' << str << '\'';
+        } else {
+            s << str;
+        }
+        return s;
     }
 
     template<typename _CharT, typename _Traits, typename _Alloc>

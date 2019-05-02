@@ -115,15 +115,15 @@ AbsFastTreeImpl(void)::run() {
                     fpInTree.clear();
                     fpInTree.seekg(0, std::ios::beg);
                 }
-                //ReadTree(/*IN/OUT*/NJ, /*IN*/unique, /*IN*/hashnames, /*READ*/fpInTree);//TODO
+                nj.readTree(unique, hashnames, fpInTree);
                 if (options.verbose > 2) {
                     log << "Read tree from " << options.intreeFile << std::endl;
                 }
                 if (options.verbose > 2) {
-                    //PrintNJ(stderr, NJ, aln->names, unique, /*support*/false, bQuote);//TODO
+                    nj.printNJ(log, aln.names, unique, false);
                 }
             } else {
-                //FastNJ(NJ);//TODO
+                nj.fastNJ();
             }
             //LogTree("NJ", 0, fpLog, NJ, aln->names, unique, bQuote); //TODO
 

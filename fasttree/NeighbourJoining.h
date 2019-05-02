@@ -4,6 +4,8 @@
 
 #include "DistanceMatrix.h"
 #include "TransitionMatrix.h"
+#include "HashTable.h"
+#include "Alignment.h"
 #include <vector>
 #include <iostream>
 
@@ -17,7 +19,18 @@ namespace fasttree {
                          std::vector<std::string> &constraintSeqs,
                          DistanceMatrix<Precision> &distanceMatrix, TransitionMatrix<Precision> &transmat);
 
-        void printDistances(std::vector<std::string>& names, std::ostream &out);
+        void printDistances(std::vector<std::string> &names, std::ostream &out);
+
+        /* ReadTree ignores non-unique leaves after the first instance.
+           At the end, it prunes the tree to ignore empty children and it
+           unroots the tree if necessary.
+        */
+        void readTree(Uniquify &unique, HashTable &hashnames, std::istream &fpInTree);
+
+        void printNJ(std::ostream &out, std::vector<std::string> &names, Uniquify &unique, bool bShowSupport);
+
+        /* Searches the visible set */
+        void fastNJ();
 
     private:
         typedef Precision numeric_t;
@@ -171,12 +184,51 @@ namespace fasttree {
 
            These produce uncorrected distances.
         */
-        void profileDist(Profile& profile1, Profile& profile2, Besthit &hit);
+        void profileDist(Profile &profile1, Profile &profile2, Besthit &hit);
 
-        void seqDist(std::string& codes1, std::string& codes2, Besthit &hit);
+        void seqDist(std::string &codes1, std::string &codes2, Besthit &hit);
 
 
+        /* Set a node's profile from its children.
+           Deletes the previous profile if it exists
+           Use -1.0 for a balanced join
+           Fails unless the node has two children (e.g., no leaves or root)
+        */
+        void setProfile(size_t node, double weight1);
 
+        /* AverageProfile is used to do a weighted combination of nodes
+           when doing a join. If weight is negative, then the value is ignored and the profiles
+           are averaged. The weight is *not* adjusted for the gap content of the nodes.
+           Also, the weight does not affect the representation of the constraints
+        */
+        void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1);
+
+        void readTreeRemove(std::vector<int64_t>& parents, std::vector<Children>& children, size_t node);
+
+        /* A token is one of ():;, or an alphanumeric string without whitespace
+            Any whitespace between tokens is ignored */
+        bool readTreeToken(std::istream &fpInTree, std::string &buf);
+
+        void
+        readTreeAddChild(size_t parent, size_t child, std::vector<int64_t> &parents, std::vector<Children> &children);
+
+        void readTreeMaybeAddLeaf(size_t parent, std::string &name, HashTable &hashnames, Uniquify &unique,
+                                  std::vector<int64_t> &parents, std::vector<Children> &children);
+
+        void readTreeError(const std::string &err, const std::string &token);
+
+        /* returns new node, or -1 if nothing left to do. Use root for the first call.
+           Will return every node and then root.
+           Uses postorder tree traversal (depth-first search going down to leaves first)
+           Keeps track of which nodes are visited, so even after an NNI that swaps a
+           visited child with an unvisited uncle, the next call will visit the
+           was-uncle-now-child. (However, after SPR moves, there is no such guarantee.)
+
+           If pUp is not NULL, then, if going "back up" through a previously visited node
+           (presumably due to an NNI), then it will return the node another time,
+           with *pUp = true.
+        */
+        size_t TraversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
     };
 }
 
