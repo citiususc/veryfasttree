@@ -15,7 +15,8 @@ namespace fasttree {
     template<typename Precision, template<typename> typename Operations>
     class NeighbourJoining {
     public:
-        NeighbourJoining(Options &options, std::ostream &log, std::vector<std::string> &seqs, size_t nPos,
+        NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressReport,
+                         std::vector<std::string> &seqs, size_t nPos,
                          std::vector<std::string> &constraintSeqs,
                          DistanceMatrix<Precision> &distanceMatrix, TransitionMatrix<Precision> &transmat);
 
@@ -81,7 +82,7 @@ namespace fasttree {
            we store invalid entries with i=j=-1 and dist/criterion very high.
         */
         struct Besthit {
-            int64_t i, j;
+            size_t i, j;
             numeric_t weight;        /* Total product of weights (maximum value is nPos)
                                            This is needed for weighted joins and for pseudocounts,
                                            but not in most other places.
@@ -91,9 +92,60 @@ namespace fasttree {
         };
 
 
+        /* Keep track of hits for the top-hits heuristic without wasting memory
+           j = -1 means empty
+           If j is an inactive node, this may be replaced by that node's parent (and dist recomputed)
+         */
+        struct Hit {
+            int j;
+            numeric_t dist;
+        };
+
+        struct TopHitsList {
+            std::vector<Hit> hits;  /* the allocated and desired size; some of them may be empty */
+            int64_t hitSource;        /* where to refresh hits from if a 2nd-level top-hit list, or -1 */
+            size_t age;                /* number of joins since a refresh */
+        };
+
+        struct TopHits {
+            size_t m;             /* size of a full top hits list, usually sqrt(N) */
+            size_t q;             /* size of a 2nd-level top hits, usually sqrt(m) */
+            size_t maxnodes;
+            std::vector<TopHitsList> topHitsLists; /* one per node */
+            std::vector<Hit> visible;        /* the "visible" (very best) hit for each node */
+
+            /* The top-visible set is a subset, usually of size m, of the visible set --
+               it is the set of joins to select from
+               Each entry is either a node whose visible set entry has a good (low) criterion,
+               or -1 for empty, or is an obsolete node (which is effectively the same).
+               Whenever we update the visible set, should also call UpdateTopVisible()
+               which ensures that none of the topvisible set are stale (that is, they
+               all point to an active node).
+            */
+            std::vector<size_t> topvisible; /* nTopVisible = m * topvisibleMult */
+
+            size_t topvisibleAge;        /* joins since the top-visible list was recomputed */
+
+
+            /* 1 lock to read or write any top hits list, no thread grabs more than one */
+            //omp_lock_t *locks;
+
+            TopHits(const Options &options, size_t maxnodes, int64_t m);
+
+            TopHits();
+
+        };
+
+        /* Describes which switch to do */
+        typedef enum {
+            ABvsCD, ACvsBD, ADvsBC
+        } NNI;
+
+
         Operations<Precision> operations;
         std::ostream &log;
         Options &options;
+        ProgressReport &progressReport;
         /* The input */
         size_t nPos;
         std::vector<std::string> &seqs;    /* the aligment sequences array (not reallocated) */
@@ -139,8 +191,24 @@ namespace fasttree {
 
         void seqsToProfiles();
 
-        /* outProfile() computes the out-profile */
-        void outProfile(Profile &out);
+        /* This recomputes the criterion, or returns false if the visible node
+           is no longer active.
+        */
+        bool getVisible(size_t nActive, TopHits &tophits, size_t iNode, Besthit& visible);
+
+        /* Compute the constraint penalty for a join. This is added to the "distance"
+           by SetCriterion */
+        int64_t joinConstraintPenalty(int64_t node1, int64_t node2);
+
+        int64_t joinConstraintPenaltyPiece(int64_t node1, int64_t node2, size_t iConstraint);
+
+        /* outProfile() computes the out-profile,
+         * Profile_t can be Profile or Profile*
+         * */
+        template<typename Profile_t>
+        void outProfile(Profile &out, std::vector<Profile_t> &_profiles);
+
+        void updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int nActiveOld);
 
         /* Use out-profile and NJ->totdiam to recompute out-distance for node iNode
            Only does this computation if the out-distance is "stale" (nOutDistActive[iNode] != nActive)
@@ -148,6 +216,17 @@ namespace fasttree {
            make no changes.
         */
         void setOutDistance(size_t iNode, size_t nActive);
+
+        /* Always sets join->criterion; may update NJ->outDistance and NJ->nOutDistActive,
+           assumes join's weight and distance are already set,
+           and that the constraint penalty (if any) is included in the distance
+        */
+        void setCriterion(size_t nActive, Besthit &join);
+
+        /* Computes weight and distance (which includes the constraint penalty)
+           and then sets the criterion (maybe update out-distances)
+        */
+        void setDistCriterion(size_t nActive, Besthit &join);
 
         /* only handles leaf sequences */
         size_t nGaps(size_t i);
@@ -203,7 +282,7 @@ namespace fasttree {
         */
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1);
 
-        void readTreeRemove(std::vector<int64_t>& parents, std::vector<Children>& children, size_t node);
+        void readTreeRemove(std::vector<int64_t> &parents, std::vector<Children> &children, size_t node);
 
         /* A token is one of ():;, or an alphanumeric string without whitespace
             Any whitespace between tokens is ignored */
@@ -229,6 +308,138 @@ namespace fasttree {
            with *pUp = true.
         */
         size_t TraversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
+
+        /* The allhits list contains the distances of the node to all other active nodes
+           This is useful for the "reset" improvement to the visible set
+           Note that the following routines do not handle the tophits heuristic
+           and assume that out-distances are up to date.
+        */
+        void setBestHit(size_t node, size_t nActive, Besthit &bestjoin, Besthit allhits[]);
+
+        void exhaustiveNJSearch(size_t nActive, Besthit &bestjoin);
+
+        /* Searches the visible set */
+        void fastNJSearch(size_t nActive, std::vector<Besthit> &visible, Besthit &bestjoin);
+
+        /* Subroutines for handling the tophits heuristic */
+
+        /* Before we do any joins -- sets tophits and visible
+           NJ may be modified by setting out-distances
+         */
+        void setAllLeafTopHits(TopHits &tophits);
+
+        /* Find the best join to do. */
+        void topHitNJSearch(size_t nActive, TopHits &tophits, Besthit &bestjoin);
+
+        /* Returns the best hit within top hits
+           NJ may be modified because it updates out-distances if they are too stale
+           Does *not* update visible set
+        */
+        void getBestFromTopHits(size_t iNode, size_t nActive, std::vector<TopHits> &tophits,
+                                std::vector<Besthit> &bestjoin);
+
+        /* visible set is modifiable so that we can reset it more globally when we do
+           a "refresh", but we also set the visible set for newnode and do any
+           "reset" updates too. And, we update many outdistances.
+         */
+        void topHitJoin(size_t newnode, size_t nActive, TopHits &tophits);
+
+        /* Sort the input besthits by criterion
+           and save the best nOut hits as a new array in top_hits_lists
+           Does not update criterion or out-distances
+           Ignores (silently removes) hit to self
+           Saved list may be shorter than requested if there are insufficient entries
+        */
+        void sortSaveBestHits(size_t iNode, std::vector<Besthit> &besthits, size_t nIn, size_t nOut,
+                              TopHits &tophits);
+
+        /* Given candidate hits from one node, "transfer" them to another node:
+           Stores them in a new place in the same order
+           searches up to active nodes if hits involve non-active nodes
+           If update flag is set, it also recomputes distance and criterion
+           (and ensures that out-distances are updated); otherwise
+           it sets dist to -1e20 and criterion to 1e20
+
+         */
+        void
+        transferBestHits(size_t nActive, size_t iNode, std::vector<Besthit> &oldhits, size_t nOldHits,
+                         std::vector<Besthit> &newhits, bool updateDistance);
+
+        /* Create best hit objects from 1 or more hits. Do not update out-distances or set criteria */
+        void hitsToBestHits(std::vector<Hit> &hits, size_t iNode, std::vector<Besthit> &newhits);
+
+        void hitToBestHit(size_t i, Hit &hit, Besthit &out);
+
+        /* Given a set of besthit entries,
+           look for improvements to the visible set of the j entries.
+           Updates out-distances as it goes.
+           Also replaces stale nodes with this node, because a join is usually
+           how this happens (i.e. it does not need to walk up to ancestors).
+           Note this calls UpdateTopVisible() on any change
+        */
+        void updateVisible(size_t nActive, std::vector<Besthit> &tophitsNode, TopHits *tophits);
+
+        /* Update the top-visible list to perhaps include this hit (O(sqrt(N)) time) */
+        void updateTopVisible(size_t nActive, size_t iNode, Hit &hit, TopHits &tophits);
+
+        /* Recompute the top-visible subset of the visible set */
+        void resetTopVisible(size_t nActive, TopHits &tophits);
+
+        /* Make a shorter list with only unique entries.
+           Replaces any "dead" hits to nodes that have parents with their active ancestors
+           and ignores any that become dead.
+           Updates all criteria.
+           Combined gets sorted by i & j
+           The returned list is allocated to nCombined even though only *nUniqueOut entries are filled
+        */
+        void uniqueBestHits(size_t nActive, std::vector<Besthit> &combined, std::vector<Besthit> &out);
+
+        NNI
+        chooseNNI(Profile profiles[4], double criteria[3]); /* The three internal branch lengths or log likelihoods*/
+
+        /* length[] is ordered as described by quartet_length_t, but after we do the swap
+           of B with C (to give AC|BD) or B with D (to get AD|BC), if that is the returned choice
+           bFast means do not consider NNIs if AB|CD is noticeably better than the star topology
+           (as implemented by MLQuartetOptimize).
+           If there are constraints, then the constraint penalty is included in criteria[]
+        */
+        NNI MLQuartetNNI(Profile profiles[4], double criteria[3], /* The three potential quartet log-likelihoods */
+                         numeric_t length[5], bool bFast);
+
+        void optimizeAllBranchLengths();
+
+        double treeLogLk(double site_loglk[]);
+
+        double MLQuartetLogLk(Profile &pA, Profile &pB, Profile &pC, Profile &pD, double branchLengths[5],
+                              double siteLikelihoods[]);
+
+        /* Given a topology and branch lengths, estimate rates & recompute profiles */
+        void setMLRates();
+
+        /* Returns a set of nRateCategories potential rates; the caller must free it */
+        void MLSiteRates(size_t nRateCategories, std::vector<numeric_t> &rates);
+
+        /* returns site_loglk so that
+           site_loglk[nPos*iRate + j] is the log likelihood of site j with rate iRate
+           The caller must free it.
+        */
+        void MLSiteLikelihoodsByRate(std::vector<numeric_t> &rates, std::vector<double> &site_loglk);
+
+        /************************Sort comparators************************/
+
+        /* Helper function for sorting in SetAllLeafTopHits,
+           and the global variables it needs
+        */
+        struct CompareSeeds {
+            const std::vector<numeric_t> &outDistances;
+            const std::vector<size_t> &compareSeedGaps;
+
+            CompareSeeds(const std::vector<numeric_t> &outDistances, const std::vector<size_t> &compareSeedGaps);
+
+            bool operator()(size_t seed1, size_t seed2) const;
+        };
+
+
     };
 }
 

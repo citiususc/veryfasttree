@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <chrono>
+#include "boost/sort/sample_sort/sample_sort.hpp"
 
 #if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
 
@@ -61,6 +62,26 @@ namespace fasttree {
         std::ostream &os1;
         std::ostream &os2;
     };
+
+    template<typename T, typename... Args>
+    std::unique_ptr<T> make_unique(Args &&... args) {
+        return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+    }
+
+    template<typename T>
+    inline T &asRef(T &value) {
+        return value;
+    }
+
+    template<typename T>
+    inline T &asRef(T *value) {
+        return *value;
+    }
+
+    template<typename Iter, typename Compare>
+    inline void psort(Iter first, Iter last, size_t threads, const Compare& comp) {
+        boost::sort::sample_sort(first, last, comp, threads);
+    }
 
     template<typename ... Args>
     inline std::string strformat(const std::string &format, Args ... args) {

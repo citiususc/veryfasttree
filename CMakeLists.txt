@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 11)
 ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")
 ADD_SUBDIRECTORY("libs/xxhash")
+ADD_SUBDIRECTORY("libs/boost-sort")
 
 set(SOURCE_FILES
         fasttree/operations/BasicOperations.tcc
@@ -38,5 +39,5 @@ else()
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} CLI11 robin-map xxhash)
+target_link_libraries(${PROJECT_NAME} CLI11 robin-map xxhash boost-sort)
 

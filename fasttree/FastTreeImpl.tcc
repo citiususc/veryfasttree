@@ -64,9 +64,8 @@ AbsFastTreeImpl(void)::run() {
         progressReport.print("Hashed the names");
         if (options.makeMatrix) {
             std::vector<std::string> constraintSeqs;
-            NeighbourJoining <Precision, Operations> nj(options, log, aln.seqs, aln.nPos, constraintSeqs,
-                                                        distanceMatrix,
-                                                        transmat);
+            NeighbourJoining <Precision, Operations> nj(options, log, progressReport, aln.seqs, aln.nPos,
+                                                        constraintSeqs, distanceMatrix, transmat);
             nj.printDistances(aln.names, output);
         } else {
             /* reset counters*/
@@ -100,9 +99,8 @@ AbsFastTreeImpl(void)::run() {
             } else if (options.nCodes == 4 && options.bUseGtr && (options.bUseGtrRates || options.bUseGtrFreq)) {
                 transmat.createGTR(options, options.gtrrates, options.gtrfreq);
             }
-            NeighbourJoining <Precision, Operations> nj(options, log, unique.uniqueSeq, aln.nPos, uniqConstraints,
-                                                        distanceMatrix,
-                                                        transmat);
+            NeighbourJoining <Precision, Operations> nj(options, log, progressReport, unique.uniqueSeq, aln.nPos,
+                                                        uniqConstraints, distanceMatrix, transmat);
             if (options.verbose > 2) {
                 log << strformat("read %s seqs %d (%d unique) positions %d nameLast %s seqLast %s",
                                  options.inFileName.empty() ? "standard input" : options.inFileName.c_str(),
