@@ -229,6 +229,77 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
     }
 }
 
+AbsNeighbourJoining(int64_t)::activeAncestor(int64_t iNode) {
+    if (iNode < 0) {
+        return iNode;
+    }
+    while (parent[iNode] >= 0) {
+        iNode = parent[iNode];
+    }
+    return iNode;
+}
+
+AbsNeighbourJoining(bool)::getVisible(size_t nActive, TopHits &tophits, size_t iNode, Besthit &visible) {
+    if (iNode < 0 || parent[iNode] >= 0) {
+        return false;
+    }
+    Hit &v = tophits.visible[iNode];
+    if (v.j < 0 || parent[v.j] >= 0) {
+        return false;
+    }
+    hitToBestHit(iNode, v, visible);
+    setCriterion(nActive, visible);
+    return true;
+}
+
+AbsNeighbourJoining(int64_t)::joinConstraintPenalty(int64_t node1, int64_t node2) {
+    if (constraintSeqs.size() == 0) {
+        return 0.0;
+    }
+    int64_t penalty = 0;
+    for (int64_t iC = 0; iC < constraintSeqs.size(); iC++) {
+        penalty += joinConstraintPenaltyPiece(node1, node2, iC);
+    }
+    return penalty;
+}
+
+AbsNeighbourJoining(int64_t)::joinConstraintPenaltyPiece(int64_t node1, int64_t node2, size_t iC) {
+    Profile &pOut = outprofile;
+    Profile &p1 = profiles[node1];
+    Profile &p2 = profiles[node2];
+    int64_t nOn1 = p1.nOn[iC];
+    int64_t nOff1 = p1.nOff[iC];
+    int64_t nOn2 = p2.nOn[iC];
+    int64_t nOff2 = p2.nOff[iC];
+    int64_t nOnOut = pOut.nOn[iC] - nOn1 - nOn2;
+    int64_t nOffOut = pOut.nOff[iC] - nOff1 - nOff2;
+
+    if ((nOn1 + nOff1) > 0 && (nOn2 + nOff2) > 0 && (nOnOut + nOffOut) > 0) {
+        /* code is -1 for split, 0 for off, 1 for on */
+        int64_t code1 = (nOn1 > 0 && nOff1 > 0) ? -1 : (nOn1 > 0 ? 1 : 0);
+        int64_t code2 = (nOn2 > 0 && nOff2 > 0) ? -1 : (nOn2 > 0 ? 1 : 0);
+        int64_t code3 = (nOnOut > 0 && nOffOut) > 0 ? -1 : (nOnOut > 0 ? 1 : 0);
+        int64_t nSplit = (code1 == -1 ? 1 : 0) + (code2 == -1 ? 1 : 0) + (code3 == -1 ? 1 : 0);
+        int64_t nOn = (code1 == 1 ? 1 : 0) + (code2 == 1 ? 1 : 0) + (code3 == 1 ? 1 : 0);
+        if (nSplit == 1 && nOn == 1) {
+            return splitConstraintPenalty(nOn1 + nOn2, nOff1 + nOff2, nOnOut, nOffOut);
+        }
+    }
+    /* else */
+    return 0;
+}
+
+/* Minimum number of constrained leaves that need to be moved
+   to satisfy the constraint (or 0 if constraint is satisfied)
+   Defining it this way should ensure that SPR moves that break
+   constraints get a penalty
+*/
+AbsNeighbourJoining(int64_t)::splitConstraintPenalty(int64_t nOn1, int64_t nOff1, int64_t nOn2, int64_t nOff2) {
+    return (nOn1 + nOff2 < nOn2 + nOff1 ?
+            (nOn1 < nOff2 ? nOn1 : nOff2)
+                                        : (nOn2 < nOff1 ? nOn2 : nOff1));
+}
+
 AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out, std::vector<Profile_t> &_profiles) {
     double inweight = 1.0 / (double) _profiles.size();   /* The maximal output weight is 1.0 */
 
@@ -393,6 +464,72 @@ profileDistPiece(size_t code1, size_t code2, numeric_t f1[], numeric_t f2[], num
     }
 }
 
+AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int nActiveOld) {
+    size_t iFreqOut = 0;
+    size_t iFreq1 = 0;
+    size_t iFreq2 = 0;
+    size_t iFreqNew = 0;
+    assert(nActiveOld > 0);
+
+    for (size_t i = 0; i < nPos; i++) {
+        numeric_t *fOut = getFreq(out, i, iFreqOut);
+        numeric_t *fOld1 = getFreq(old1, i, iFreq1);
+        numeric_t *fOld2 = getFreq(old2, i, iFreq2);
+        numeric_t *fNew = getFreq(_new, i, iFreqNew);
+
+        assert(out.codes[i] == NOCODE && fOut != NULL); /* No no-vector optimization for outprofiles */
+        if (options.verbose > 3 && i < 3) {
+            log << strformat("Updating out-profile position %d weight %f (mult %f)",
+                             i, out.weights[i], out.weights[i] * nActiveOld) << std::endl;
+        }
+        double originalMult = out.weights[i] * nActiveOld;
+        double newMult = originalMult + _new.weights[i] - old1.weights[i] - old2.weights[i];
+        out.weights[i] = newMult / (nActiveOld - 1);
+        if (out.weights[i] <= 0) out.weights[i] = 1e-20; /* always use the vector */
+
+        for (int64_t k = 0; k < options.nCodes; k++) {
+            fOut[k] *= originalMult;
+        }
+
+        if (old1.weights[i] > 0) {
+            addToFreq(fOut, -old1.weights[i], old1.codes[i], fOld1);
+        }
+        if (old2.weights[i] > 0) {
+            addToFreq(fOut, -old2.weights[i], old2.codes[i], fOld2);
+        }
+        if (_new.weights[i] > 0) {
+            addToFreq(fOut, _new.weights[i], _new.codes[i], fNew);
+        }
+
+        /* And renormalize */
+        normalizeFreq(fOut);
+
+        if (options.verbose > 2 && i < 3) {
+            log << strformat("Updated out-profile position %d weight %f (mult %f)",
+                             i, out.weights[i], out.weights[i] * nActiveOld);
+            if (out.weights[i] > 0) {
+                for (int k = 0; k < options.nCodes; k++) {
+                    log << strformat(" %c:%f", (distanceMatrix ? '?' : options.codesString[k]), fOut[k]);
+                }
+            }
+            log << std::endl;
+        }
+    }
+    assert(iFreqOut == out.vectors.size());
+    assert(iFreq1 == old1.vectors.size());
+    assert(iFreq2 == old2.vectors.size());
+    assert(iFreqNew == _new.vectors.size());
+    if (distanceMatrix) {
+        setCodeDist(out);
+    }
+
+    /* update constraints -- note in practice this should be a no-op */
+    for (int64_t i = 0; i < constraintSeqs.size(); i++) {
+        out.nOn[i] += _new.nOn[i] - old1.nOn[i] - old2.nOn[i];
+        out.nOff[i] += _new.nOff[i] - old1.nOff[i] - old2.nOff[i];
+    }
+}
+
 AbsNeighbourJoining(void)::setOutDistance(size_t iNode, size_t nActive) {
     if (nOutDistActive[iNode] == nActive) {
         return;
@@ -463,6 +600,46 @@ AbsNeighbourJoining(void)::setOutDistance(size_t iNode, size_t nActive) {
                              fabs(pdistOutWithoutA - total_pd)) << std::endl;
         };
     }
+}
+
+AbsNeighbourJoining(void)::setCriterion(size_t nActive, Besthit &join) {
+    if (join.i < 0 || join.j < 0 || parent[join.i] >= 0 || parent[join.j] >= 0) {
+        return;
+    }
+    assert(nOutDistActive[join.i] >= nActive);
+    assert(nOutDistActive[join.j] >= nActive);
+
+    int64_t nDiffAllow = options.tophitsMult > 0 ? (int64_t) (nActive * options.staleOutLimit) : 0;
+    if (nOutDistActive[join.i] - nActive > nDiffAllow) {
+        setOutDistance(join.i, nActive);
+    }
+    if (nOutDistActive[join.j] - nActive > nDiffAllow) {
+        setOutDistance(join.j, nActive);
+    }
+    double outI = outDistances[join.i];
+    if (nOutDistActive[join.i] != nActive) {
+        outI *= (nActive - 1) / (double) (nOutDistActive[join.i] - 1);
+    }
+    double outJ = outDistances[join.j];
+    if (nOutDistActive[join.j] != nActive) {
+        outJ *= (nActive - 1) / (double) (nOutDistActive[join.j] - 1);
+    }
+    join.criterion = join.dist - (outI + outJ) / (double) (nActive - 2);
+    if (options.verbose > 2 && nActive <= 5) {
+        log << strformat("Set Criterion to join %d %d with nActive=%d dist+penalty %.3f criterion %.3f",
+                         join.i, join.j, nActive, join.dist, join.criterion) << std::endl;
+    }
+}
+
+AbsNeighbourJoining(void)::setDistCriterion(size_t nActive, Besthit &hit) {
+    if (hit.i < seqs.size() && hit.j < seqs.size()) {
+        seqDist(profiles[hit.i].codes, profiles[hit.j].codes, hit);
+    } else {
+        profileDist(profiles[hit.i], profiles[hit.j], hit);
+        hit.dist -= (diameter[hit.i] + diameter[hit.j]);
+    }
+    hit.dist += options.constraintWeight * (double) joinConstraintPenalty(hit.i, hit.j);
+    setCriterion(nActive, hit);
 }
 
 AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Besthit &hit) {
@@ -985,7 +1162,7 @@ AbsNeighbourJoining(void)::fastNJ() {
     if (m > 0) {
         tophits = make_unique<TopHits>(options, maxnode, m);
         setAllLeafTopHits(*tophits);
-        resetTopVisible(/*nActive*/seqs.size(), *tophits);
+        resetTopVisible(seqs.size(), *tophits);
     } else if (!options.slow) {
         visible.resize(maxnodes);
         besthitNew.resize(maxnodes);
@@ -1017,7 +1194,7 @@ AbsNeighbourJoining(void)::fastNJ() {
                                  join.i, join.j, maxnode, penalty) << std::endl;
 
                 for (size_t iC = 0; iC < constraintSeqs.size(); iC++) {
-                    int local = joinConstraintPenaltyPiece(join.i, join.j, iC);
+                    int64_t local = joinConstraintPenaltyPiece(join.i, join.j, iC);
                     if (local > 0)
                         log << strformat("Constraint %d piece %d %d/%d %d/%d %d/%d", iC, local,
                                          profiles[join.i].nOn[iC],
@@ -1205,7 +1382,7 @@ AbsNeighbourJoining(void)::fastNJ() {
                         }
                         auto iOldVisible = visible[iNode].j;
                         assert(iOldVisible >= 0);
-                        assert(visible[iNode].i == iNode);
+                        assert(visible[iNode].i == (int64_t) iNode);
 
                         /* Update the criterion; use nActive-1 because haven't decremented nActive yet */
                         if (parent[iOldVisible] < 0) {
@@ -1425,6 +1602,130 @@ AbsNeighbourJoining(size_t)::TraversePostorder(int64_t node, std::vector<bool> &
             *pUp = true;
             return node;
         }
+    }
+}
+
+AbsNeighbourJoining(void)::setBestHit(size_t node, size_t nActive, Besthit &bestjoin, Besthit allhits[]) {
+    assert(parent[node] < 0);
+
+    bestjoin.i = node;
+    bestjoin.j = -1;
+    bestjoin.dist = 1e20;
+    bestjoin.criterion = 1e20;
+
+    Besthit tmp;
+
+    /* Note -- if we are already in a parallel region, this will be ignored */
+    #pragma omp parallel for schedule(static)
+    for (size_t j = 0; j < maxnode; j++) {
+        Besthit &sv = allhits != NULL ? allhits[j] : tmp;
+        sv.i = node;
+        sv.j = j;
+        if (parent[j] >= 0) {
+            sv.i = -1;        /* illegal/empty join */
+            sv.weight = 0.0;
+            sv.criterion = sv.dist = 1e20;
+            continue;
+        }
+        /* Note that we compute self-distances (allow j==node) because the top-hit heuristic
+           expects self to be within its top hits, but we exclude those from the bestjoin
+           that we return...
+        */
+        setDistCriterion(nActive, sv);
+        if (sv.criterion < bestjoin.criterion && node != j) {
+            bestjoin = sv;
+        }
+    }
+    if (options.verbose > 5) {
+        log << strformat("SetBestHit %d %d %f %f", bestjoin.i, bestjoin.j, bestjoin.dist, bestjoin.criterion)
+            << std::endl;
+    }
+}
+
+AbsNeighbourJoining(void)::exhaustiveNJSearch(size_t nActive, Besthit &join) {
+    join.i = -1;
+    join.j = -1;
+    join.weight = 0;
+    join.dist = 1e20;
+    join.criterion = 1e20;
+    double bestCriterion = 1e20;
+
+    for (int64_t i = 0; i < maxnode - 1; i++) {
+        if (parent[i] < 0) {
+            for (int64_t j = i + 1; j < maxnode; j++) {
+                if (parent[j] < 0) {
+                    Besthit hit;
+                    hit.i = i;
+                    hit.j = j;
+                    setDistCriterion(nActive, hit);
+                    if (hit.criterion < bestCriterion) {
+                        join = hit;
+                        bestCriterion = hit.criterion;
+                    }
+                }
+            }
+        }
+    }
+    assert (join.i >= 0 && join.j >= 0);
+}
+
+AbsNeighbourJoining(void)::fastNJSearch(size_t nActive, std::vector<Besthit> &besthits, Besthit &join) {
+    join.i = -1;
+    join.j = -1;
+    join.dist = 1e20;
+    join.weight = 0;
+    join.criterion = 1e20;
+    int iNode;
+    for (iNode = 0; iNode < maxnode; iNode++) {
+        int jNode = besthits[iNode].j;
+        if (parent[iNode] < 0 && parent[jNode] < 0) { /* both i and j still active */
+            /* recompute criterion to reflect the current out-distances */
+            setCriterion(nActive, besthits[iNode]);
+            if (besthits[iNode].criterion < join.criterion) {
+                join = besthits[iNode];
+            }
+        }
+    }
+
+    if (!options.fastest) {
+        int changed;
+        do {
+            changed = 0;
+            assert(join.i >= 0 && join.j >= 0);
+            setBestHit(join.i, nActive, besthits[join.i], NULL);
+            if (besthits[join.i].j != join.j) {
+                changed = 1;
+                if (options.verbose > 2) {
+                    log << strformat("BetterI\t%d\t%d\t%d\t%d\t%f\t%f",
+                                     join.i, join.j, besthits[join.i].i, besthits[join.i].j,
+                                     join.criterion, besthits[join.i].criterion) << std::endl;
+                }
+            }
+
+            /* Save the best hit either way, because the out-distance has probably changed
+               since we started the computation. */
+            join.j = besthits[join.i].j;
+            join.weight = besthits[join.i].weight;
+            join.dist = besthits[join.i].dist;
+            join.criterion = besthits[join.i].criterion;
+
+            setBestHit(join.j, nActive, besthits[join.j], NULL);
+            if (besthits[join.j].j != join.i) {
+                changed = 1;
+                if (options.verbose > 2) {
+                    log << strformat("BetterJ\t%d\t%d\t%d\t%d\t%f\t%f",
+                                     join.i, join.j, besthits[join.j].i, besthits[join.j].j,
+                                     join.criterion, besthits[join.j].criterion) << std::endl;
+                }
+                join.i = besthits[join.j].j;
+                join.weight = besthits[join.j].weight;
+                join.dist = besthits[join.j].dist;
+                join.criterion = besthits[join.j].criterion;
+            }
+            if (changed) {
+                options.debug.nHillBetter++;
+            }
+        } while (changed);
     }
 }
 
@@ -1653,6 +1954,170 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
     }
 }
 
+AbsNeighbourJoining(void)::topHitNJSearch(size_t nActive, TopHits &tophits, Besthit &bestjoin) {
+    //TODO
+}
+
+AbsNeighbourJoining(void)::topHitJoin(size_t newnode, size_t nActive, TopHits &tophits) {
+    //TODO
+}
+
+AbsNeighbourJoining(void)::sortSaveBestHits(size_t iNode, std::vector<Besthit> &besthits, size_t nIn, size_t nOut,
+                                            TopHits &tophits) {
+    assert(nIn > 0);
+    assert(nOut > 0);
+    TopHitsList &l = tophits.topHitsLists[iNode];
+
+    psort(besthits.begin(), besthits.end(), options.threads, CompareHitsByCriterion());
+
+    /* First count how many we will save
+       Not sure if removing duplicates is actually necessary.
+     */
+    int64_t nSave = 0;
+    int64_t jLast = -1;
+    for (int64_t iBest = 0; iBest < nIn && nSave < nOut; iBest++) {
+        if (besthits[iBest].i < 0)
+            continue;
+        assert(besthits[iBest].i == iNode);
+        int64_t j = besthits[iBest].j;
+        if (j != iNode && j != jLast && j >= 0) {
+            nSave++;
+            jLast = j;
+        }
+    }
+
+    assert(nSave > 0);
+    //omp_set_lock(&tophits.locks[iNode]); TODO check how to remove the lock
+    l.hits.resize(nSave);
+
+    size_t iSave = 0;
+    jLast = -1;
+    for (size_t iBest = 0; iBest < nIn && iSave < nSave; iBest++) {
+        int64_t j = besthits[iBest].j;
+        if (j != iNode && j != jLast && j >= 0) {
+            l.hits[iSave].j = j;
+            l.hits[iSave].dist = besthits[iBest].dist;
+            iSave++;
+            jLast = j;
+        }
+    }
+    //omp_unset_lock(&tophits->locks[iNode]); TODO check how to remove the lock
+    assert(iSave == nSave);
+}
+
+AbsNeighbourJoining(void)::transferBestHits(size_t nActive, size_t iNode, std::vector<Besthit> &oldhits,
+                                            size_t nOldHits, std::vector<Besthit> &newhits, bool updateDistances) {
+    assert(iNode >= 0);
+    assert(parent[iNode] < 0);
+
+    for (int64_t iBest = 0; iBest < nOldHits; iBest++) {
+        Besthit &oldhit = oldhits[iBest];
+        Besthit &newhit = newhits[iBest];
+        newhit.i = iNode;
+        newhit.j = activeAncestor(oldhit.j);
+        newhit.dist = oldhit.dist;    /* may get reset below */
+        newhit.weight = oldhit.weight;
+        newhit.criterion = oldhit.criterion;
+
+        if (newhit.j < 0 || newhit.j == iNode) {
+            newhit.weight = 0;
+            newhit.dist = -1e20;
+            newhit.criterion = 1e20;
+        } else if (newhit.i != oldhit.i || newhit.j != oldhit.j) {
+            if (updateDistances) {
+                setDistCriterion(nActive, newhit);
+            } else {
+                newhit.dist = -1e20;
+                newhit.criterion = 1e20;
+            }
+        } else {
+            if (updateDistances) {
+                setCriterion(nActive, newhit);
+            } else {
+                newhit.criterion = 1e20;    /* leave dist alone */
+            }
+        }
+    }
+}
+
+AbsNeighbourJoining(void)::hitsToBestHits(std::vector<Hit> &hits, size_t iNode, std::vector<Besthit> &newhits) {
+    for (int64_t i = 0; i < hits.size(); i++) {
+        Hit &hit = hits[i];
+        Besthit &bh = newhits[i];
+        bh.i = iNode;
+        bh.j = hit.j;
+        bh.dist = hit.dist;
+        bh.criterion = 1e20;
+        bh.weight = -1;        /* not the true value -- we compute these directly when needed */
+    }
+}
+
+AbsNeighbourJoining(void)::hitToBestHit(size_t i, Hit &hit, Besthit &out) {
+    out.i = i;
+    out.j = hit.j;
+    out.dist = hit.dist;
+    out.criterion = 1e20;
+    out.weight = -1;
+}
+
+AbsNeighbourJoining(void)::resetTopVisible(size_t nActive, TopHits &tophits) {
+    std::vector<Besthit> visibleSorted(nActive);
+    int64_t nVisible = 0;        /* #entries in visibleSorted */
+    for (int64_t iNode = 0; iNode < maxnode; iNode++) {
+        /* skip joins involving stale nodes */
+        if (parent[iNode] >= 0) {
+            continue;
+        }
+        Besthit v;
+        if (getVisible(nActive, tophits, iNode, v)) {
+            assert(nVisible < nActive);
+            visibleSorted[nVisible++] = v;
+        }
+    }
+    assert(nVisible > 0);
+
+    psort(visibleSorted.begin(), visibleSorted.end(), options.threads, CompareHitsByCriterion());
+
+    /* Only keep the top m items, and try to avoid duplicating i->j with j->i
+       Note that visible(i) -> j does not necessarily imply visible(j) -> i,
+       so we store what the pairing was (or -1 for not used yet)
+     */
+    std::vector<int64_t> inTopVisible(maxnodes);
+    for (int64_t i = 0; i < maxnodes; i++)
+        inTopVisible[i] = -1;
+
+    if (options.verbose > 2) {
+        log << strformat("top-hit search: nActive %d nVisible %d considering up to %d items",
+                         nActive, nVisible, tophits.m) << std::endl;
+    }
+
+    /* save the sorted indices in topvisible */
+    int64_t iSave = 0;
+    for (int64_t i = 0; i < nVisible && iSave < tophits.topvisible.size(); i++) {
+        Besthit &v = visibleSorted[i];
+        if (inTopVisible[v.i] != v.j) { /* not seen already */
+            tophits.topvisible[iSave++] = v.i;
+            inTopVisible[v.i] = v.j;
+            inTopVisible[v.j] = v.i;
+        }
+    }
+    while (iSave < tophits.topvisible.size()) {
+        tophits.topvisible[iSave++] = -1;
+    }
+    tophits.topvisibleAge = 0;
+    if (options.verbose > 2) {
+        log << "Reset TopVisible: ";
+        for (int64_t i = 0; i < tophits.topvisible.size(); i++) {
+            int64_t iNode = tophits.topvisible[i];
+            if (iNode < 0) {
+                break;
+            }
+            log << strformat(" %d=>%d", iNode, tophits.visible[iNode].j);
+        }
+        log << std::endl;;
+    }
+}
+
 AbsNeighbourJoining(void)::readTreeError(const std::string &err, const std::string &token) {
     throw std::invalid_argument(strformat("Tree parse error: unexpected token '%s' -- %s",
                                           token.empty() ? "(End of file)" : token,
@@ -1664,7 +2129,7 @@ AbsNeighbourJoining()::CompareSeeds::CompareSeeds(const std::vector<numeric_t> &
                                                   const std::vector<size_t> &compareSeedGaps) :
         outDistances(outDistances), compareSeedGaps(compareSeedGaps) {}
 
-AbsNeighbourJoining(bool)::CompareSeeds::operator()(size_t seed1, size_t seed2) const{
+AbsNeighbourJoining(bool)::CompareSeeds::operator()(size_t seed1, size_t seed2) const {
     size_t gapdiff = compareSeedGaps[seed1] - compareSeedGaps[seed2];
     if (gapdiff != 0) {
         return gapdiff < 0; /* fewer gaps is better */
@@ -1678,6 +2143,18 @@ AbsNeighbourJoining(bool)::CompareSeeds::operator()(size_t seed1, size_t seed2) 
     }
     return true;
 
+}
+
+AbsNeighbourJoining(bool)::CompareHitsByCriterion::operator()(const Besthit &hit1, const Besthit &hit2) const {
+    if (hit1.criterion > hit2.criterion) {
+        return false;
+    }
+    return true;
+}
+
+
+AbsNeighbourJoining(bool)::CompareHitsByIJ::operator()(const Besthit &hit1, const Besthit &hit2) const {
+    return (hit1.i != hit2.i ? hit1.i - hit2.i : hit1.j - hit2.j) <= 0;
 }
 
 #endif

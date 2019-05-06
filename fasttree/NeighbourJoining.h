@@ -82,7 +82,7 @@ namespace fasttree {
            we store invalid entries with i=j=-1 and dist/criterion very high.
         */
         struct Besthit {
-            size_t i, j;
+            int64_t i, j;
             numeric_t weight;        /* Total product of weights (maximum value is nPos)
                                            This is needed for weighted joins and for pseudocounts,
                                            but not in most other places.
@@ -97,7 +97,7 @@ namespace fasttree {
            If j is an inactive node, this may be replaced by that node's parent (and dist recomputed)
          */
         struct Hit {
-            int j;
+            int64_t j;
             numeric_t dist;
         };
 
@@ -122,7 +122,7 @@ namespace fasttree {
                which ensures that none of the topvisible set are stale (that is, they
                all point to an active node).
             */
-            std::vector<size_t> topvisible; /* nTopVisible = m * topvisibleMult */
+            std::vector<int64_t> topvisible; /* nTopVisible = m * topvisibleMult */
 
             size_t topvisibleAge;        /* joins since the top-visible list was recomputed */
 
@@ -194,13 +194,19 @@ namespace fasttree {
         /* This recomputes the criterion, or returns false if the visible node
            is no longer active.
         */
-        bool getVisible(size_t nActive, TopHits &tophits, size_t iNode, Besthit& visible);
+        bool getVisible(size_t nActive, TopHits &tophits, size_t iNode, Besthit &visible);
+
+        int64_t activeAncestor(int64_t iNode);
 
         /* Compute the constraint penalty for a join. This is added to the "distance"
            by SetCriterion */
         int64_t joinConstraintPenalty(int64_t node1, int64_t node2);
 
         int64_t joinConstraintPenaltyPiece(int64_t node1, int64_t node2, size_t iConstraint);
+
+        /* Helper function for computing the number of constraints violated by
+           a split, represented as counts of on and off on each side */
+        int64_t splitConstraintPenalty(int64_t nOn1, int64_t nOff1, int64_t nOn2, int64_t nOff2);
 
         /* outProfile() computes the out-profile,
          * Profile_t can be Profile or Profile*
@@ -439,6 +445,13 @@ namespace fasttree {
             bool operator()(size_t seed1, size_t seed2) const;
         };
 
+        struct CompareHitsByCriterion {
+            bool operator()(const Besthit& hit1, const Besthit& hit2) const;
+        };
+
+        struct CompareHitsByIJ {
+            bool operator()(const Besthit& hit1, const Besthit& hit2) const;
+        };
 
     };
 }
