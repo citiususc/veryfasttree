@@ -140,7 +140,43 @@ AbsFastTreeImpl(void)::run() {
                 }
             }
 
+            if (nniToDo > 0) {
+                bool bConverged = false;
+                std::vector<typename decltype(nj)::NNIStats> nni_stats;
+                nj.initNNIStats(nni_stats);
 
+                for (int64_t i = 0; i < nniToDo; i++) {
+                    double maxDelta;
+                    if (!bConverged) {
+                        int64_t nChange = nj.NNI(i, nniToDo,/*use ml*/false, nni_stats, maxDelta);
+
+                        nj.logTree("ME_NNI%d", i + 1, aln.names, unique);
+                        if (nChange == 0) {
+                            bConverged = true;
+                            if (options.verbose > 1) {
+                                log << strformat("Min_evolution NNIs converged at round %d -- skipping some rounds",
+                                                 i + 1) << std::endl;
+                            }
+                            if (!options.logFileName.empty()) {
+                                log << strformat("Min_evolution NNIs converged at round %d -- skipping some rounds",
+                                                 i + 1) << std::endl;
+                            }
+                        }
+                    }
+
+                    /* Interleave SPRs with NNIs (typically 1/3rd NNI, SPR, 1/3rd NNI, SPR, 1/3rd NNI */
+                    if (sprRemaining > 0 &&
+                        (nniToDo / (options.spr + 1) > 0 &&
+                         ((i + 1) % (nniToDo / (options.spr + 1))) == 0)) {
+                        nj.SPR(options.maxSPRLength, options.spr - sprRemaining, options.spr);
+                        nj.logTree("ME_SPR%d", options.spr - sprRemaining + 1, aln.names, unique);
+                        sprRemaining--;
+                        /* Restart the NNIs -- set all ages to 0, etc. */
+                        bConverged = false;
+                        nj.initNNIStats(nni_stats);
+                    }
+                }
+            }
             //TODO implement
         }
     }

@@ -140,6 +140,56 @@ AbsNeighbourJoining(double)::logCorrect(double dist) {
     return (dist < maxscore ? dist : maxscore);
 }
 
+/* Print topology using node indices as node names */
+AbsNeighbourJoining(void)::printNJInternal(std::ostream &out, bool useLen) {
+    if (seqs.size() < 4) {
+        return;
+    }
+    std::vector<std::pair<int64_t, int64_t>> stack(maxnodes);
+    int64_t stackSize = 1;
+    stack[0].first = root;
+    stack[0].second = 0;
+
+    while (stackSize > 0) {
+        auto &last = stack[stackSize - 1];
+        stackSize--;
+        /* Save last, as we are about to overwrite it */
+        int64_t node = last.first;
+        int64_t end = last.second;
+
+        if (node < (int64_t) seqs.size()) {
+            if (child[parent[node]].child[0] != node) {
+                out << ",";
+            }
+            out << node;
+            if (useLen) {
+                out << strformat(":%.4f", branchlength[node]);
+            }
+        } else if (end) {
+            out << strformat(")%d", node);
+            if (useLen) {
+                out << strformat(":%.4f", branchlength[node]);
+            }
+        } else {
+            if (node != root && child[parent[node]].child[0] != node) {
+                out << ",";
+            }
+            out << "(";
+            stackSize++;
+            stack[stackSize - 1].first = node;
+            stack[stackSize - 1].second = 1;
+            Children &c = child[node];
+            /* put children on in reverse order because we use the last one first */
+            for (int i = c.nChild - 1; i >= 0; i--) {
+                stackSize++;
+                stack[stackSize - 1].first = c.child[i];
+                stack[stackSize - 1].second = 0;
+            }
+        }
+    }
+    out << ";" << std::endl;
+}
+
 AbsNeighbourJoining(void)::seqsToProfiles() {
     profiles.resize(maxnodes, Profile(nPos, constraintSeqs.size()));
     uint8_t charToCode[256];
@@ -364,7 +414,7 @@ AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out,
 }
 
 AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[]) {
-    assert(fOut != NULL);
+    assert(fOut != nullptr);
     if (fIn != nullptr) {
         operations.vector_add_mult(fOut, fIn, weight, options.nCodes);
     } else if (distanceMatrix) {
@@ -416,7 +466,7 @@ AbsNeighbourJoining(void)::setCodeDist(Profile &profile) {
         numeric_t *f = getFreq(profile, i, iFreq);
 
         for (int k = 0; k < options.nCodes; k++)
-            profile.codeDist[i * options.nCodes + k] = profileDistPiece(profile.codes[i], k, f, NULL, NULL);
+            profile.codeDist[i * options.nCodes + k] = profileDistPiece(profile.codes[i], k, f, nullptr, nullptr);
     }
     assert(iFreq == (int64_t) profile.vectors.size());
 }
@@ -426,14 +476,14 @@ profileDistPiece(int64_t code1, int64_t code2, numeric_t f1[], numeric_t f2[], n
     if (distanceMatrix) {
         if (code1 != NOCODE && code2 != NOCODE) { /* code1 vs code2 */
             return distanceMatrix.distances[code1][code2];
-        } else if (codeDist2 != NULL && code1 != NOCODE) { /* code1 vs. codeDist2 */
+        } else if (codeDist2 != nullptr && code1 != NOCODE) { /* code1 vs. codeDist2 */
             return codeDist2[code1];
         } else { /* f1 vs f2 */
-            if (f1 == NULL) {
+            if (f1 == nullptr) {
                 if (code1 == NOCODE) { return (10.0); }
                 f1 = &distanceMatrix.codeFreq[code1][0];
             }
-            if (f2 == NULL) {
+            if (f2 == nullptr) {
                 if (code2 == NOCODE) { return (10.0); }
                 f2 = &distanceMatrix.codeFreq[code2][0];
             }
@@ -445,15 +495,15 @@ profileDistPiece(int64_t code1, int64_t code2, numeric_t f1[], numeric_t f2[], n
             if (code2 != NOCODE) {
                 return (code1 == code2 ? 0.0 : 1.0); /* code1 vs code2 */
             } else {
-                if (f2 == NULL) { return (10.0); }
+                if (f2 == nullptr) { return (10.0); }
                 return 1.0 - f2[code1]; /* code1 vs. f2 */
             }
         } else {
             if (code2 != NOCODE) {
-                if (f1 == NULL) { return (10.0); }
+                if (f1 == nullptr) { return (10.0); }
                 return 1.0 - f1[code2]; /* f1 vs code2 */
             } else { /* f1 vs. f2 */
-                if (f1 == NULL || f2 == NULL) { return (10.0); }
+                if (f1 == nullptr || f2 == nullptr) { return (10.0); }
                 double piece = 1.0;
                 for (int k = 0; k < options.nCodes; k++) {
                     piece -= f1[k] * f2[k];
@@ -477,7 +527,7 @@ AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile
         numeric_t *fOld2 = getFreq(old2, i, iFreq2);
         numeric_t *fNew = getFreq(_new, i, iFreqNew);
 
-        assert(out.codes[i] == NOCODE && fOut != NULL); /* No no-vector optimization for outprofiles */
+        assert(out.codes[i] == NOCODE && fOut != nullptr); /* No no-vector optimization for outprofiles */
         if (options.verbose > 3 && i < 3) {
             log << strformat("Updating out-profile position %d weight %f (mult %f)",
                              i, out.weights[i], out.weights[i] * nActiveOld) << std::endl;
@@ -655,7 +705,7 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
             denom += weight;
             double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
                                             (!profile2.codeDist.empty() ? &profile2.codeDist[i * options.nCodes]
-                                                                        : NULL));
+                                                                        : nullptr));
             top += weight * piece;
         }
     }
@@ -664,6 +714,36 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
     hit.weight = denom > 0 ? denom : 0.01; /* 0.01 is an arbitrarily low value of weight (normally >>1) */
     hit.dist = denom > 0 ? top / denom : 1;
     options.debug.profileOps++;
+}
+
+AbsNeighbourJoining(void)::correctedPairDistances(Profile *_profiles[], int nProfiles, double distances[6]) {
+    assert(_profiles != nullptr);
+    assert(nProfiles > 1 && nProfiles <= 4);
+    Besthit hit[6];
+
+    for (int iHit = 0, i = 0; i < nProfiles; i++) {
+        for (int j = i + 1; j < nProfiles; j++, iHit++) {
+            profileDist(*_profiles[i], *_profiles[j], hit[iHit]);
+            distances[iHit] = hit[iHit].dist;
+        }
+    }
+    if (options.pseudoWeight > 0) {
+        /* Estimate the prior distance */
+        double dTop = 0;
+        double dBottom = 0;
+        for (int iHit = 0; iHit < (nProfiles * (nProfiles - 1)) / 2; iHit++) {
+            dTop += hit[iHit].dist * hit[iHit].weight;
+            dBottom += hit[iHit].weight;
+        }
+        double prior = (dBottom > 0.01) ? dTop / dBottom : 3.0;
+        for (int iHit = 0; iHit < (nProfiles * (nProfiles - 1)) / 2; iHit++)
+            distances[iHit] = (distances[iHit] * hit[iHit].weight + prior * options.pseudoWeight)
+                              / (hit[iHit].weight + options.pseudoWeight);
+    }
+    if (options.logdist) {
+        for (int iHit = 0; iHit < (nProfiles * (nProfiles - 1)) / 2; iHit++)
+            distances[iHit] = logCorrect(distances[iHit]);
+    }
 }
 
 AbsNeighbourJoining(void)::seqDist(std::string &codes1, std::string &codes2, Besthit &hit) {
@@ -715,8 +795,129 @@ AbsNeighbourJoining(bool)::updateBestHit(int64_t nActive, Besthit &hit, bool bUp
     return true;
 }
 
+/* Update the profile of node and its ancestor, and delete nearby out-profiles */
+AbsNeighbourJoining(void)::updateForNNI(int64_t node, std::unique_ptr<Profile> upProfiles[], bool useML) {
+    if (options.slow) {
+        /* exhaustive update */
+        for (int64_t i = 0; i < maxnodes; i++) {
+            upProfiles[i].reset();
+        }
+
+        /* update profiles back to root */
+        for (int64_t ancestor = node; ancestor >= 0; ancestor = parent[ancestor]) {
+            recomputeProfile(upProfiles, ancestor, useML);
+        }
+
+        /* remove any up-profiles made while doing that*/
+        for (int64_t i = 0; i < maxnodes; i++) {
+            upProfiles[i].reset();
+        }
+    } else {
+        /* if fast, only update around self
+           note that upProfile(parent) is still OK after an NNI, but
+           up-profiles of uncles may not be
+        */
+        upProfiles[node].reset();
+        for (int64_t i = 0; i < child[node].nChild; i++) {
+            upProfiles[child[node].child[i]].reset();
+        }
+        assert(node != root);
+        int64_t iparent = parent[node];
+        int64_t neighbors[2] = {iparent, sibling(node)};
+        if (iparent == root) {
+            rootSiblings(node, /*OUT*/neighbors);
+        }
+        upProfiles[neighbors[0]].reset();
+        upProfiles[neighbors[1]].reset();
+
+        int64_t uncle = sibling(iparent);
+        if (uncle >= 0) {
+            upProfiles[uncle].reset();
+        }
+        recomputeProfile(upProfiles, node, useML);
+        recomputeProfile(upProfiles, iparent, useML);
+    }
+}
+
+/* Resets the children entry of parent and also the parent entry of newchild */
+AbsNeighbourJoining(void)::replaceChild(int64_t _parent, int64_t oldchild, int64_t newchild) {
+    parent[newchild] = _parent;
+
+    for (int64_t iChild = 0; iChild < child[_parent].nChild; iChild++) {
+        if (child[_parent].child[iChild] == oldchild) {
+            child[_parent].child[iChild] = newchild;
+            return;
+        }
+    }
+    assert(0);
+}
+
+AbsNeighbourJoining(void)::setupABCD(int64_t node, Profile *_profiles[4], std::unique_ptr<Profile> upProfiles[],
+                                     int nodeABCD[4], bool useML) {
+    int64_t iparent = parent[node];
+    assert(iparent >= 0);
+    assert(child[node].nChild == 2);
+    nodeABCD[0] = child[node].child[0]; /*A*/
+    nodeABCD[1] = child[node].child[1]; /*B*/
+
+    Profile *profile4 = nullptr;
+    if (iparent == root) {
+        int64_t sibs[2];
+        rootSiblings(node, /*OUT*/sibs);
+        nodeABCD[2] = sibs[0];
+        nodeABCD[3] = sibs[1];
+        if (_profiles == nullptr) {
+            return;
+        }
+        profile4 = _profiles[sibs[1]];
+    } else {
+        nodeABCD[2] = sibling(node);
+        assert(nodeABCD[2] >= 0);
+        nodeABCD[3] = iparent;
+        if (_profiles == nullptr) {
+            return;
+        }
+        //profile4 = getUpProfile(upProfiles, iparent, useML); TODO
+    }
+    assert(upProfiles != NULL);
+    int i;
+    for (i = 0; i < 3; i++) {
+        _profiles[i] = _profiles[nodeABCD[i]];
+    }
+    _profiles[3] = profile4;
+}
+
+AbsNeighbourJoining(int64_t)::sibling(int64_t node) {
+    int64_t iparent = parent[node];
+    if (iparent < 0 || iparent == root) {
+        return -1;
+    }
+
+    for (int64_t iChild = 0; iChild < child[iparent].nChild; iChild++) {
+        if (child[iparent].child[iChild] != node) {
+            return (child[iparent].child[iChild]);
+        }
+    }
+    assert(0);
+    return -1;
+}
+
+AbsNeighbourJoining(void)::rootSiblings(int64_t node, /*OUT*/int64_t sibs[2]) {
+    assert(parent[node] == root);
+    assert(child[root].nChild == 3);
+
+    int64_t nSibs = 0;
+    for (int64_t iChild = 0; iChild < child[root].nChild; iChild++) {
+        int64_t ichild = child[root].child[iChild];
+        if (ichild != node) {
+            sibs[nSibs++] = ichild;
+        }
+    }
+    assert(nSibs == 2);
+}
+
 AbsNeighbourJoining(inline Precision*)::getFreq(Profile &p, int64_t &i, int64_t &ivector) {
-    return p.weights[i] > 0 && p.codes[i] == NOCODE ? &p.vectors[options.nCodes * (ivector++)] : NULL;
+    return p.weights[i] > 0 && p.codes[i] == NOCODE ? &p.vectors[options.nCodes * (ivector++)] : nullptr;
 }
 
 AbsNeighbourJoining(int64_t)::nGaps(int64_t i) {
@@ -790,7 +991,7 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
         if (options.verbose > 10 && i < 5) {
             log << strformat("Average profiles: pos %d in-w1 %f in-w2 %f bionjWeight %f to weight %f code %d",
                              i, profile1.weights[i], profile2.weights[i], bionjWeight, out.weights[i], out.codes[i]);
-            if (f != NULL) {
+            if (f != nullptr) {
                 for (int k = 0; k < options.nCodes; k++) {
                     log << strformat("\t%c:%f", options.codesString[k], f ? f[k] : -1.0);
                 }
@@ -808,6 +1009,11 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
         out.nOff[i] = profile1.nOff[i] + profile2.nOff[i];
     }
     options.debug.profileAvgOps++;
+}
+
+AbsNeighbourJoining(void)::
+posteriorProfile(Profile &out, Profile &profile1, Profile &profile2, double len1, double len2) {
+    //TODO implement
 }
 
 AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std::istream &fpInTree) {
@@ -1037,7 +1243,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     */
     std::vector<bool> traversal(maxnode, false);
     node = root;
-    while ((node = TraversePostorder(node, traversal, nullptr)) >= 0) {
+    while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
         if (node >= (int64_t) seqs.size() && node != root) {
             setProfile(node, -1.0);
         }
@@ -1124,8 +1330,7 @@ printNJ(std::ostream &out, std::vector<std::string> &names, Uniquify &unique, bo
             stack[stackSize - 1].second = 1;
             Children &c = child[node];
             /* put children on in reverse order because we use the last one first */
-            int i;
-            for (i = c.nChild - 1; i >= 0; i--) {
+            for (int i = c.nChild - 1; i >= 0; i--) {
                 stackSize++;
                 stack[stackSize - 1].first = c.child[i];
                 stack[stackSize - 1].second = 0;
@@ -1190,7 +1395,7 @@ AbsNeighbourJoining(void)::fastNJ() {
         visible.resize(maxnodes);
         besthitNew.resize(maxnodes);
         for (int64_t iNode = 0; iNode < (int64_t) seqs.size(); iNode++)
-            setBestHit(iNode, /*nActive*/seqs.size(), visible[iNode], /*OUT IGNORED*/NULL);
+            setBestHit(iNode, /*nActive*/seqs.size(), visible[iNode], /*OUT IGNORED*/nullptr);
     }
 
     /* Iterate over joins */
@@ -1590,7 +1795,7 @@ AbsNeighbourJoining(bool)::readTreeToken(std::istream &fpInTree, std::string &bu
     return !buf.empty();
 }
 
-AbsNeighbourJoining(int64_t)::TraversePostorder(int64_t node, std::vector<bool> &traversal, bool *pUp) {
+AbsNeighbourJoining(int64_t)::traversePostorder(int64_t node, std::vector<bool> &traversal, bool *pUp) {
     if (pUp != nullptr) {
         *pUp = false;
     }
@@ -1629,6 +1834,89 @@ AbsNeighbourJoining(int64_t)::TraversePostorder(int64_t node, std::vector<bool> 
     }
 }
 
+AbsNeighbourJoining(void)::recomputeProfile(std::unique_ptr<Profile> upProfiles[], int64_t node, int64_t useML) {
+    if (node < (int64_t) seqs.size() || node == root) {
+        return;            /* no profile to compute */
+    }
+    assert(child[node].nChild == 2);
+
+    Profile *profiles4[4] = {nullptr, nullptr, nullptr, nullptr};
+    double weight = 0.5;
+    if (useML || !options.bionj) {
+        profiles4[0] = &profiles[child[node].child[0]];
+        profiles4[1] = &profiles[child[node].child[1]];
+    } else {
+        int nodeABCD[4];
+        setupABCD(node, profiles4, upProfiles, nodeABCD, useML);
+        weight = quartetWeight(profiles4);
+    }
+    if (options.verbose > 3) {
+        if (useML) {
+            log << strformat("Recompute %d from %d %d lengths %.4f %.4f",
+                             node,
+                             child[node].child[0],
+                             child[node].child[1],
+                             branchlength[child[node].child[0]],
+                             branchlength[child[node].child[1]]) << std::endl;
+        } else {
+            log << strformat("Recompute %d from %d %d weight %.3f\n",
+                             node, child[node].child[0], child[node].child[1], weight);
+        }
+    }
+    if (useML) {
+        posteriorProfile(*profiles4[node], *profiles4[0], *profiles4[1],
+                         branchlength[child[node].child[0]],
+                         branchlength[child[node].child[1]]);
+    } else {
+        averageProfile(*profiles4[node], *profiles4[0], *profiles4[1], weight);
+    }
+}
+
+AbsNeighbourJoining(void)::recomputeProfiles() {
+    std::vector<bool> traversal(maxnodes, false);
+    int64_t node = root;
+    while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
+        if (child[node].nChild == 2) {
+            int64_t *children = child[node].child;
+            averageProfile(profiles[node], profiles[child[0]], profiles[child[1]],  /*unweighted*/-1.0);
+        }
+    }
+}
+
+AbsNeighbourJoining(void)::recomputeMLProfiles() {
+    std::vector<bool> traversal(maxnodes, false);
+    int64_t node = root;
+    while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
+        if (child[node].nChild == 2) {
+            int64_t *children = child[node].child;
+            posteriorProfile(profiles[node], profiles[children[0]], profiles[children[1]],
+                             branchlength[children[0]], branchlength[children[1]]);
+        }
+    }
+}
+
+/* The BIONJ-like formula for the weight of A when building a profile for AB is
+     1/2 + (avgD(B,CD) - avgD(A,CD))/(2*d(A,B))
+*/
+AbsNeighbourJoining(double)::quartetWeight(Profile *profiles4[4]) {
+    if (!options.bionj) {
+        return (-1.0); /* even weighting */
+    }
+    double d[6];
+    correctedPairDistances(profiles4, 4, d);
+    if (d[qAB] < 0.01) {
+        return -1.0;
+    }
+    double weight = 0.5 + ((d[qBC] + d[qBD]) - (d[qAC] + d[qAD])) / (4 * d[qAB]);
+    if (weight < 0) {
+        weight = 0;
+    }
+    if (weight > 1) {
+        weight = 1;
+    }
+    return weight;
+}
+
 AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &bestjoin, Besthit allhits[]) {
     assert(parent[node] < 0);
 
@@ -1642,7 +1930,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
     /* Note -- if we are already in a parallel region, this will be ignored */
     #pragma omp parallel for schedule(static)
     for (int64_t j = 0; j < maxnode; j++) {
-        Besthit &sv = allhits != NULL ? allhits[j] : tmp;
+        Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
         sv.i = node;
         sv.j = j;
         if (parent[j] >= 0) {
@@ -1716,7 +2004,7 @@ AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &b
         do {
             changed = 0;
             assert(join.i >= 0 && join.j >= 0);
-            setBestHit(join.i, nActive, besthits[join.i], NULL);
+            setBestHit(join.i, nActive, besthits[join.i], nullptr);
             if (besthits[join.i].j != join.j) {
                 changed = 1;
                 if (options.verbose > 2) {
@@ -1733,7 +2021,7 @@ AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &b
             join.dist = besthits[join.i].dist;
             join.criterion = besthits[join.i].criterion;
 
-            setBestHit(join.j, nActive, besthits[join.j], NULL);
+            setBestHit(join.j, nActive, besthits[join.j], nullptr);
             if (besthits[join.j].j != join.i) {
                 changed = 1;
                 if (options.verbose > 2) {
@@ -2655,6 +2943,13 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
     }
 }
 
+
+AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::
+                             NNI)::
+chooseNNI(Profile *profiles[4], double criteria[3]) {
+    //TODO
+}
+
 AbsNeighbourJoining(void)::readTreeError(const std::string &err, const std::string &token) {
     throw std::invalid_argument(strformat("Tree parse error: unexpected token '%s' -- %s",
                                           token.empty() ? "(End of file)" : token,
@@ -2686,6 +2981,404 @@ AbsNeighbourJoining(void)::logTree(const std::string &format, int64_t i, std::ve
     if (!options.logFileName.empty()) {
         log << strformat(format, i) << "\t";
         printNJ(log, names, unique,/*support*/false);
+    }
+}
+
+AbsNeighbourJoining(int64_t)::NNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats,
+                                  double &dMaxDelta) {
+/* For each non-root node N, with children A,B, sibling C, and uncle D,
+     we compare the current topology AB|CD to the alternate topologies
+     AC|BD and AD|BC, by using the 4 relevant profiles.
+
+     If useML is true, it uses quartet maximum likelihood, and it
+     updates branch lengths as it goes.
+
+     If useML is false, it uses the minimum-evolution criterion with
+     log-corrected distances on profiles.  (If logdist is false, then
+     the log correction is not done.) If useML is false, then NNI()
+     does NOT modify the branch lengths.
+
+     Regardless of whether it changes the topology, it recomputes the
+     profile for the node, using the pairwise distances and BIONJ-like
+     weightings (if bionj is set). The parent's profile has changed,
+     but recomputing it is not necessary because we will visit it
+     before we need it (we use postorder, so we may visit the sibling
+     and its children before we visit the parent, but we never
+     consider an ancestor's profile, so that is OK). When we change
+     the parent's profile, this alters the uncle's up-profile, so we
+     remove that.  Finally, if the topology has changed, we remove the
+     up-profiles of the nodes.
+
+     If we do an NNI during post-order traversal, the result is a bit
+     tricky. E.g. if we are at node N, and have visited its children A
+     and B but not its uncle C, and we do an NNI that swaps B & C,
+     then the post-order traversal will visit C, and its children, but
+     then on the way back up, it will skip N, as it has already
+     visited it.  So, the profile of N will not be recomputed: any
+     changes beneath C will not be reflected in the profile of N, and
+     the profile of N will be slightly stale. This will be corrected
+     on the next round of NNIs.
+  */
+    double supportThreshold = useML ? Constants::treeLogLkDelta : options.MEMinDelta;
+    dMaxDelta = 0.0;
+    int64_t nNNIThisRound = 0;
+
+    if (seqs.size() <= 3) {
+        return 0;            /* nothing to do */
+    }
+    if (options.verbose > 2) {
+        log << strformat("Beginning round %d of NNIs with ml? %d", iRound, useML ? 1 : 0) << std::endl;
+        printNJInternal(log, /*useLen*/useML && iRound > 0 ? true : false);
+    }
+    /* For each node the upProfile or NULL */
+    std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
+
+    std::vector<bool> traversal(maxnodes, false);
+
+    /* Identify nodes we can skip traversing into */
+    if (options.fastNNI) {
+        for (int64_t node = 0; node < maxnode; node++) {
+            if (node != root
+                && node >= (int64_t) seqs.size()
+                && stats[node].age >= 2
+                && stats[node].subtreeAge >= 2
+                && stats[node].support > supportThreshold) {
+                int nodeABCD[4];
+                setupABCD(node, nullptr, nullptr, nodeABCD, useML);
+                int i;
+                for (i = 0; i < 4; i++) {
+                    if (stats[nodeABCD[i]].age == 0 && stats[nodeABCD[i]].support > supportThreshold) {
+                        break;
+                    }
+                }
+                if (i == 4) {
+                    traversal[node] = true;
+                    if (options.verbose > 2) {
+                        log << strformat(
+                                "Skipping subtree at %d: child %d %d parent %d age %d subtreeAge %d support %.3f",
+                                node, nodeABCD[0], nodeABCD[1], parent[node],
+                                stats[node].age, stats[node].subtreeAge, stats[node].support) << std::endl;
+                    }
+                }
+            }
+        }
+    }
+
+    int64_t iDone = 0;
+    bool bUp;
+    int64_t node = root;
+    while ((node = traversePostorder(node, traversal, &bUp)) >= 0) {
+        if (node < (int64_t) seqs.size() || node == root) {
+            continue; /* nothing to do for leaves or root */
+        }
+        if (bUp) {
+            if (options.verbose > 2) {
+                log << "Going up back to node " << node << std::endl;
+            }
+            /* No longer needed */
+            for (int64_t i = 0; i < child[node].nChild; i++) {
+                upProfiles[child[node].child[i]].reset();
+            }
+            upProfiles[node].reset();
+            recomputeProfile(upProfiles.data(), node, useML);
+            continue;
+        }
+        if ((iDone % 100) == 0) {
+            std::string buf;
+            buf.reserve(100);
+            buf += strformat("%s NNI round %%d of %%d, %%d of %%d splits", useML ? "ML" : "ME");
+            if (iDone > 0) {
+                buf += strformat(", %d changes", nNNIThisRound);
+            }
+            if (nNNIThisRound > 0) {
+                buf += strformat(" (max delta %.3f)", dMaxDelta);
+            }
+            progressReport.print(buf, iRound + 1, nRounds, iDone + 1, maxnode - seqs.size());
+        }
+        iDone++;
+
+        Profile *profiles4[4] = {nullptr, nullptr, nullptr, nullptr};
+        int nodeABCD[4];
+        /* Note -- during the first round of ML NNIs, we use the min-evo-based branch lengths,
+           which may be suboptimal */
+        setupABCD(node, profiles4, upProfiles.data(), nodeABCD, useML);
+
+        /* Given our 4 profiles, consider doing a swap */
+        int nodeA = nodeABCD[0];
+        int nodeB = nodeABCD[1];
+        int nodeC = nodeABCD[2];
+        int nodeD = nodeABCD[3];
+
+        auto choice = ABvsCD;
+
+        if (options.verbose > 2) {
+            log << strformat("Considering NNI around %d: Swap A=%d B=%d C=%d D=up(%d) or parent %d",
+                             node, nodeA, nodeB, nodeC, nodeD, parent[node]) << std::endl;
+        }
+        if (options.verbose > 3 && useML) {
+            double len[5] = {branchlength[nodeA], branchlength[nodeB], branchlength[nodeC],
+                             branchlength[nodeD],
+                             branchlength[node]};
+            for (int i = 0; i < 5; i++) {
+                if (len[i] < options.MLMinBranchLength)
+                    len[i] = options.MLMinBranchLength;
+            }
+            log << strformat("Starting quartet likelihood %.3f len %.3f %.3f %.3f %.3f %.3f",
+                             MLQuartetLogLk(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3], len, /*site_lk*/
+                                            nullptr),
+                             len[0], len[1], len[2], len[3], len[4]) << std::endl;
+        }
+
+        numeric_t newlength[5];
+        double criteria[3];
+        if (useML) {
+            for (int i = 0; i < 4; i++) {
+                newlength[i] = branchlength[nodeABCD[i]];
+            }
+            newlength[4] = branchlength[node];
+            bool bFast = options.mlAccuracy < 2 && stats[node].age > 0;
+            choice = MLQuartetNNI(profiles4, criteria, newlength, bFast);
+        } else {
+            choice = chooseNNI(profiles4, criteria);
+            /* invert criteria so that higher is better, as in ML case, to simplify code below */
+            for (int i = 0; i < 3; i++)
+                criteria[i] = -criteria[i];
+        }
+
+        if (choice == ACvsBD) {
+            /* swap B and C */
+            replaceChild(node, nodeB, nodeC);
+            replaceChild(parent[node], nodeC, nodeB);
+        } else if (choice == ADvsBC) {
+            /* swap A and C */
+            replaceChild(node, nodeA, nodeC);
+            replaceChild(parent[node], nodeC, nodeA);
+        }
+
+        if (useML) {
+            /* update branch length for the internal branch, and of any
+           branches that lead to leaves, b/c those will not are not
+           the internal branch for NNI and would not otherwise be set.
+            */
+            if (choice == ADvsBC) {
+                /* For ADvsBC, MLQuartetNNI swaps B with D, but we swap A with C */
+                double length2[5] = {newlength[LEN_C], newlength[LEN_D],
+                                     newlength[LEN_A], newlength[LEN_B],
+                                     newlength[LEN_I]};
+
+                for (int i = 0; i < 5; i++) {
+                    newlength[i] = length2[i];
+                }
+                /* and swap A and C */
+                double tmp = newlength[LEN_A];
+                newlength[LEN_A] = newlength[LEN_C];
+                newlength[LEN_C] = tmp;
+            } else if (choice == ACvsBD) {
+                /* swap B and C */
+                double tmp = newlength[LEN_B];
+                newlength[LEN_B] = newlength[LEN_C];
+                newlength[LEN_C] = tmp;
+            }
+
+            branchlength[node] = newlength[LEN_I];
+            branchlength[nodeA] = newlength[LEN_A];
+            branchlength[nodeB] = newlength[LEN_B];
+            branchlength[nodeC] = newlength[LEN_C];
+            branchlength[nodeD] = newlength[LEN_D];
+        }
+
+        if (options.verbose > 2 && (choice != ABvsCD || options.verbose > 2)) {
+            log << strformat("NNI around %d: Swap A=%d B=%d C=%d D=out(C) -- choose %s %s %.4f",
+                             node, nodeA, nodeB, nodeC,
+                             choice == ACvsBD ? "AC|BD" : (choice == ABvsCD ? "AB|CD" : "AD|BC"),
+                             useML ? "delta-loglk" : "-deltaLen",
+                             criteria[choice] - criteria[ABvsCD]) << std::endl;
+        }
+        if (options.verbose >= 3 && options.slow && useML) {
+            log << strformat("Old tree lk -- %.4f\n", treeLogLk(/*site_likelihoods*/nullptr)) << std::endl;
+        }
+
+        /* update stats, *dMaxDelta, etc. */
+        if (choice == ABvsCD) {
+            stats[node].age++;
+        } else {
+            if (useML) {
+                options.debug.nML_NNI++;
+            } else {
+                options.debug.nNNI++;
+            }
+            nNNIThisRound++;
+            stats[node].age = 0;
+            stats[nodeA].age = 0;
+            stats[nodeB].age = 0;
+            stats[nodeC].age = 0;
+            stats[nodeD].age = 0;
+        }
+        stats[node].delta = criteria[choice] - criteria[ABvsCD]; /* 0 if ABvsCD */
+        if (stats[node].delta > dMaxDelta) {
+            dMaxDelta = stats[node].delta;
+        }
+
+        /* support is improvement of score for self over better of alternatives */
+        stats[node].support = 1e20;
+        for (int i = 0; i < 3; i++)
+            if (choice != i && criteria[choice] - criteria[i] < stats[node].support)
+                stats[node].support = criteria[choice] - criteria[i];
+
+        /* subtreeAge is the number of rounds since self or descendent had a significant improvement */
+        if (stats[node].delta > supportThreshold) {
+            stats[node].subtreeAge = 0;
+        } else {
+            stats[node].subtreeAge++;
+            for (int i = 0; i < 2; i++) {
+                int64_t ichild = child[node].child[i];
+                if (stats[node].subtreeAge > stats[ichild].subtreeAge) {
+                    stats[node].subtreeAge = stats[ichild].subtreeAge;
+                }
+            }
+        }
+
+        /* update profiles and free up unneeded up-profiles */
+        if (choice == ABvsCD) {
+            /* No longer needed */
+            upProfiles[nodeA].reset();
+            upProfiles[nodeB].reset();
+            upProfiles[nodeC].reset();
+            recomputeProfile(upProfiles.data(), node, useML);
+            if (options.slow && useML) {
+                updateForNNI(node, upProfiles.data(), useML);
+            }
+        } else {
+            updateForNNI(node, upProfiles.data(), useML);
+        }
+        if (options.verbose > 2 && options.slow && useML) {
+            /* Note we recomputed profiles back up to root already if slow */
+            printNJInternal(log, /*useLen*/true);
+            log << strformat("New tree lk -- %.4f\n", treeLogLk(/*site_likelihoods*/nullptr));
+        }
+    } /* end postorder traversal */
+
+    if (options.verbose >= 2) {
+        int nUp = 0;
+        for (int64_t i = 0; i < maxnodes; i++) {
+            if (!upProfiles[i]) {
+                nUp++;
+            }
+        }
+        log << "N up profiles at end of NNI:  " << nUp << std::endl;
+    }
+    return nNNIThisRound;
+}
+
+
+AbsNeighbourJoining(void)::SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRounds) {
+    //TODo
+}
+
+/* Recomputes all branch lengths
+
+   For internal branches such as (A,B) vs. (C,D), uses the formula
+
+   length(AB|CD) = (d(A,C)+d(A,D)+d(B,C)+d(B,D))/4 - d(A,B)/2 - d(C,D)/2
+
+   (where all distances are profile distances - diameters).
+
+   For external branches (e.g. to leaves) A vs. (B,C), use the formula
+
+   length(A|BC) = (d(A,B)+d(A,C)-d(B,C))/2
+*/
+AbsNeighbourJoining(void)::updateBranchLengths() {
+    if (seqs.size() < 2) {
+        return;
+    } else if (seqs.size() == 2) {
+        int64_t root = root;
+        int64_t nodeA = child[root].child[0];
+        int64_t nodeB = child[root].child[1];
+        Besthit h;
+        profileDist(profiles[nodeA], profiles[nodeB], h);
+        if (options.logdist) {
+            h.dist = LogCorrect(h.dist);
+        }
+        branchlength[nodeA] = h.dist / 2.0;
+        branchlength[nodeB] = h.dist / 2.0;
+        return;
+    }
+
+    std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
+    std::vector<bool> traversal(maxnodes, false);
+
+    int64_t node = root;
+    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr)) >= 0) {
+        /* reset branch length of node (distance to its parent) */
+        if (node == root) {
+            continue; /* no branch length to set */
+        }
+        if (node < seqs.size()) { /* a leaf */
+            Profile *profileA = profiles[node];
+            Profile *profileB = nullptr;
+            Profile *profileC = nullptr;
+
+            int64_t sib = sibling(node);
+            if (sib == -1) { /* at root, have 2 siblings */
+                int64_t sibs[2];
+                rootSiblings(node, /*OUT*/sibs);
+                profileB = &profiles[sibs[0]];
+                profileC = &profiles[sibs[1]];
+            } else {
+                profileB = &profiles[sib];
+                profileC = getUpProfile(upProfiles, parent[node], /*useML*/false);
+            }
+            Profile *profiles3[3] = {profileA, profileB, profileC};
+            double d[3]; /*AB,AC,BC*/
+            correctedPairDistances(profiles3, 3, /*OUT*/d);
+            /* d(A,BC) = (dAB+dAC-dBC)/2 */
+            branchlength[node] = (d[0] + d[1] - d[2]) / 2.0;
+        } else {
+            Profile *profiles4[4];
+            int nodeABCD[4];
+            setupABCD(node, profiles4, upProfiles, nodeABCD, false);
+            double d[6];
+            correctedPairDistances(profiles4, 4, d);
+            branchlength[node] = (d[qAC] + d[qAD] + d[qBC] + d[qBD]) / 4.0 - (d[qAB] + d[qCD]) / 2.0;
+
+            /* no longer needed */
+            upProfiles[nodeABCD[0]].reset();
+            upProfiles[nodeABCD[1]].reset();
+        }
+    }
+}
+
+
+AbsNeighbourJoining(double)::treeLength(bool recomputeProfiles) {
+    if (recomputeProfiles) {
+        std::vector<bool> traversal2(maxnodes, false);
+        int64_t j = root;
+        while ((j = traversePostorder(j, traversal2, /*pUp*/nullptr)) >= 0) {
+            /* nothing to do for leaves or root */
+            if (j >= seqs.size() && j != root)
+                setProfile(j, /*noweight*/-1.0);
+        }
+    }
+    updateBranchLengths();
+    double total_len = 0;
+    for (int64_t iNode = 0; iNode < maxnode; iNode++)
+        total_len += branchlength[iNode];
+    return total_len;
+}
+
+AbsNeighbourJoining(void)::initNNIStats(std::vector<NNIStats> &stats) {
+    stats.resize(maxnode);
+    const int64_t LargeAge = 1000000;
+    for (int64_t i = 0; i < maxnode; i++) {
+        stats[i].delta = 0;
+        stats[i].support = 0;
+        if (i == root || i < (int64_t) seqs.size()) {
+            stats[i].age = LargeAge;
+            stats[i].subtreeAge = LargeAge;
+        } else {
+            stats[i].age = 0;
+            stats[i].subtreeAge = 0;
+        }
     }
 }
 

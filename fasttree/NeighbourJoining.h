@@ -37,6 +37,47 @@ namespace fasttree {
 
         void logTree(const std::string &format, int64_t i, std::vector<std::string> &names, Uniquify &unique);
 
+        /* nni_stats_t is meaningless for leaves and root, so all of those entries
+           will just be high (for age) or 0 (for delta)
+        */
+        struct NNIStats {
+            int64_t age;        /* number of rounds since this node was modified by an NNI */
+            int64_t subtreeAge; /* number of rounds since self or descendent had a significant improvement */
+            double delta;        /* improvement in score for this node (or 0 if no change) */
+            double support;     /* improvement of score for self over better of alternatives */
+        };
+
+        struct SplitCount {
+            int64_t nBadSplits;
+            int64_t nConstraintViolations;
+            int64_t nBadBoth;
+            int64_t nSplits;
+            /* How much length would be reduce or likelihood would be increased by the
+               best NNI we find (the worst "miss") */
+            double dWorstDeltaUnconstrained;
+            double dWorstDeltaConstrained;
+        };
+
+        /* One round of nearest-neighbor interchanges according to the
+           minimum-evolution or approximate maximum-likelihood criterion.
+           If doing maximum likelihood then this modifies the branch lengths.
+           age is the # of rounds since a node was NNId
+           Returns the # of topological changes performed
+        */
+        int64_t
+        NNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats, double &maxDeltaCriterion);
+
+        /* Recomputes all branch lengths by minimum evolution criterion*/
+        void updateBranchLengths();
+
+        /* Recomputes all branch lengths and, optionally, internal profiles */
+        double treeLength(bool recomputeProfiles);
+
+        void initNNIStats(std::vector<NNIStats> &stats);
+
+        /* One round of subtree-prune-regraft moves (minimum evolution) */
+        void SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRounds);
+
     private:
         typedef Precision numeric_t;
 
@@ -141,9 +182,9 @@ namespace fasttree {
         };
 
         /* Describes which switch to do */
-        typedef enum {
+        enum NNI {
             ABvsCD, ACvsBD, ADvsBC
-        } NNI;
+        };
 
 
         Operations<Precision> operations;
@@ -192,6 +233,9 @@ namespace fasttree {
         Rates rates;
 
         double logCorrect(double dist);
+
+        /* Print topology using node indices as node names */
+        void printNJInternal(std::ostream &out, bool useLen);
 
         void seqsToProfiles();
 
@@ -247,8 +291,30 @@ namespace fasttree {
         */
         bool updateBestHit(int64_t nActive, Besthit &join, bool bUpdateDist);
 
+        /* Update the profile of node and its ancestor, and delete nearby out-profiles */
+        void updateForNNI(int64_t node, std::unique_ptr<Profile> upProfiles[], bool useML);
+
+        /* Sets NJ->parent[newchild] and replaces oldchild with newchild
+           in the list of children of parent
+        */
+        void replaceChild(int64_t parent, int64_t oldchild, int64_t newchild);
+
         /* only handles leaf sequences */
         int64_t nGaps(int64_t i);
+
+        /* node is the parent of AB, sibling of C
+           node cannot be root or a leaf
+           If node is the child of root, then D is the other sibling of node,
+           and the 4th profile is D's profile.
+           Otherwise, D is the parent of node, and we use its upprofile
+           Call this with profiles=NULL to get the nodes, without fetching or
+           computing profiles
+        */
+        void setupABCD(int64_t node, Profile *profiles[4], std::unique_ptr<Profile> upProfiles[], int nodeABCD[4],
+                       bool useML);
+
+        int64_t sibling(int64_t node); /* At root, no unique sibling so returns -1 */
+        void rootSiblings(int64_t node, /*OUT*/int64_t sibs[2]);
 
         /* E.g. GET_FREQ(profile,iPos,iVector)
            Gets the next element of the vectors (and updates iVector), or
@@ -284,6 +350,22 @@ namespace fasttree {
         */
         void profileDist(Profile &profile1, Profile &profile2, Besthit &hit);
 
+        /* Computes all pairs of profile distances, applies pseudocounts
+           if pseudoWeight > 0, and applies log-correction if logdist is true.
+           The lower index is compared to the higher index, e.g. for profiles
+           A,B,C,D the comparison will be as in quartet_pair_t
+        */
+        enum QuartetPair {
+            qAB, qAC, qAD, qBC, qBD, qCD
+        };
+
+        /* Branch lengths for 4-taxon tree ((A,B),C,D); I means internal */
+        enum QuartetLength {
+            LEN_A, LEN_B, LEN_C, LEN_D, LEN_I
+        };
+
+        void correctedPairDistances(Profile *profiles[], int nProfiles, double distances[6]);
+
         void seqDist(std::string &codes1, std::string &codes2, Besthit &hit);
 
 
@@ -300,6 +382,11 @@ namespace fasttree {
            Also, the weight does not affect the representation of the constraints
         */
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1);
+
+        /* PosteriorProfile() is like AverageProfile() but it computes posterior probabilities
+           rather than an average
+        */
+        void posteriorProfile(Profile &out, Profile &profile1, Profile &profile2, double len1, double len2);
 
         void readTreeRemove(std::vector<int64_t> &parents, std::vector<Children> &children, int64_t node);
 
@@ -326,7 +413,27 @@ namespace fasttree {
            (presumably due to an NNI), then it will return the node another time,
            with *pUp = true.
         */
-        int64_t TraversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
+        int64_t traversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
+
+        /* Recomputes the profile for a node, presumably to reflect topology changes
+           If bionj is set, does a weighted join -- which requires using upProfiles
+           If useML is set, computes the posterior probability instead of averaging
+         */
+        void recomputeProfile(std::unique_ptr<Profile> upProfiles[], int64_t node, int64_t useML);
+
+        /* Recompute profiles going up from the leaves, using the provided distance matrix
+           and unweighted joins
+        */
+        void recomputeProfiles();
+
+        void recomputeMLProfiles();
+
+        /* If bionj is set, computes the weight to be given to A when computing the
+           profile for the ancestor of A and B. C and D are the other profiles in the quartet
+           If bionj is not set, returns -1 (which means unweighted in AverageProfile).
+           (A and B are the first two profiles in the array)
+        */
+        double quartetWeight(Profile *profiles[4]);
 
         /* The allhits list contains the distances of the node to all other active nodes
            This is useful for the "reset" improvement to the visible set
@@ -412,7 +519,7 @@ namespace fasttree {
         void uniqueBestHits(int64_t nActive, std::vector<Besthit> &combined, std::vector<Besthit> &out);
 
         /* The three internal branch lengths or log likelihoods*/
-        NNI chooseNNI(Profile profiles[4], double criteria[3]);
+        enum NNI chooseNNI(Profile *profiles[4], double criteria[3]);
 
         /* length[] is ordered as described by quartet_length_t, but after we do the swap
            of B with C (to give AC|BD) or B with D (to get AD|BC), if that is the returned choice
@@ -420,8 +527,9 @@ namespace fasttree {
            (as implemented by MLQuartetOptimize).
            If there are constraints, then the constraint penalty is included in criteria[]
         */
-        NNI MLQuartetNNI(Profile profiles[4], double criteria[3], /* The three potential quartet log-likelihoods */
-                         numeric_t length[5], bool bFast);
+        enum NNI
+        MLQuartetNNI(Profile *profiles[4], double criteria[3], /* The three potential quartet log-likelihoods */
+                     numeric_t length[5], bool bFast);
 
         void optimizeAllBranchLengths();
 
