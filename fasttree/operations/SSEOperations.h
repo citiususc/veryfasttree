@@ -10,7 +10,7 @@ namespace fasttree {
     public:
         typedef Precision numeric_t;
 
-        void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, size_t n);
+        void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n);
 
     };
 }

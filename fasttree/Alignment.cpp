@@ -45,7 +45,7 @@ void Alignment::readAlignment() {
                 }
                 auto &seq = seqs[names.size() - 1];
                 seq.append(buf.begin(), buf.begin() + nKeep);
-                if (seq.size() > nPos) {
+                if ((int64_t)seq.size() > nPos) {
                     nPos = seq.size();
                 }
             }
@@ -61,7 +61,7 @@ void Alignment::readAlignment() {
            Allow multiple alignments, either separated by a single empty line (e.g. seqboot output)
            or not.
          */
-        size_t nSeq = 0;
+        int64_t nSeq = 0;
         if (buf.empty()) {
             if (readline(fp, buf)) {
                 throw std::invalid_argument("Empty header line followed by EOF");
@@ -77,12 +77,12 @@ void Alignment::readAlignment() {
         names.resize(nSeq);
         seqs.resize(nSeq);
 
-        size_t iSeq = 0;
+        int64_t iSeq = 0;
         while (readline(fp, buf)) {
             if (buf.empty() && (iSeq == nSeq || iSeq == 0)) {
                 iSeq = 0;
             } else {
-                size_t j = 0; /* character just past end of name */
+                std::string::size_type j = 0; /* character just past end of name */
                 if (buf[0] == ' ') {
                     if (names[iSeq].empty()) {
                         throw std::invalid_argument("No name in phylip line: " + buf);
@@ -108,7 +108,7 @@ void Alignment::readAlignment() {
                 }
                 for (; j < buf.size(); j++) {
                     if (buf[j] != ' ') {
-                        if (seqs[iSeq].size() >= nPos) {
+                        if ((int64_t)seqs[iSeq].size() >= nPos) {
                             throw std::invalid_argument(strformat(
                                     "Too many characters (expected %d) for sequence named %s\\nSo far have:\\n%s",
                                     nPos, names[iSeq].c_str(), seqs[iSeq].c_str()));
@@ -124,7 +124,7 @@ void Alignment::readAlignment() {
                                      iSeq, names[iSeq].c_str(), seqs[iSeq].c_str());
                 }
                 iSeq++;
-                if (iSeq == nSeq && seqs[0].size() == nPos) {
+                if (iSeq == nSeq && (int64_t)seqs[0].size() == nPos) {
                     break; /* finished alignment */
                 }
             }/* end else non-empty phylip line */
@@ -134,8 +134,8 @@ void Alignment::readAlignment() {
         }
     }
     /* Check lengths of sequences */
-    for (size_t i = 0; i < seqs.size(); i++) {
-        if (seqs[i].size() != nPos) {
+    for (int64_t i = 0; i < (int64_t)seqs.size(); i++) {
+        if ((int64_t)seqs[i].size() != nPos) {
             throw std::invalid_argument(strformat(
                     "Wrong number of characters for %s: expected %d but have %d instead.\n"
                     "This sequence may be truncated, or another sequence may be too long.",
@@ -146,8 +146,8 @@ void Alignment::readAlignment() {
     /* If nucleotide sequences, replace U with T and N with X */
     bool findDot = false;
     #pragma omp parallel for schedule(static), reduction(||:findDot)
-    for (size_t i = 0; i < seqs.size(); i++) {
-        for (size_t j = 0; j < seqs[i].size(); j++) {
+    for (int64_t i = 0; i < (int64_t)seqs.size(); i++) {
+        for (int64_t j = 0; j < (int64_t)seqs[i].size(); j++) {
             if (seqs[i][j] == '.') {
                 seqs[i][j] = '-';
                 findDot = true;
@@ -188,9 +188,9 @@ Uniquify::Uniquify(const Alignment &aln) {
     alnNext.resize(aln.seqs.size(), -1);   /* i in aln -> next, or -1 */
     alnToUniq.resize(aln.seqs.size(), -1); /* i in aln -> iUnique; many -> -1 */
 
-    for (size_t i = 0; i < aln.seqs.size(); i++) {
+    for (int64_t i = 0; i < (int64_t)aln.seqs.size(); i++) {
         assert(hashseqs.find(aln.seqs[i]) != nullptr);
-        size_t first = hashseqs[aln.seqs[i]];
+        int64_t first = hashseqs[aln.seqs[i]];
         if (first == i) {
             /* table uses a pointer to the last repeated sequence as key so if it is affected when move is used,
              * it will not be accessed again */
@@ -209,5 +209,5 @@ Uniquify::Uniquify(const Alignment &aln) {
             alnToUniq[i] = alnToUniq[last];
         }
     }
-    assert((size_t)nUniqueSeq == uniqueSeq.size());
+    assert((int64_t)nUniqueSeq == (int64_t)uniqueSeq.size());
 }

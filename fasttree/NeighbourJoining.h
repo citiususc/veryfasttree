@@ -12,11 +12,11 @@
 
 namespace fasttree {
 
-    template<typename Precision, template<typename> typename Operations>
+    template<typename Precision, template<class> class Operations>
     class NeighbourJoining {
     public:
         NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressReport,
-                         std::vector<std::string> &seqs, size_t nPos,
+                         std::vector<std::string> &seqs, int64_t nPos,
                          std::vector<std::string> &constraintSeqs,
                          DistanceMatrix<Precision> &distanceMatrix, TransitionMatrix<Precision> &transmat);
 
@@ -33,6 +33,10 @@ namespace fasttree {
         /* Searches the visible set */
         void fastNJ();
 
+        void logMLRates();
+
+        void logTree(const std::string &format, int64_t i, std::vector<std::string> &names, Uniquify &unique);
+
     private:
         typedef Precision numeric_t;
 
@@ -44,30 +48,30 @@ namespace fasttree {
             std::vector<numeric_t> codeDist;        /* Optional -- distance to each code at each position */
 
             /* constraint profile */
-            std::vector<size_t> nOn;
-            std::vector<size_t> nOff;
+            std::vector<int64_t> nOn;
+            std::vector<int64_t> nOff;
 
             numeric_t nGaps; /*precalculated in construction*/
 
-            Profile(size_t nPos, size_t nConstraints);
+            Profile(int64_t nPos, int64_t nConstraints);
 
             Profile();
         };
 
         struct Rates {
             std::vector<numeric_t> rates;    /* 1 per rate category */
-            std::vector<size_t> ratecat;    /* 1 category per position */
+            std::vector<int64_t> ratecat;    /* 1 category per position */
 
             /* Allocate or reallocate the rate categories, and set every position
                to category 0 and every category's rate to 1.0
                If nRateCategories=0, just deallocate
             */
-            Rates(size_t nRateCategories, size_t nPos);
+            Rates(int64_t nRateCategories, int64_t nPos);
         };
 
         struct Children {
             int nChild = 0;
-            size_t child[3];
+            int64_t child[3];
         };
 
         /* A visible node is a pair of nodes i, j such that j is the best hit of i,
@@ -104,13 +108,13 @@ namespace fasttree {
         struct TopHitsList {
             std::vector<Hit> hits;  /* the allocated and desired size; some of them may be empty */
             int64_t hitSource;        /* where to refresh hits from if a 2nd-level top-hit list, or -1 */
-            size_t age;                /* number of joins since a refresh */
+            int64_t age;                /* number of joins since a refresh */
         };
 
         struct TopHits {
-            size_t m;             /* size of a full top hits list, usually sqrt(N) */
-            size_t q;             /* size of a 2nd-level top hits, usually sqrt(m) */
-            size_t maxnodes;
+            int64_t m;             /* size of a full top hits list, usually sqrt(N) */
+            int64_t q;             /* size of a 2nd-level top hits, usually sqrt(m) */
+            int64_t maxnodes;
             std::vector<TopHitsList> topHitsLists; /* one per node */
             std::vector<Hit> visible;        /* the "visible" (very best) hit for each node */
 
@@ -124,13 +128,13 @@ namespace fasttree {
             */
             std::vector<int64_t> topvisible; /* nTopVisible = m * topvisibleMult */
 
-            size_t topvisibleAge;        /* joins since the top-visible list was recomputed */
+            int64_t topvisibleAge;        /* joins since the top-visible list was recomputed */
 
 
             /* 1 lock to read or write any top hits list, no thread grabs more than one */
             //omp_lock_t *locks;
 
-            TopHits(const Options &options, size_t maxnodes, int64_t m);
+            TopHits(const Options &options, int64_t maxnodes, int64_t m);
 
             TopHits();
 
@@ -147,7 +151,7 @@ namespace fasttree {
         Options &options;
         ProgressReport &progressReport;
         /* The input */
-        size_t nPos;
+        int64_t nPos;
         std::vector<std::string> &seqs;    /* the aligment sequences array (not reallocated) */
         DistanceMatrix<Precision> &distanceMatrix; /* a ref, not set if using %identity distance */
         TransitionMatrix<Precision> &transmat; /* a ref, not set for Jukes-Cantor */
@@ -158,8 +162,8 @@ namespace fasttree {
         std::vector<std::string> &constraintSeqs;
 
         /* The profile data structures */
-        size_t maxnode;            /* The next index to allocate */
-        size_t maxnodes;            /* Space allocated in data structures below */
+        int64_t maxnode;            /* The next index to allocate */
+        int64_t maxnodes;            /* Space allocated in data structures below */
         std::vector<Profile> profiles; /* Profiles of leaves and intermediate nodes */
         std::vector<numeric_t> diameter;        /* To correct for distance "up" from children (if any) */
         std::vector<numeric_t> varDiameter;        /* To correct variances for distance "up" */
@@ -175,7 +179,7 @@ namespace fasttree {
 
         /* We sometimes use stale out-distances, so we remember what nActive was  */
         std::vector<numeric_t> outDistances;        /* Sum of distances to other active (parent==-1) nodes */
-        std::vector<size_t> nOutDistActive;        /* What nActive was when this outDistance was computed */
+        std::vector<int64_t> nOutDistActive;        /* What nActive was when this outDistance was computed */
 
         /* the inferred tree */
         int64_t root;                   /* index of the root. Unlike other internal nodes, it has 3 children */
@@ -194,7 +198,7 @@ namespace fasttree {
         /* This recomputes the criterion, or returns false if the visible node
            is no longer active.
         */
-        bool getVisible(size_t nActive, TopHits &tophits, size_t iNode, Besthit &visible);
+        bool getVisible(int64_t nActive, TopHits &tophits, int64_t iNode, Besthit &visible);
 
         int64_t activeAncestor(int64_t iNode);
 
@@ -202,7 +206,7 @@ namespace fasttree {
            by SetCriterion */
         int64_t joinConstraintPenalty(int64_t node1, int64_t node2);
 
-        int64_t joinConstraintPenaltyPiece(int64_t node1, int64_t node2, size_t iConstraint);
+        int64_t joinConstraintPenaltyPiece(int64_t node1, int64_t node2, int64_t iConstraint);
 
         /* Helper function for computing the number of constraints violated by
            a split, represented as counts of on and off on each side */
@@ -221,33 +225,42 @@ namespace fasttree {
            Note "IN/UPDATE" for NJ always means that we may update out-distances but otherwise
            make no changes.
         */
-        void setOutDistance(size_t iNode, size_t nActive);
+        void setOutDistance(int64_t iNode, int64_t nActive);
 
         /* Always sets join->criterion; may update NJ->outDistance and NJ->nOutDistActive,
            assumes join's weight and distance are already set,
            and that the constraint penalty (if any) is included in the distance
         */
-        void setCriterion(size_t nActive, Besthit &join);
+        void setCriterion(int64_t nActive, Besthit &join);
 
         /* Computes weight and distance (which includes the constraint penalty)
            and then sets the criterion (maybe update out-distances)
         */
-        void setDistCriterion(size_t nActive, Besthit &join);
+        void setDistCriterion(int64_t nActive, Besthit &join);
+
+        /* If join->i or join->j are inactive nodes, replaces them with their active ancestors.
+           After doing this, if i == j, or either is -1, sets weight to 0 and dist and criterion to 1e20
+              and returns false (not a valid join)
+           Otherwise, if i or j changed, recomputes the distance and criterion.
+           Note that if i and j are unchanged then the criterion could be stale
+           If bUpdateDist is false, and i or j change, then it just sets dist to a negative number
+        */
+        bool updateBestHit(int64_t nActive, Besthit &join, bool bUpdateDist);
 
         /* only handles leaf sequences */
-        size_t nGaps(size_t i);
+        int64_t nGaps(int64_t i);
 
         /* E.g. GET_FREQ(profile,iPos,iVector)
            Gets the next element of the vectors (and updates iVector), or
            returns NULL if we didn't store a vector
         */
-        inline numeric_t *getFreq(Profile &p, size_t &i, size_t &ivector);
+        inline numeric_t *getFreq(Profile &p, int64_t &i, int64_t &ivector);
 
         /* Adds (or subtracts, if weight is negative) fIn/codeIn from fOut
            fOut is assumed to exist (as from an outprofile)
            do not call unless weight of input profile > 0
          */
-        void addToFreq(numeric_t fOut[], double weight, size_t codeIn, numeric_t fIn[]);
+        void addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[]);
 
         /* Divide the vector (of length nCodes) by a constant
            so that the total (unrotated) frequency is 1.0
@@ -261,7 +274,7 @@ namespace fasttree {
            Or, if (say) weight1 was 0, then can have code1==NOCODE *and* f1==NULL
            In that case, returns an arbitrary large number.
         */
-        double profileDistPiece(size_t code1, size_t code2, numeric_t f1[], numeric_t f2[], numeric_t codeDist2[]);
+        double profileDistPiece(int64_t code1, int64_t code2, numeric_t f1[], numeric_t f2[], numeric_t codeDist2[]);
 
         /* ProfileDist and SeqDist only set the dist and weight fields
            If using an outprofile, use the second argument of ProfileDist
@@ -279,7 +292,7 @@ namespace fasttree {
            Use -1.0 for a balanced join
            Fails unless the node has two children (e.g., no leaves or root)
         */
-        void setProfile(size_t node, double weight1);
+        void setProfile(int64_t node, double weight1);
 
         /* AverageProfile is used to do a weighted combination of nodes
            when doing a join. If weight is negative, then the value is ignored and the profiles
@@ -288,16 +301,16 @@ namespace fasttree {
         */
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1);
 
-        void readTreeRemove(std::vector<int64_t> &parents, std::vector<Children> &children, size_t node);
+        void readTreeRemove(std::vector<int64_t> &parents, std::vector<Children> &children, int64_t node);
 
         /* A token is one of ():;, or an alphanumeric string without whitespace
             Any whitespace between tokens is ignored */
         bool readTreeToken(std::istream &fpInTree, std::string &buf);
 
         void
-        readTreeAddChild(size_t parent, size_t child, std::vector<int64_t> &parents, std::vector<Children> &children);
+        readTreeAddChild(int64_t parent, int64_t child, std::vector<int64_t> &parents, std::vector<Children> &children);
 
-        void readTreeMaybeAddLeaf(size_t parent, std::string &name, HashTable &hashnames, Uniquify &unique,
+        void readTreeMaybeAddLeaf(int64_t parent, std::string &name, HashTable &hashnames, Uniquify &unique,
                                   std::vector<int64_t> &parents, std::vector<Children> &children);
 
         void readTreeError(const std::string &err, const std::string &token);
@@ -313,19 +326,19 @@ namespace fasttree {
            (presumably due to an NNI), then it will return the node another time,
            with *pUp = true.
         */
-        size_t TraversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
+        int64_t TraversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
 
         /* The allhits list contains the distances of the node to all other active nodes
            This is useful for the "reset" improvement to the visible set
            Note that the following routines do not handle the tophits heuristic
            and assume that out-distances are up to date.
         */
-        void setBestHit(size_t node, size_t nActive, Besthit &bestjoin, Besthit allhits[]);
+        void setBestHit(int64_t node, int64_t nActive, Besthit &bestjoin, Besthit allhits[]);
 
-        void exhaustiveNJSearch(size_t nActive, Besthit &bestjoin);
+        void exhaustiveNJSearch(int64_t nActive, Besthit &bestjoin);
 
         /* Searches the visible set */
-        void fastNJSearch(size_t nActive, std::vector<Besthit> &visible, Besthit &bestjoin);
+        void fastNJSearch(int64_t nActive, std::vector<Besthit> &visible, Besthit &bestjoin);
 
         /* Subroutines for handling the tophits heuristic */
 
@@ -335,20 +348,19 @@ namespace fasttree {
         void setAllLeafTopHits(TopHits &tophits);
 
         /* Find the best join to do. */
-        void topHitNJSearch(size_t nActive, TopHits &tophits, Besthit &bestjoin);
+        void topHitNJSearch(int64_t nActive, TopHits &tophits, Besthit &bestjoin);
 
         /* Returns the best hit within top hits
            NJ may be modified because it updates out-distances if they are too stale
            Does *not* update visible set
         */
-        void getBestFromTopHits(size_t iNode, size_t nActive, std::vector<TopHits> &tophits,
-                                std::vector<Besthit> &bestjoin);
+        void getBestFromTopHits(int64_t iNode, int64_t nActive, TopHits &tophits, Besthit &bestjoin);
 
         /* visible set is modifiable so that we can reset it more globally when we do
            a "refresh", but we also set the visible set for newnode and do any
            "reset" updates too. And, we update many outdistances.
          */
-        void topHitJoin(size_t newnode, size_t nActive, TopHits &tophits);
+        void topHitJoin(int64_t newnode, int64_t nActive, TopHits &tophits);
 
         /* Sort the input besthits by criterion
            and save the best nOut hits as a new array in top_hits_lists
@@ -356,7 +368,7 @@ namespace fasttree {
            Ignores (silently removes) hit to self
            Saved list may be shorter than requested if there are insufficient entries
         */
-        void sortSaveBestHits(size_t iNode, std::vector<Besthit> &besthits, size_t nIn, size_t nOut,
+        void sortSaveBestHits(int64_t iNode, std::vector<Besthit> &besthits, int64_t nIn, int64_t nOut,
                               TopHits &tophits);
 
         /* Given candidate hits from one node, "transfer" them to another node:
@@ -367,14 +379,13 @@ namespace fasttree {
            it sets dist to -1e20 and criterion to 1e20
 
          */
-        void
-        transferBestHits(size_t nActive, size_t iNode, std::vector<Besthit> &oldhits, size_t nOldHits,
-                         std::vector<Besthit> &newhits, bool updateDistance);
+        void transferBestHits(int64_t nActive, int64_t iNode, std::vector<Besthit> &oldhits, int64_t nOldHits,
+                              Besthit newhits[], bool updateDistance);
 
         /* Create best hit objects from 1 or more hits. Do not update out-distances or set criteria */
-        void hitsToBestHits(std::vector<Hit> &hits, size_t iNode, std::vector<Besthit> &newhits);
+        void hitsToBestHits(std::vector<Hit> &hits, int64_t iNode, Besthit newhits[]);
 
-        void hitToBestHit(size_t i, Hit &hit, Besthit &out);
+        void hitToBestHit(int64_t i, Hit &hit, Besthit &out);
 
         /* Given a set of besthit entries,
            look for improvements to the visible set of the j entries.
@@ -383,13 +394,13 @@ namespace fasttree {
            how this happens (i.e. it does not need to walk up to ancestors).
            Note this calls UpdateTopVisible() on any change
         */
-        void updateVisible(size_t nActive, std::vector<Besthit> &tophitsNode, TopHits *tophits);
+        void updateVisible(int64_t nActive, std::vector<Besthit> &tophitsNode, TopHits &tophits);
 
         /* Update the top-visible list to perhaps include this hit (O(sqrt(N)) time) */
-        void updateTopVisible(size_t nActive, size_t iNode, Hit &hit, TopHits &tophits);
+        void updateTopVisible(int64_t nActive, int64_t iNode, Hit &hit, TopHits &tophits);
 
         /* Recompute the top-visible subset of the visible set */
-        void resetTopVisible(size_t nActive, TopHits &tophits);
+        void resetTopVisible(int64_t nActive, TopHits &tophits);
 
         /* Make a shorter list with only unique entries.
            Replaces any "dead" hits to nodes that have parents with their active ancestors
@@ -398,10 +409,10 @@ namespace fasttree {
            Combined gets sorted by i & j
            The returned list is allocated to nCombined even though only *nUniqueOut entries are filled
         */
-        void uniqueBestHits(size_t nActive, std::vector<Besthit> &combined, std::vector<Besthit> &out);
+        void uniqueBestHits(int64_t nActive, std::vector<Besthit> &combined, std::vector<Besthit> &out);
 
-        NNI
-        chooseNNI(Profile profiles[4], double criteria[3]); /* The three internal branch lengths or log likelihoods*/
+        /* The three internal branch lengths or log likelihoods*/
+        NNI chooseNNI(Profile profiles[4], double criteria[3]);
 
         /* length[] is ordered as described by quartet_length_t, but after we do the swap
            of B with C (to give AC|BD) or B with D (to get AD|BC), if that is the returned choice
@@ -423,7 +434,7 @@ namespace fasttree {
         void setMLRates();
 
         /* Returns a set of nRateCategories potential rates; the caller must free it */
-        void MLSiteRates(size_t nRateCategories, std::vector<numeric_t> &rates);
+        void MLSiteRates(int64_t nRateCategories, std::vector<numeric_t> &rates);
 
         /* returns site_loglk so that
            site_loglk[nPos*iRate + j] is the log likelihood of site j with rate iRate
@@ -438,19 +449,19 @@ namespace fasttree {
         */
         struct CompareSeeds {
             const std::vector<numeric_t> &outDistances;
-            const std::vector<size_t> &compareSeedGaps;
+            const std::vector<int64_t> &compareSeedGaps;
 
-            CompareSeeds(const std::vector<numeric_t> &outDistances, const std::vector<size_t> &compareSeedGaps);
+            CompareSeeds(const std::vector<numeric_t> &outDistances, const std::vector<int64_t> &compareSeedGaps);
 
-            bool operator()(size_t seed1, size_t seed2) const;
+            bool operator()(int64_t seed1, int64_t seed2) const;
         };
 
         struct CompareHitsByCriterion {
-            bool operator()(const Besthit& hit1, const Besthit& hit2) const;
+            bool operator()(const Besthit &hit1, const Besthit &hit2) const;
         };
 
         struct CompareHitsByIJ {
-            bool operator()(const Besthit& hit1, const Besthit& hit2) const;
+            bool operator()(const Besthit &hit1, const Besthit &hit2) const;
         };
 
     };

@@ -15,7 +15,7 @@
 #include "NeighbourJoining.h"
 
 namespace fasttree {
-    template<typename Precision, template<typename> typename Operations>
+    template<typename Precision, template<class> class Operations>
     class FastTreeImpl {
     public:
         FastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log);

@@ -79,13 +79,13 @@ namespace fasttree {
     }
 
     template<typename Iter, typename Compare>
-    inline void psort(Iter first, Iter last, size_t threads, const Compare& comp) {
+    inline void psort(Iter first, Iter last, int64_t threads, const Compare &comp) {
         boost::sort::sample_sort(first, last, comp, threads);
     }
 
     template<typename ... Args>
     inline std::string strformat(const std::string &format, Args ... args) {
-        size_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1;//\0'
+        int64_t size = snprintf(nullptr, 0, format.c_str(), args ...) + 1;//\0'
         std::string buf;
         buf.resize(size);
         snprintf(&buf.front(), size, format.c_str(), args ...);
@@ -120,9 +120,14 @@ namespace fasttree {
     public:
 
         typedef std::chrono::high_resolution_clock Clock;
-        const Clock::time_point clockStart;
 
         ProgressReport(const Options &options) : clockStart(Clock::now()), options(options) {}
+
+        inline double clockDiff() {
+            auto timeNow = Clock::now();
+            return std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count() /
+                   (double) (1000);
+        }
 
         template<typename ... Args>
         inline void print(const std::string &format, Args ... args) {
@@ -133,7 +138,7 @@ namespace fasttree {
             auto timeNow = Clock::now();
 
             if (std::chrono::duration_cast<std::chrono::seconds>(timeNow - timeLast).count() > 1) {
-                size_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count();
+                int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count();
                 std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
                 std::cerr << strformat(format, args...);
                 if (options.verbose > 1 || !isattyErr()) {
@@ -146,7 +151,7 @@ namespace fasttree {
         }
 
     private:
-
+        const Clock::time_point clockStart;
         Clock::time_point timeLast;
         const Options &options;
 

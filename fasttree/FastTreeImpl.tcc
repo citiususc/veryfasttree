@@ -8,7 +8,7 @@
 #include "assert.h"
 
 #define AbsFastTreeImpl(...) \
-template<typename Precision, template<typename> typename Operations> \
+template<typename Precision, template<class> class Operations> \
 __VA_ARGS__ fasttree::FastTreeImpl<Precision, Operations>
 
 
@@ -43,7 +43,7 @@ AbsFastTreeImpl()::FastTreeImpl(Options &options, std::istream &input, std::ostr
 
 AbsFastTreeImpl(void)::run() {
     Alignment aln(options, input, log);
-    for (size_t iAln = 0; iAln < options.nAlign; iAln++) {
+    for (int64_t iAln = 0; iAln < options.nAlign; iAln++) {
         aln.readAlignment();
 
         if (aln.seqs.empty()) {
@@ -123,13 +123,23 @@ AbsFastTreeImpl(void)::run() {
             } else {
                 nj.fastNJ();
             }
-            //LogTree("NJ", 0, fpLog, NJ, aln->names, unique, bQuote); //TODO
+            nj.logTree("NJ", 0, aln.names, unique);
 
-            /* profile-frequencies for the "up-profiles" in ReliabilityNJ take only diameter(Tree)*L*a
-               space not N*L*a space, because we can free them as we go.
-               And up-profile by their nature tend to be complicated.
-               So save the profile-frequency memory allocation counters now to exclude later results.
-            */
+            int64_t nniToDo = options.nni == -1 ? (int64_t) (0.5 + 4.0 * std::log(aln.seqs.size()) / std::log(2)) :
+                              options.nni;
+            int64_t sprRemaining = options.spr;
+            int64_t MLnniToDo = (options.MLnni != -1) ? options.MLnni :
+                                (int64_t) (0.5 + 2.0 * std::log(aln.seqs.size()) / std::log(2));
+            if (options.verbose > 0) {
+                if (!fpInTree) {
+                    log << strformat("Initial topology in %.2f seconds", progressReport.clockDiff()) << std::endl;
+                }
+                if (options.spr > 0 || nniToDo > 0 || MLnniToDo > 0) {
+                    log << strformat("Refining topology: %d rounds ME-NNIs, %d rounds ME-SPRs, %d rounds ML-NNIs",
+                                     nniToDo, options.spr, MLnniToDo) << std::endl;
+                }
+            }
+
 
             //TODO implement
         }
@@ -142,7 +152,7 @@ AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraint
     /* look up constraints as names and map to unique-space */
     uniqConstraints.reserve(unique.uniqueSeq.size());
 
-    for (size_t i = 0; i < constraints.seqs.size(); i++) {
+    for (int64_t i = 0; i < (int64_t) constraints.seqs.size(); i++) {
         auto &name = constraints.names[i];
         auto &constraintSeq = constraints.seqs[i];
         auto hi = hashnames.find(name);
@@ -150,10 +160,10 @@ AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraint
             throw std::invalid_argument(
                     strformat("Sequence %s from constraints file is not in the alignment", name.c_str()));
         }
-        size_t iSeqNonunique = *hi;
-        assert(iSeqNonunique >= 0 && iSeqNonunique < unique.alnToUniq.size());
-        size_t iSeqUnique = unique.alnToUniq[iSeqNonunique];
-        assert(iSeqUnique >= 0 && iSeqUnique < unique.uniqueSeq.size());
+        int64_t iSeqNonunique = *hi;
+        assert(iSeqNonunique >= 0 && iSeqNonunique < (int64_t) unique.alnToUniq.size());
+        int64_t iSeqUnique = unique.alnToUniq[iSeqNonunique];
+        assert(iSeqUnique >= 0 && iSeqUnique < (int64_t) unique.uniqueSeq.size());
         if (!uniqConstraints[iSeqUnique].empty()) {
             /* Already set a constraint for this group of sequences!
             Warn that we are ignoring this one unless the constraints match */

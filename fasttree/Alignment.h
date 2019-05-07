@@ -14,7 +14,7 @@ namespace fasttree {
         std::ostream &log;
 
     public:
-        size_t nPos;
+        int64_t nPos;
         std::vector<std::string> names;
         std::vector<std::string> seqs;
 
@@ -32,7 +32,7 @@ namespace fasttree {
        in the alignment to unique indicies in a NJ_t
     */
     struct Uniquify {
-        std::vector<size_t> uniqueFirst;       /* iUnique -> iAln */
+        std::vector<int64_t> uniqueFirst;       /* iUnique -> iAln */
         std::vector<int64_t> alnNext;          /* iAln -> next, or -1  */
         std::vector<int64_t> alnToUniq;        /* iAln -> iUnique, or -1 if another was the exemplar */
         std::vector<std::string> uniqueSeq;    /* indexed by iUniq -- points to strings allocated elsewhere */
