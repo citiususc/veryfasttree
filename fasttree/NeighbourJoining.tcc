@@ -716,6 +716,272 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
     options.debug.profileOps++;
 }
 
+AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, double site_likelihoods[]) {
+    double lk = 1.0;
+    double loglk = 0.0;        /* stores underflow of lk during the loop over positions */
+
+    assert(!rates.rates.empty());
+    std::vector<numeric_t> expeigenRates;
+    if (transmat) {
+        expEigenRates(length, expeigenRates);
+    }
+
+    if (!transmat) {    /* Jukes-Cantor */
+        assert (options.nCodes == 4);
+        std::vector<double> pSame;
+        std::vector<double> pDiff;
+
+        pSameVector(length, pSame);
+        pDiffVector(pSame, pDiff);
+
+        int64_t iFreqA = 0;
+        int64_t iFreqB = 0;
+        for (int64_t i = 0; i < nPos; i++) {
+            int64_t iRate = rates.ratecat[i];
+            double wA = p1.weights[i];
+            double wB = p2.weights[i];
+            int64_t codeA = p1.codes[i];
+            int64_t codeB = p2.codes[i];
+            numeric_t *fA = getFreq(p1, i, iFreqA);
+            numeric_t *fB = getFreq(p2, i, iFreqB);
+            double lkAB = 0;
+
+            if (fA == nullptr && fB == nullptr) {
+                if (codeA == NOCODE) {    /* A is all gaps */
+                    /* gap to gap is sum(j) 0.25 * (0.25 * pSame + 0.75 * pDiff) = sum(i) 0.25*0.25 = 0.25
+                       gap to any character gives the same result
+                    */
+                    lkAB = 0.25;
+                } else if (codeB == NOCODE) { /* B is all gaps */
+                    lkAB = 0.25;
+                } else if (codeA == codeB) { /* A and B match */
+                    lkAB = pSame[iRate] * wA * wB + 0.25 * (1 - wA * wB);
+                } else {        /* codeA != codeB */
+                    lkAB = pDiff[iRate] * wA * wB + 0.25 * (1 - wA * wB);
+                }
+            } else if (fA == nullptr) {
+                /* Compare codeA to profile of B */
+                if (codeA == NOCODE)
+                    lkAB = 0.25;
+                else
+                    lkAB = wA * (pDiff[iRate] + fB[codeA] * (pSame[iRate] - pDiff[iRate])) + (1.0 - wA) * 0.25;
+                /* because lkAB = wA * P(codeA->B) + (1-wA) * 0.25
+                   P(codeA -> B) = sum(j) P(B==j) * (j==codeA ? pSame : pDiff)
+                   = sum(j) P(B==j) * pDiff +
+                   = pDiff + P(B==codeA) * (pSame-pDiff)
+                */
+            } else if (fB == nullptr) { /* Compare codeB to profile of A */
+                if (codeB == NOCODE) {
+                    lkAB = 0.25;
+                } else {
+                    lkAB = wB * (pDiff[iRate] + fA[codeB] * (pSame[iRate] - pDiff[iRate])) + (1.0 - wB) * 0.25;
+                }
+            } else { /* both are full profiles */
+                for (int j = 0; j < 4; j++) {
+                    lkAB += fB[j] * (fA[j] * pSame[iRate] + (1 - fA[j]) * pDiff[iRate]); /* P(A|B) */
+                }
+            }
+            assert(lkAB > 0);
+            lk *= lkAB;
+            while (lk < Constants::LkUnderflow) {
+                lk *= Constants::LkUnderflowInv;
+                loglk -= Constants::LogLkUnderflow;
+            }
+            if (site_likelihoods != nullptr) {
+                site_likelihoods[i] *= lkAB;
+            }
+        }
+    } else if (options.nCodes == 4) {    /* matrix model on nucleotides */
+        int64_t iFreqA = 0;
+        int64_t iFreqB = 0;
+        numeric_t fAmix[4], fBmix[4];
+        numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
+
+        for (int64_t i = 0; i < nPos; i++) {
+            int iRate = rates.ratecat[i];
+            numeric_t *expeigen = &expeigenRates[iRate * 4];
+            double wA = p1.weights[i];
+            double wB = p2.weights[i];
+            if (wA == 0 && wB == 0 && p1.codes[i] == NOCODE && p2.codes[i] == NOCODE) {
+                /* Likelihood of A vs B is 1, so nothing changes
+                   Do not need to advance iFreqA or iFreqB */
+                continue;
+            }
+            numeric_t *fA = getFreq(p1, i, iFreqA);
+            numeric_t *fB = getFreq(p2, i, iFreqB);
+            if (fA == nullptr) {
+                fA = &transmat.codeFreq[(int) p1.codes[i]][0];
+            }
+            if (wA > 0.0 && wA < 1.0) {
+                for (int64_t j = 0; j < 4; j++) {
+                    fAmix[j] = wA * fA[j] + (1.0 - wA) * fGap[j];
+                }
+                fA = fAmix;
+            }
+            if (fB == nullptr) {
+                fB = &transmat.codeFreq[(int) p2.codes[i]][0];
+            }
+            if (wB > 0.0 && wB < 1.0) {
+                for (int64_t j = 0; j < 4; j++) {
+                    fBmix[j] = wB * fB[j] + (1.0 - wB) * fGap[j];
+                }
+                fB = fBmix;
+            }
+            /* SSE3 instructions do not speed this step up:
+           numeric_t lkAB = vector_multiply3_sum(expeigen, fA, fB); */
+            // dsp this is where check for <=0 was added in 2.1.1.LG
+            double lkAB = 0;
+            for (int j = 0; j < 4; j++) {
+                lkAB += expeigen[j] * fA[j] * fB[j];
+            }
+            assert(lkAB > 0);
+            if (site_likelihoods != nullptr)
+                site_likelihoods[i] *= lkAB;
+            lk *= lkAB;
+            while (lk < Constants::LkUnderflow) {
+                lk *= Constants::LkUnderflowInv;
+                loglk -= Constants::LogLkUnderflow;
+            }
+            while (lk > Constants::LkUnderflowInv) {
+                lk *= Constants::LkUnderflow;
+                loglk += Constants::LogLkUnderflow;
+            }
+        }
+    } else if (options.nCodes == 20) {    /* matrix model on amino acids */
+        int64_t iFreqA = 0;
+        int64_t iFreqB = 0;
+        numeric_t fAmix[20], fBmix[20];
+        numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
+
+        for (int64_t i = 0; i < nPos; i++) {
+            int iRate = rates.ratecat[i];
+            numeric_t *expeigen = &expeigenRates[iRate * 20];
+            double wA = p1.weights[i];
+            double wB = p2.weights[i];
+            if (wA == 0 && wB == 0 && p1.codes[i] == NOCODE && p2.codes[i] == NOCODE) {
+                /* Likelihood of A vs B is 1, so nothing changes
+                   Do not need to advance iFreqA or iFreqB */
+                continue;
+            }
+            numeric_t *fA = getFreq(p1, i, iFreqA);
+            numeric_t *fB = getFreq(p2, i, iFreqB);
+            if (fA == nullptr)
+                fA = &transmat.codeFreq[(int) p1.codes[i]][0];
+            if (wA > 0.0 && wA < 1.0) {
+                for (int j = 0; j < 20; j++) {
+                    fAmix[j] = wA * fA[j] + (1.0 - wA) * fGap[j];
+                }
+                fA = fAmix;
+            }
+            if (fB == nullptr)
+                fB = &transmat.codeFreq[(int) p2.codes[i]][0];
+            if (wB > 0.0 && wB < 1.0) {
+                for (int j = 0; j < 20; j++) {
+                    fBmix[j] = wB * fB[j] + (1.0 - wB) * fGap[j];
+                }
+                fB = fBmix;
+            }
+            numeric_t lkAB = operations.vector_multiply3_sum(expeigen, fA, fB, 20);
+            if (!(lkAB > 0)) {
+                /* If this happens, it indicates a numerical problem that needs to be addressed elsewhere,
+                   so report all the details */
+                log << "# FastTree.c::PairLogLk -- numerical problem!" << std::endl;
+                log << "# This block is intended for loading into R" << std::endl;
+
+                log << strformat("lkAB = %.8g", lkAB) << std::endl;
+                log << strformat("Branch_length= %.8g\nalignment_position=%d\nnCodes=%d\nrate_category=%d\nrate=%.8g",
+                                 length, i, options.nCodes, iRate, rates.rates[iRate]) << std::endl;
+                log << strformat("wA=%.8g\nwB=%.8g", wA, wB) << std::endl;
+                log << strformat("codeA = %d\ncodeB = %d", p1.codes[i], p2.codes[i]) << std::endl;
+
+                log << "fA = c(";
+                for (int j = 0; j < options.nCodes; j++) {
+                    log << (j == 0 ? "" : ",") << strformat(" %.8g", fA[j]);
+                }
+                log << ")" << std::endl;
+
+                log << "fB = c(";
+                for (int j = 0; j < options.nCodes; j++) {
+                    log << (j == 0 ? "" : ",") << strformat(" %.8g", fB[j]);
+                }
+                log << ")" << std::endl;
+
+                log << "stat = c(";
+                for (int j = 0; j < options.nCodes; j++) {
+                    log << (j == 0 ? "" : ",") << strformat(" %.8g", transmat.stat[j]);
+                }
+                log << ")" << std::endl;
+
+                log << "eigenval = c(";
+                for (int j = 0; j < options.nCodes; j++) {
+                    log << (j == 0 ? "" : ",") << strformat(" %.8g", transmat.eigenval[j]);
+                }
+                log << ")" << std::endl;
+
+                log << "expeigen = c(";
+                for (int j = 0; j < options.nCodes; j++) {
+                    log << (j == 0 ? "" : ",") << strformat(" %.8g", expeigen[j]);
+                }
+                log << ")" << std::endl;
+
+                log << "codeFreq = c(";
+                for (int j = 0; j < options.nCodes; j++) {
+                    for (int k = 0; k < options.nCodes; k++) {
+                        log << (j == 0 ? "" : ",") << strformat(" %.8g", transmat.codeFreq[j][k]);
+                    }
+                }
+                log << ")" << std::endl;
+
+                log << "eigeninv = c(";
+                for (int j = 0; j < options.nCodes; j++) {
+                    for (int k = 0; k < options.nCodes; k++) {
+                        fprintf(stderr, "%s %.8g", j == 0 && k == 0 ? "" : ",",
+                                transmat.eigeninv[j][k]);
+                    }
+                }
+                log << ")" << std::endl;
+
+                log << "# Transform into matrices and compute un-rotated vectors for profiles A and B" << std::endl;
+                log << "codeFreq = matrix(codeFreq,nrow=20);" << std::endl;
+                log << "eigeninv = matrix(eigeninv,nrow=20);" << std::endl;
+                log << "unrotA = stat * (eigeninv %*% fA)" << std::endl;
+                log << "unrotB = stat * (eigeninv %*% fB)" << std::endl;
+                log << "# End of R block" << std::endl;
+
+            }
+            assert(lkAB > 0);
+            if (site_likelihoods != nullptr)
+                site_likelihoods[i] *= lkAB;
+            lk *= lkAB;
+            while (lk < Constants::LkUnderflow) {
+                lk *= Constants::LkUnderflowInv;
+                loglk -= Constants::LogLkUnderflow;
+            }
+            while (lk > Constants::LkUnderflowInv) {
+                lk *= Constants::LkUnderflow;
+                loglk += Constants::LogLkUnderflow;
+            }
+        }
+    } else {
+        assert(0);            /* illegal nCodes */
+    }
+
+    loglk += std::log(lk);
+    options.debug.nLkCompute++;
+    return (loglk);
+}
+
+AbsNeighbourJoining(double)::pairNegLogLk(double x, QuartetOpt &qo) {
+    assert(qo.pair1 != nullptr && qo.pair2 != nullptr);
+    qo.nEval++;
+    double loglk = pairLogLk(*qo.pair1, *qo.pair2, x, /*site_lk*/nullptr);
+    assert(loglk < 1e100);
+    if (options.verbose > 5) {
+        log << strformat("PairLogLk(%.4f) =  %.4f", x, loglk) << std::endl;
+    }
+    return -loglk;
+}
+
 AbsNeighbourJoining(void)::correctedPairDistances(Profile *_profiles[], int nProfiles, double distances[6]) {
     assert(_profiles != nullptr);
     assert(nProfiles > 1 && nProfiles <= 4);
@@ -744,6 +1010,82 @@ AbsNeighbourJoining(void)::correctedPairDistances(Profile *_profiles[], int nPro
         for (int iHit = 0; iHit < (nProfiles * (nProfiles - 1)) / 2; iHit++)
             distances[iHit] = logCorrect(distances[iHit]);
     }
+}
+
+AbsNeighbourJoining(void)::quartetConstraintPenalties(Profile *profiles4[4], double penalty[3]) {
+    for (int i = 0; i < 3; i++) {
+        penalty[i] = 0.0;
+    }
+    if (constraintSeqs.empty()) {
+        return;
+    }
+
+    for (int64_t iC = 0; iC < (int64_t) constraintSeqs.size(); iC++) {
+        double part[3];
+        if (quartetConstraintPenaltiesPiece(profiles4, iC, /*OUT*/part)) {
+            for (int i = 0; i < 3; i++) {
+                penalty[i] += part[i];
+            }
+
+            if (options.verbose > 2
+                && (std::fabs(part[ABvsCD] - part[ACvsBD]) > 0.001 || std::fabs(part[ABvsCD] - part[ADvsBC]) > 0.001)) {
+                log << strformat(
+                        "Constraint Penalties at %d: ABvsCD %.3f ACvsBD %.3f ADvsBC %.3f %d/%d %d/%d %d/%d %d/%d",
+                        iC, part[ABvsCD], part[ACvsBD], part[ADvsBC],
+                        profiles4[0]->nOn[iC], profiles4[0]->nOff[iC],
+                        profiles4[1]->nOn[iC], profiles4[1]->nOff[iC],
+                        profiles4[2]->nOn[iC], profiles4[2]->nOff[iC],
+                        profiles4[3]->nOn[iC], profiles4[3]->nOff[iC]) << std::endl;
+            }
+        }
+    }
+    if (options.verbose > 2) {
+        log << strformat("Total Constraint Penalties: ABvsCD %.3f ACvsBD %.3f ADvsBC %.3f",
+                         penalty[ABvsCD], penalty[ACvsBD], penalty[ADvsBC]) << std::endl;
+    }
+}
+
+AbsNeighbourJoining(double)::pairConstraintDistance(int64_t nOn1, int64_t nOff1, int64_t nOn2, int64_t nOff2) {
+    double f1 = nOn1 / (double) (nOn1 + nOff1);
+    double f2 = nOn2 / (double) (nOn2 + nOff2);
+    /* 1 - f1 * f2 - (1-f1)*(1-f2) = 1 - f1 * f2 - 1 + f1 + f2 - f1 * f2 */
+    return (f1 + f2 - 2.0 * f1 * f2);
+}
+
+AbsNeighbourJoining(bool)::quartetConstraintPenaltiesPiece(Profile *profiles[4], int64_t iC, double piece[3]) {
+    int64_t nOn[4];
+    int64_t nOff[4];
+
+    int64_t nSplit = 0;
+    int64_t nPlus = 0;
+    int64_t nMinus = 0;
+
+    for (int64_t i = 0; i < 4; i++) {
+        nOn[i] = profiles[i]->nOn[iC];
+        nOff[i] = profiles[i]->nOff[iC];
+        if (nOn[i] + nOff[i] == 0)
+            return (false);        /* ignore */
+        else if (nOn[i] > 0 && nOff[i] > 0)
+            nSplit++;
+        else if (nOn[i] > 0)
+            nPlus++;
+        else
+            nMinus++;
+    }
+    /* If just one of them is split or on the other side and the others all agree, also ignore */
+    if (nPlus >= 3 || nMinus >= 3) {
+        return false;
+    }
+    piece[ABvsCD] = options.constraintWeight
+                    * (pairConstraintDistance(nOn[0], nOff[0], nOn[1], nOff[1])
+                       + pairConstraintDistance(nOn[2], nOff[2], nOn[3], nOff[3]));
+    piece[ACvsBD] = options.constraintWeight
+                    * (pairConstraintDistance(nOn[0], nOff[0], nOn[2], nOff[2])
+                       + pairConstraintDistance(nOn[1], nOff[1], nOn[3], nOff[3]));
+    piece[ADvsBC] = options.constraintWeight
+                    * (pairConstraintDistance(nOn[0], nOff[0], nOn[3], nOff[3])
+                       + pairConstraintDistance(nOn[2], nOff[2], nOn[1], nOff[1]));
+    return true;
 }
 
 AbsNeighbourJoining(void)::seqDist(std::string &codes1, std::string &codes2, Besthit &hit) {
@@ -793,6 +1135,146 @@ AbsNeighbourJoining(bool)::updateBestHit(int64_t nActive, Besthit &hit, bool bUp
         }
     }
     return true;
+}
+
+AbsNeighbourJoining(double)::MLQuartetOptimize(Profile &pA, Profile &pB, Profile &pC, Profile &pD,
+                                               double branch_lengths[5], bool *pStarTest, double *site_likelihoods) {
+    double start_length[5];
+    for (int j = 0; j < 5; j++) {
+        start_length[j] = branch_lengths[j];
+        if (branch_lengths[j] < options.MLMinBranchLength) {
+            branch_lengths[j] = options.MLMinBranchLength;
+        }
+    }
+
+    QuartetOpt qopt = {/*nEval*/0, /*pair1*/NULL, /*pair2*/NULL};
+    double f2x, negloglk;
+
+    if (pStarTest != nullptr) {
+        *pStarTest = false;
+    }
+
+    /* First optimize internal branch, then branch to A, B, C, D, in turn
+       May use star test to quit after internal branch
+     */
+    Profile AB(nPos, /*nConstraints*/0);
+    Profile CD(nPos, /*nConstraints*/0);
+
+    posteriorProfile(AB, pA, pB, branch_lengths[LEN_A], branch_lengths[LEN_B]);
+    posteriorProfile(CD, pC, pD, branch_lengths[LEN_C], branch_lengths[LEN_D]);
+    qopt.pair1 = &AB;
+    qopt.pair2 = &CD;
+    branch_lengths[LEN_I] = onedimenmin(
+            /*xmin*/options.MLMinBranchLength,
+            /*xguess*/branch_lengths[LEN_I],
+            /*xmax*/6.0,
+            /*func*/[this](double x, QuartetOpt &qo) { return pairNegLogLk(x, qo); },
+            /*data*/qopt,
+            /*ftol*/options.MLFTolBranchLength,
+            /*atol*/options.MLMinBranchLengthTolerance,
+            /*OUT*/negloglk,
+            /*OUT*/f2x);
+
+    if (pStarTest != nullptr) {
+        assert(site_likelihoods == nullptr);
+        double loglkStar = -pairNegLogLk(options.MLMinBranchLength, qopt);
+        if (loglkStar < -negloglk - Constants::closeLogLkLimit) {
+            *pStarTest = true;
+            double off = pairLogLk(pA, pB, branch_lengths[LEN_A] + branch_lengths[LEN_B],/*site_lk*/NULL)
+                         + pairLogLk(pC, pD, branch_lengths[LEN_C] + branch_lengths[LEN_D], /*site_lk*/NULL);
+            return -negloglk + off;
+        }
+    }
+    {
+        Profile BCD(nPos, /*nConstraints*/0);
+        posteriorProfile(BCD, pB, CD, branch_lengths[LEN_B], branch_lengths[LEN_I]);
+        qopt.pair1 = &pA;
+        qopt.pair2 = &BCD;
+        branch_lengths[LEN_A] = onedimenmin(
+                /*xmin*/options.MLMinBranchLength,
+                /*xguess*/branch_lengths[LEN_A],
+                /*xmax*/6.0,
+                /*func*/[this](double x, QuartetOpt &qo) { return pairNegLogLk(x, qo); },
+                /*data*/qopt,
+                /*ftol*/options.MLFTolBranchLength,
+                /*atol*/options.MLMinBranchLengthTolerance,
+                /*OUT*/negloglk,
+                /*OUT*/f2x);
+    }
+    {
+        Profile ACD(nPos, /*nConstraints*/0);
+        posteriorProfile(ACD, pA, CD, branch_lengths[LEN_A], branch_lengths[LEN_I]);
+        qopt.pair1 = &pB;
+        qopt.pair2 = &ACD;
+        branch_lengths[LEN_B] = onedimenmin(
+                /*xmin*/options.MLMinBranchLength,
+                /*xguess*/branch_lengths[LEN_B],
+                /*xmax*/6.0,
+                /*func*/[this](double x, QuartetOpt &qo) { return pairNegLogLk(x, qo); },
+                /*data*/qopt,
+                /*ftol*/options.MLFTolBranchLength,
+                /*atol*/options.MLMinBranchLengthTolerance,
+                /*OUT*/negloglk,
+                /*OUT*/f2x);
+    }
+    posteriorProfile(AB, pA, pB, branch_lengths[LEN_A], branch_lengths[LEN_B]);
+    {
+        Profile ABD(nPos, /*nConstraints*/0);
+        posteriorProfile(ABD, AB, pD, branch_lengths[LEN_I], branch_lengths[LEN_D]);
+        qopt.pair1 = &pC;
+        qopt.pair2 = &ABD;
+        branch_lengths[LEN_C] = onedimenmin(
+                /*xmin*/options.MLMinBranchLength,
+                /*xguess*/branch_lengths[LEN_C],
+                /*xmax*/6.0,
+                /*func*/[this](double x, QuartetOpt &qo) { return pairNegLogLk(x, qo); },
+                /*data*/qopt,
+                /*ftol*/options.MLFTolBranchLength,
+                /*atol*/options.MLMinBranchLengthTolerance,
+                /*OUT*/negloglk,
+                /*OUT*/f2x);
+    }
+
+    Profile ABC(nPos, /*nConstraints*/0);
+    posteriorProfile(ABC, AB, pC, branch_lengths[LEN_I], branch_lengths[LEN_C]);
+    qopt.pair1 = &pD;
+    qopt.pair2 = &ABC;
+    branch_lengths[LEN_D] = onedimenmin(
+            /*xmin*/options.MLMinBranchLength,
+            /*xguess*/branch_lengths[LEN_D],
+            /*xmax*/6.0,
+            /*func*/[this](double x, QuartetOpt &qo) { return pairNegLogLk(x, qo); },
+            /*data*/qopt,
+            /*ftol*/options.MLFTolBranchLength,
+            /*atol*/options.MLMinBranchLengthTolerance,
+            /*OUT*/negloglk,
+            /*OUT*/f2x);
+
+    /* Compute the total quartet likelihood
+       PairLogLk(ABC,D) + PairLogLk(AB,C) + PairLogLk(A,B)
+     */
+    double loglkABCvsD = -negloglk;
+    if (site_likelihoods) {
+        for (int64_t j = 0; j < nPos; j++) {
+            site_likelihoods[j] = 1.0;
+        }
+        pairLogLk(ABC, pD, branch_lengths[LEN_D],/*IN/OUT*/site_likelihoods);
+    }
+    double quartetloglk = loglkABCvsD
+                          + pairLogLk(AB, pC, branch_lengths[LEN_I] + branch_lengths[LEN_C],/*IN/OUT*/site_likelihoods)
+                          + pairLogLk(pA, pB, branch_lengths[LEN_A] + branch_lengths[LEN_B],/*IN/OUT*/site_likelihoods);
+
+    if (options.verbose > 3) {
+        double loglkStart = MLQuartetLogLk(pA, pB, pC, pD, start_length, /*site_lk*/NULL);
+        log << strformat("Optimize loglk from %.5f to %.5f eval %d lengths from\n"
+                         "   %.5f %.5f %.5f %.5f %.5f to\n"
+                         "   %.5f %.5f %.5f %.5f %.5f",
+                         loglkStart, quartetloglk, qopt.nEval,
+                         start_length[0], start_length[1], start_length[2], start_length[3], start_length[4],
+                         branch_lengths[0], branch_lengths[1], branch_lengths[2], branch_lengths[3], branch_lengths[4])
+            << std::endl;
+    }
+    return quartetloglk;
 }
 
 /* Update the profile of node and its ancestor, and delete nearby out-profiles */
@@ -853,7 +1335,7 @@ AbsNeighbourJoining(void)::replaceChild(int64_t _parent, int64_t oldchild, int64
 }
 
 AbsNeighbourJoining(void)::setupABCD(int64_t node, Profile *_profiles[4], std::unique_ptr<Profile> upProfiles[],
-                                     int nodeABCD[4], bool useML) {
+                                     int64_t nodeABCD[4], bool useML) {
     int64_t iparent = parent[node];
     assert(iparent >= 0);
     assert(child[node].nChild == 2);
@@ -877,11 +1359,10 @@ AbsNeighbourJoining(void)::setupABCD(int64_t node, Profile *_profiles[4], std::u
         if (_profiles == nullptr) {
             return;
         }
-        //profile4 = getUpProfile(upProfiles, iparent, useML); TODO
+        profile4 = getUpProfile(upProfiles, iparent, useML);
     }
-    assert(upProfiles != NULL);
-    int i;
-    for (i = 0; i < 3; i++) {
+    assert(upProfiles);
+    for (int i = 0; i < 3; i++) {
         _profiles[i] = _profiles[nodeABCD[i]];
     }
     _profiles[3] = profile4;
@@ -914,6 +1395,34 @@ AbsNeighbourJoining(void)::rootSiblings(int64_t node, /*OUT*/int64_t sibs[2]) {
         }
     }
     assert(nSibs == 2);
+}
+
+AbsNeighbourJoining(void)::pSameVector(double length, std::vector<double> &pSame) {
+    pSame.resize(rates.rates.size());
+    for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
+        pSame[iRate] = 0.25 + 0.75 * exp((-4.0 / 3.0) * fabs(length * rates.rates[iRate]));
+    }
+}
+
+
+AbsNeighbourJoining(void)::pDiffVector(std::vector<double> &pSame, std::vector<double> &pDiff) {
+    pDiff.resize(rates.rates.size());
+    for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
+        pDiff[iRate] = (1.0 - pSame[iRate]) / 3.0;
+    }
+}
+
+AbsNeighbourJoining(void)::expEigenRates(double length, std::vector<numeric_t> &expeigenRates) {
+    expeigenRates.resize(options.nCodes * rates.rates.size());
+    for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
+        for (int64_t j = 0; j < options.nCodes; j++) {
+            double relLen = length * rates.rates[iRate];
+            /* very short branch lengths lead to numerical problems so prevent them */
+            if (relLen < options.MLMinRelBranchLength)
+                relLen = options.MLMinRelBranchLength;
+            expeigenRates[iRate * options.nCodes + j] = std::exp(relLen * transmat.eigenval[j]);
+        }
+    }
 }
 
 AbsNeighbourJoining(inline Precision*)::getFreq(Profile &p, int64_t &i, int64_t &ivector) {
@@ -1012,8 +1521,315 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
 }
 
 AbsNeighbourJoining(void)::
-posteriorProfile(Profile &out, Profile &profile1, Profile &profile2, double len1, double len2) {
-    //TODO implement
+posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len2) {
+    if (len1 < options.MLMinBranchLength) {
+        len1 = options.MLMinBranchLength;
+    }
+    if (len2 < options.MLMinBranchLength) {
+        len2 = options.MLMinBranchLength;
+    }
+
+    for (int64_t i = 0; i < nPos; i++) {
+        out.codes[i] = NOCODE;
+        out.weights[i] = 1.0;
+    }
+
+    out.vectors.reserve(options.nCodes * nPos);
+    out.vectors.resize(nPos, 0);
+
+    int64_t iFreqOut = 0;
+    int64_t iFreq1 = 0;
+    int64_t iFreq2 = 0;
+    std::vector<numeric_t> expeigenRates1, expeigenRates2;
+
+    if (transmat) {
+        expEigenRates(len1, expeigenRates1);
+        expEigenRates(len2, expeigenRates2);
+    }
+
+    if (!transmat) {    /* Jukes-Cantor */
+        assert(options.nCodes == 4);
+
+        std::vector<double> PSame1, PDiff1, PSame2, PDiff2;
+
+        pSameVector(len1, PSame1);
+        pDiffVector(PSame1, PDiff1);
+        pSameVector(len2, PSame2);
+        pDiffVector(PSame2, PDiff2);
+
+        numeric_t mix1[4], mix2[4];
+
+        for (int64_t i = 0; i < nPos; i++) {
+            int64_t iRate = rates.ratecat[i];
+            double w1 = p1.weights[i];
+            double w2 = p2.weights[i];
+            int64_t code1 = p1.codes[i];
+            int64_t code2 = p2.codes[i];
+            numeric_t *f1 = getFreq(p1, i,/*IN/OUT*/iFreq1);
+            numeric_t *f2 = getFreq(p2, i,/*IN/OUT*/iFreq2);
+
+            /* First try to store a simple profile */
+            if (f1 == nullptr && f2 == nullptr) {
+                if (code1 == NOCODE && code2 == NOCODE) {
+                    out.codes[i] = NOCODE;
+                    out.weights[i] = 0.0;
+                    continue;
+                } else if (code1 == NOCODE) {
+                    /* Posterior(parent | character & gap, len1, len2) = Posterior(parent | character, len1)
+                       = PSame() for matching characters and 1-PSame() for the rest
+                       = (pSame - pDiff) * character + (1-(pSame-pDiff)) * gap
+                    */
+                    out.codes[i] = code2;
+                    out.weights[i] = w2 * (PSame2[iRate] - PDiff2[iRate]);
+                    continue;
+                } else if (code2 == NOCODE) {
+                    out.codes[i] = code1;
+                    out.weights[i] = w1 * (PSame1[iRate] - PDiff1[iRate]);
+                    continue;
+                } else if (code1 == code2) {
+                    out.codes[i] = code1;
+                    double f12code = (w1 * PSame1[iRate] + (1 - w1) * 0.25) * (w2 * PSame2[iRate] + (1 - w2) * 0.25);
+                    double f12other = (w1 * PDiff1[iRate] + (1 - w1) * 0.25) * (w2 * PDiff2[iRate] + (1 - w2) * 0.25);
+                    /* posterior probability of code1/code2 after scaling */
+                    double pcode = f12code / (f12code + 3 * f12other);
+                    /* Now f = w * (code ? 1 : 0) + (1-w) * 0.25, so to get pcode we need
+                       fcode = 1/4 + w1*3/4 or w = (f-1/4)*4/3
+                     */
+                    out.weights[i] = (pcode - 0.25) * 4.0 / 3.0;
+                    /* This can be zero because of numerical problems, I think */
+                    if (out.weights[i] < 1e-6) {
+                        if (options.verbose > 1) {
+                            log << strformat(
+                                    "Replaced weight %f with %f from w1 %f w2 %f PSame %f %f f12code %f f12other %f",
+                                    out.weights[i], 1e-6,
+                                    w1, w2,
+                                    PSame1[iRate], PSame2[iRate],
+                                    f12code, f12other) << std::endl;
+                        }
+                        out.weights[i] = 1e-6;
+                    }
+                    continue;
+                }
+            }
+            /* if we did not compute a simple profile, then do the full computation and
+               store the full vector
+            */
+            if (f1 == nullptr) {
+                for (int j = 0; j < 4; j++) {
+                    mix1[j] = (1 - w1) * 0.25;
+                }
+                if (code1 != NOCODE)
+                    mix1[code1] += w1;
+                f1 = mix1;
+            }
+            if (f2 == nullptr) {
+                for (int j = 0; j < 4; j++) {
+                    mix2[j] = (1 - w2) * 0.25;
+                }
+                if (code2 != NOCODE) {
+                    mix2[code2] += w2;
+                }
+                f2 = mix2;
+            }
+            out.codes[i] = NOCODE;
+            out.weights[i] = 1.0;
+            numeric_t *f = getFreq(out, i,/*IN/OUT*/iFreqOut);
+            double lkAB = 0;
+            for (int j = 0; j < 4; j++) {
+                f[j] = (f1[j] * PSame1[iRate] + (1.0 - f1[j]) * PDiff1[iRate])
+                       * (f2[j] * PSame2[iRate] + (1.0 - f2[j]) * PDiff2[iRate]);
+                lkAB += f[j];
+            }
+            double lkABInv = 1.0 / lkAB;
+            for (int j = 0; j < 4; j++) {
+                f[j] *= lkABInv;
+            }
+        }
+    } else if (options.nCodes == 4) {    /* matrix model on nucleotides */
+        numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
+        numeric_t f1mix[4], f2mix[4];
+
+        for (int64_t i = 0; i < nPos; i++) {
+            if (p1.codes[i] == NOCODE && p2.codes[i] == NOCODE && p1.weights[i] == 0 && p2.weights[i] == 0) {
+                /* aligning gap with gap -- just output a gap
+                   out->codes[i] is already set to NOCODE so need not set that */
+                out.weights[i] = 0;
+                continue;
+            }
+            int64_t iRate = rates.ratecat[i];
+            numeric_t *expeigen1 = &expeigenRates1[iRate * 4];
+            numeric_t *expeigen2 = &expeigenRates2[iRate * 4];
+            numeric_t *f1 = getFreq(p1, i,/*IN/OUT*/iFreq1);
+            numeric_t *f2 = getFreq(p2, i,/*IN/OUT*/iFreq2);
+            numeric_t *fOut = getFreq(out, i,/*IN/OUT*/iFreqOut);
+            assert(fOut != nullptr);
+
+            if (f1 == nullptr) {
+                f1 = &transmat.codeFreq[(int)p1.codes[i]][0]; /* codeFreq includes an entry for NOCODE */
+                double w = p1.weights[i];
+                if (w > 0.0 && w < 1.0) {
+                    for (int j = 0; j < 4; j++) {
+                        f1mix[j] = w * f1[j] + (1.0 - w) * fGap[j];
+                    }
+                    f1 = f1mix;
+                }
+            }
+            if (f2 == nullptr) {
+                f2 = &transmat.codeFreq[(int)p2.codes[i]][0];
+                double w = p2.weights[i];
+                if (w > 0.0 && w < 1.0) {
+                    for (int j = 0; j < 4; j++) {
+                        f2mix[j] = w * f2[j] + (1.0 - w) * fGap[j];
+                    }
+                    f2 = f2mix;
+                }
+            }
+
+            numeric_t fMult1[4];  /* rotated1 * expeigen1 */
+            numeric_t fMult2[4]; /* rotated2 * expeigen2 */
+
+            for (int j = 0; j < 4; j++) {
+                fMult1[j] = f1[j] * expeigen1[j];
+                fMult2[j] = f2[j] * expeigen2[j];
+            }
+
+            alignas(op_t::ALIGNMENT) numeric_t fPost[4];  /* in  unrotated space */
+            for (int j = 0; j < 4; j++) {
+                double out1 = 0;
+                double out2 = 0;
+                for (int k = 0; k < 4; k++) {
+                    out1 += fMult1[k] * transmat.codeFreq[j][k];
+                    out2 += fMult2[k] * transmat.codeFreq[j][k];
+                }
+                fPost[j] = out1 * out2 * transmat.statinv[j];
+
+            }
+            double fPostTot = 0;
+            for (int j = 0; j < 4; j++) {
+                fPostTot += fPost[j];
+            }
+            assert(fPostTot > options.fPostTotalTolerance);
+            double fPostInv = 1.0 / fPostTot;
+
+            for (int j = 0; j < 4; j++) {
+                fPost[j] *= fPostInv;
+            }
+
+            /* and finally, divide by stat again & rotate to give the new frequencies */
+            operations.matrixt_by_vector4(transmat.eigeninvT, fPost, /*OUT*/fOut);
+        }  /* end loop over position i */
+    } else if (options.nCodes == 20) {    /* matrix model on amino acids */
+        numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
+        alignas(op_t::ALIGNMENT) numeric_t f1mix[20];
+        alignas(op_t::ALIGNMENT) numeric_t f2mix[20];
+
+        for (int64_t i = 0; i < nPos; i++) {
+            if (p1.codes[i] == NOCODE && p2.codes[i] == NOCODE && p1.weights[i] == 0 && p2.weights[i] == 0) {
+                /* aligning gap with gap -- just output a gap
+                   out->codes[i] is already set to NOCODE so need not set that */
+                out.weights[i] = 0;
+                continue;
+            }
+            int64_t iRate = rates.ratecat[i];
+            numeric_t *expeigen1 = &expeigenRates1[iRate * 20];
+            numeric_t *expeigen2 = &expeigenRates2[iRate * 20];
+            numeric_t *f1 = getFreq(p1, i, iFreq1);
+            numeric_t *f2 = getFreq(p2, i, iFreq2);
+            numeric_t *fOut = getFreq(out, i, iFreqOut);
+            assert(fOut != nullptr);
+
+            if (f1 == nullptr) {
+                f1 = &transmat.codeFreq[(int)p1.codes[i]][0]; /* codeFreq includes an entry for NOCODE */
+                double w = p1.weights[i];
+                if (w > 0.0 && w < 1.0) {
+                    for (int j = 0; j < 20; j++) {
+                        f1mix[j] = w * f1[j] + (1.0 - w) * fGap[j];
+                    }
+                    f1 = f1mix;
+                }
+            }
+            if (f2 == nullptr) {
+                f2 = &transmat.codeFreq[(int)p2.codes[i]][0];
+                double w = p2.weights[i];
+                if (w > 0.0 && w < 1.0) {
+                    for (int j = 0; j < 20; j++) {
+                        f2mix[j] = w * f2[j] + (1.0 - w) * fGap[j];
+                    }
+                    f2 = f2mix;
+                }
+            }
+            alignas(op_t::ALIGNMENT) numeric_t fMult1[20];    /* rotated1 * expeigen1 */
+            alignas(op_t::ALIGNMENT) numeric_t fMult2[20];    /* rotated2 * expeigen2 */
+            operations.vector_multiply(f1, expeigen1, 20, /*OUT*/fMult1);
+            operations.vector_multiply(f2, expeigen2, 20, /*OUT*/fMult2);
+            alignas(op_t::ALIGNMENT) numeric_t fPost[20];        /* in  unrotated space */
+            for (int j = 0; j < 20; j++) {
+                numeric_t value = operations.vector_dot_product_rot(fMult1, fMult2, &transmat.codeFreq[j][0], 20)
+                                  * transmat.statinv[j];
+                /* Added this logic try to avoid rare numerical problems */
+                fPost[j] = value >= 0 ? value : 0;
+            }
+            double fPostTot = operations.vector_sum(fPost, 20);
+            assert(fPostTot > options.fPostTotalTolerance);
+            double fPostInv = 1.0 / fPostTot;
+            operations.vector_multiply_by(fPost, fPostInv, 20);
+            int64_t ch = -1;        /* the dominant character, if any */
+            if (!options.exactML) {
+                for (int j = 0; j < 20; j++) {
+                    if (fPost[j] >= Constants::approxMLminf) {
+                        ch = j;
+                        break;
+                    }
+                }
+            }
+
+            /* now, see if we can use the approximation
+           fPost ~= (1 or 0) * w + nearP * (1-w)
+           to avoid rotating */
+            double w = 0;
+            if (ch >= 0) {
+                w = (fPost[ch] - transmat.nearP[ch][ch]) / (1.0 - transmat.nearP[ch][ch]);
+                for (int j = 0; j < 20; j++) {
+                    if (j != ch) {
+                        double fRough = (1.0 - w) * transmat.nearP[ch][j];
+                        if (fRough < fPost[j] * Constants::approxMLminratio) {
+                            ch = -1;        /* give up on the approximation */
+                            break;
+                        }
+                    }
+                }
+            }
+            if (ch >= 0) {
+                options.debug.nAAPosteriorRough++;
+                double wInvStat = w * transmat.statinv[ch];
+                for (int j = 0; j < 20; j++) {
+                    fOut[j] = wInvStat * transmat.codeFreq[ch][j] + (1.0 - w) * transmat.nearFreq[ch][j];
+                }
+            } else {
+                /* and finally, divide by stat again & rotate to give the new frequencies */
+                options.debug.nAAPosteriorExact++;
+                for (int j = 0; j < 20; j++) {
+                    fOut[j] = operations.vector_multiply_sum(fPost, &transmat.eigeninv[j][0], 20);
+                }
+            }
+        } /* end loop over position i */
+    } else {
+        assert(0);            /* illegal nCodes */
+    }
+
+    /* Reallocate out->vectors to be the right size */
+    out.vectors.resize(iFreqOut);
+    out.vectors.reserve(iFreqOut); /* try to save space */
+
+    options.debug.nProfileFreqAlloc += out.vectors.size();
+    options.debug.nProfileFreqAvoid += nPos - out.vectors.size();
+
+    /* compute total constraints */
+    for (int64_t i = 0; i < (int64_t) constraintSeqs.size(); i++) {
+        out.nOn[i] = p1.nOn[i] + p2.nOn[i];
+        out.nOff[i] = p1.nOff[i] + p2.nOff[i];
+    }
+    options.debug.nPosteriorCompute++;
 }
 
 AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std::istream &fpInTree) {
@@ -1834,6 +2650,59 @@ AbsNeighbourJoining(int64_t)::traversePostorder(int64_t node, std::vector<bool> 
     }
 }
 
+AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::Profile *)::getUpProfile(
+        std::unique_ptr<Profile> upProfiles[], int64_t outnode, bool useML) {
+    assert(outnode != root && outnode >= (int64_t) seqs.size()); /* not for root or leaves */
+    if (upProfiles[outnode]) {
+        return upProfiles[outnode].get();
+    }
+
+    std::vector<int64_t> path;
+    pathToRoot(outnode, path);
+
+    /* depth-1 is root */
+    for (int64_t i = path.size() - 2; i >= 0; i--) {
+        int64_t node = path[i];
+
+        if (!upProfiles[node]) {
+            /* Note -- SetupABCD may call GetUpProfile, but it should do it farther
+               up in the path to the root
+            */
+            Profile *profiles4[4];
+            int64_t nodeABCD[4];
+            setupABCD(node, profiles4, upProfiles, nodeABCD, useML);
+            upProfiles[node] = make_unique<Profile>(nPos, constraintSeqs.size());
+            if (useML) {
+                /* If node is a child of root, then the 4th profile is of the 2nd root-sibling of node
+                   Otherwise, the 4th profile is the up-profile of the parent of node, and that
+                   is the branch-length we need
+                 */
+                double lenC = branchlength[nodeABCD[2]];
+                double lenD = branchlength[nodeABCD[3]];
+                if (options.verbose > 3) {
+                    log << strformat("Computing UpProfile for node %d with lenC %.4f lenD %.4f pair-loglk %.3f",
+                                     node, lenC, lenD,
+                                     pairLogLk(*profiles4[2], *profiles4[3], lenC + lenD, /*site_lk*/ nullptr))
+                        << std::endl;
+                    printNJInternal(log, /*useLen*/true);
+                }
+                posteriorProfile(*upProfiles[node], /*C*/*profiles4[2], /*D*/*profiles4[3], lenC, lenD);
+            } else {
+                Profile *profiles4CDAB[4] = {profiles4[2], profiles4[3], profiles4[0], profiles4[1]};
+                double weight = quartetWeight(profiles4CDAB);
+                if (options.verbose > 3) {
+                    log << strformat(
+                            "Compute upprofile of %d from %d and parents (vs. children %d %d) with weight %.3f",
+                            node, nodeABCD[2], nodeABCD[0], nodeABCD[1], weight) << std::endl;
+                }
+                averageProfile(*upProfiles[node], *profiles4[2], *profiles4[3], weight);
+            }
+        }
+    }
+    assert(upProfiles[outnode]);
+    return upProfiles[outnode].get();
+}
+
 AbsNeighbourJoining(void)::recomputeProfile(std::unique_ptr<Profile> upProfiles[], int64_t node, int64_t useML) {
     if (node < (int64_t) seqs.size() || node == root) {
         return;            /* no profile to compute */
@@ -1846,7 +2715,7 @@ AbsNeighbourJoining(void)::recomputeProfile(std::unique_ptr<Profile> upProfiles[
         profiles4[0] = &profiles[child[node].child[0]];
         profiles4[1] = &profiles[child[node].child[1]];
     } else {
-        int nodeABCD[4];
+        int64_t nodeABCD[4];
         setupABCD(node, profiles4, upProfiles, nodeABCD, useML);
         weight = quartetWeight(profiles4);
     }
@@ -1915,6 +2784,15 @@ AbsNeighbourJoining(double)::quartetWeight(Profile *profiles4[4]) {
         weight = 1;
     }
     return weight;
+}
+
+AbsNeighbourJoining(void)::pathToRoot(int64_t node, std::vector<int64_t> &path) {
+    path.reserve(maxnodes);
+    int64_t ancestor = node;
+    while (ancestor >= 0) {
+        path.push_back(ancestor);
+        ancestor = parent[ancestor];
+    }
 }
 
 AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &bestjoin, Besthit allhits[]) {
@@ -2944,10 +3822,289 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
 }
 
 
-AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::
-                             NNI)::
-chooseNNI(Profile *profiles[4], double criteria[3]) {
-    //TODO
+AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::NNI)::chooseNNI(Profile *profiles[4],
+                                                                                            double criteria[3]) {
+    double d[6];
+    correctedPairDistances(profiles, 4, d);
+    double penalty[3];        /* indexed as nni_t */
+    quartetConstraintPenalties(profiles, penalty);
+    criteria[ABvsCD] = d[qAB] + d[qCD] + penalty[ABvsCD];
+    criteria[ACvsBD] = d[qAC] + d[qBD] + penalty[ACvsBD];
+    criteria[ADvsBC] = d[qAD] + d[qBC] + penalty[ADvsBC];
+
+    auto choice = ABvsCD;
+    if (criteria[ACvsBD] < criteria[ABvsCD] && criteria[ACvsBD] <= criteria[ADvsBC]) {
+        choice = ACvsBD;
+    } else if (criteria[ADvsBC] < criteria[ABvsCD] && criteria[ADvsBC] <= criteria[ACvsBD]) {
+        choice = ADvsBC;
+    }
+    if (options.verbose > 1 && penalty[choice] > penalty[ABvsCD] + 1e-6) {
+        log << strformat("Worsen constraint: from %.3f to %.3f distance %.3f to %.3f: ",
+                         penalty[ABvsCD], penalty[choice],
+                         criteria[ABvsCD], choice == ACvsBD ? criteria[ACvsBD] : criteria[ADvsBC]);
+
+        for (int64_t iC = 0; iC < (int64_t) constraintSeqs.size(); iC++) {
+            double ppart[3];
+            if (quartetConstraintPenaltiesPiece(profiles, iC, ppart)) {
+                double old_penalty = ppart[ABvsCD];
+                double new_penalty = ppart[choice];
+                if (new_penalty > old_penalty + 1e-6) {
+                    log << strformat(" %d (%d/%d %d/%d %d/%d %d/%d)", iC,
+                                     profiles[0]->nOn[iC], profiles[0]->nOff[iC],
+                                     profiles[1]->nOn[iC], profiles[1]->nOff[iC],
+                                     profiles[2]->nOn[iC], profiles[2]->nOff[iC],
+                                     profiles[3]->nOn[iC], profiles[3]->nOff[iC]);
+                }
+            }
+        }
+        log << std::endl;
+    }
+    if (options.verbose > 3) {
+        log << strformat("NNI scores ABvsCD %.5f ACvsBD %.5f ADvsBC %.5f choice %s",
+                         criteria[ABvsCD], criteria[ACvsBD], criteria[ADvsBC],
+                         choice == ABvsCD ? "AB|CD" : (choice == ACvsBD ? "AC|BD" : "AD|BC")) << std::endl;
+    }
+    return (choice);
+}
+
+AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::NNI)::
+MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool bFast) {
+    double lenABvsCD[5] = {len[LEN_A], len[LEN_B], len[LEN_C], len[LEN_D], len[LEN_I]};
+    double lenACvsBD[5] = {len[LEN_A], len[LEN_C], len[LEN_B], len[LEN_D], len[LEN_I]};   /* Swap B & C */
+    double lenADvsBC[5] = {len[LEN_A], len[LEN_D], len[LEN_C], len[LEN_B], len[LEN_I]};   /* Swap B & D */
+    bool bConsiderAC = true;
+    bool bConsiderAD = true;
+
+    int64_t nRounds = options.mlAccuracy < 2 ? 2 : options.mlAccuracy;
+    double penalty[3];
+    quartetConstraintPenalties(profiles4, penalty);
+    if (penalty[ABvsCD] > penalty[ACvsBD] || penalty[ABvsCD] > penalty[ADvsBC] || options.threads > 1) {
+        bFast = false; /* turn off star topology test */
+    }
+
+    int64_t iRound;
+    for (iRound = 0; iRound < nRounds; iRound++) {
+        bool bStarTest = false;
+        if (bFast) {
+            criteria[ABvsCD] = MLQuartetOptimize(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3],
+                                                 lenABvsCD, &bStarTest,  /*site_likelihoods*/nullptr)
+                               - penalty[ABvsCD];    /* subtract penalty b/c we are trying to maximize log lk */
+            if (bStarTest) {
+                options.debug.nStarTests++;
+                criteria[ACvsBD] = -1e20;
+                criteria[ADvsBC] = -1e20;
+                len[LEN_I] = lenABvsCD[LEN_I];
+                return ABvsCD;
+            }
+            continue;
+        }
+        {
+            #pragma omp parallel
+            #pragma omp sections
+            {
+                #pragma omp section
+                {
+                    criteria[ABvsCD] = MLQuartetOptimize(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3],
+                                                         lenABvsCD, nullptr,  /*site_likelihoods*/nullptr)
+                                       - penalty[ABvsCD];    /* subtract penalty b/c we are trying to maximize log lk */
+                }
+
+                #pragma omp section
+                {
+                    if (bConsiderAC) {
+                        criteria[ACvsBD] = MLQuartetOptimize(*profiles4[0], *profiles4[2], *profiles4[1], *profiles4[3],
+                                                             lenACvsBD, nullptr, /*site_likelihoods*/nullptr)
+                                           - penalty[ACvsBD];
+                    }
+                }
+
+                #pragma omp section
+                {
+                    if (bConsiderAD) {
+                        criteria[ADvsBC] = MLQuartetOptimize(*profiles4[0], *profiles4[3], *profiles4[2], *profiles4[1],
+                                                             lenADvsBC, nullptr, /*site_likelihoods*/nullptr)
+                                           - penalty[ADvsBC];
+                    }
+                }
+            }
+        } /* end parallel sections */
+        if (options.mlAccuracy < 2) {
+            /* If clearly worse then ABvsCD, or have short internal branch length and worse, then
+               give up */
+            if (criteria[ACvsBD] < criteria[ABvsCD] - Constants::closeLogLkLimit
+                || (lenACvsBD[LEN_I] <= 2.0 * options.MLMinBranchLength && criteria[ACvsBD] < criteria[ABvsCD])) {
+                bConsiderAC = false;
+            }
+            if (criteria[ADvsBC] < criteria[ABvsCD] - Constants::closeLogLkLimit
+                || (lenADvsBC[LEN_I] <= 2.0 * options.MLMinBranchLength && criteria[ADvsBC] < criteria[ABvsCD])) {
+                bConsiderAD = false;
+            }
+            if (!bConsiderAC && !bConsiderAD) {
+                break;
+            }
+            /* If clearly better than either alternative, then give up
+               (Comparison is probably biased in favor of ABvsCD anyway) */
+            if (criteria[ACvsBD] > criteria[ABvsCD] + Constants::closeLogLkLimit
+                && criteria[ACvsBD] > criteria[ADvsBC] + Constants::closeLogLkLimit) {
+                break;
+            }
+            if (criteria[ADvsBC] > criteria[ABvsCD] + Constants::closeLogLkLimit
+                && criteria[ADvsBC] > criteria[ACvsBD] + Constants::closeLogLkLimit) {
+                break;
+            }
+        }
+    } /* end loop over rounds */
+
+    if (options.verbose > 2) {
+        log << strformat("Optimized quartet for %d rounds: ABvsCD %.5f ACvsBD %.5f ADvsBC %.5f",
+                         iRound, criteria[ABvsCD], criteria[ACvsBD], criteria[ADvsBC]) << std::endl;
+    }
+    if (criteria[ACvsBD] > criteria[ABvsCD] && criteria[ACvsBD] > criteria[ADvsBC]) {
+        for (int i = 0; i < 5; i++) {
+            len[i] = lenACvsBD[i];
+        }
+        return (ACvsBD);
+    } else if (criteria[ADvsBC] > criteria[ABvsCD] && criteria[ADvsBC] > criteria[ACvsBD]) {
+        for (int i = 0; i < 5; i++) {
+            len[i] = lenADvsBC[i];
+        }
+        return (ADvsBC);
+    } else {
+        for (int i = 0; i < 5; i++) {
+            len[i] = lenABvsCD[i];
+        }
+        return (ABvsCD);
+    }
+}
+
+AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
+    if (seqs.size() < 2) {
+        return 0.0;
+    }
+    double loglk = 0.0;
+    std::vector<double> site_likelihood;
+
+    if (site_loglk != nullptr) {
+        site_likelihood.resize(nPos, 1.0);
+
+        for (int64_t i = 0; i < nPos; i++) {
+            site_likelihood[i] = 1.0;
+            site_loglk[i] = 0.0;
+        }
+    }
+
+    std::vector<bool> traversal(maxnodes);
+    int64_t node = root;
+    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr)) >= 0) {
+        int64_t nChild = child[node].nChild;
+        if (nChild == 0) {
+            continue;
+        }
+        assert(nChild >= 2);
+        int64_t *children = child[node].child;
+        double loglkchild = pairLogLk(profiles[children[0]], profiles[children[1]],
+                                      branchlength[children[0]] + branchlength[children[1]], site_likelihood.data());
+        loglk += loglkchild;
+        if (!site_likelihood.empty()) {
+            /* prevent underflows */
+            for (int64_t i = 0; i < nPos; i++) {
+                while (site_likelihood[i] < Constants::LkUnderflow) {
+                    site_likelihood[i] *= Constants::LkUnderflowInv;
+                    site_loglk[i] -= Constants::LogLkUnderflow;
+                }
+            }
+        }
+        if (options.verbose > 2) {
+            log << strformat("At %d: LogLk(%d:%.4f,%d:%.4f) = %.3f",
+                             node,
+                             children[0], branchlength[children[0]],
+                             children[1], branchlength[children[1]],
+                             loglkchild) << std::endl;
+        }
+        if (child[node].nChild == 3) {
+            assert(node == root);
+            /* Infer the common parent of the 1st two to define the third... */
+            Profile AB(nPos,/*nConstraints*/0);
+            posteriorProfile(AB, profiles[children[0]], profiles[children[1]], branchlength[children[0]],
+                             branchlength[children[1]]);
+            double loglkup = pairLogLk(AB, profiles[children[2]], branchlength[children[2]], site_likelihood.data());
+            loglk += loglkup;
+            if (options.verbose > 2) {
+                log << strformat("At root %d: LogLk((%d/%d),%d:%.3f) = %.3f",
+                                 node, children[0], children[1], children[2],
+                                 branchlength[children[2]], loglkup) << std::endl;
+            }
+        }
+    }
+    traversal.clear();
+    traversal.resize(0);
+    if (!site_likelihood.empty()) {
+        for (int64_t i = 0; i < nPos; i++) {
+            site_loglk[i] += std::log(site_likelihood[i]);
+        }
+    }
+
+    /* For Jukes-Cantor, with a tree of size 4, if the children of the root are
+       (A,B), C, and D, then
+       P(ABCD) = P(A) P(B|A) P(C|AB) P(D|ABC)
+
+       Above we compute P(B|A) P(C|AB) P(D|ABC) -- note P(B|A) is at the child of root
+       and P(C|AB) P(D|ABC) is at root.
+
+       Similarly if the children of the root are C, D, and (A,B), then
+       P(ABCD) = P(C|D) P(A|B) P(AB|CD) P(D), and above we compute that except for P(D)
+
+       So we need to multiply by P(A) = 0.25, so we pay log(4) at each position
+       (if ungapped). Each gapped position in any sequence reduces the payment by log(4)
+
+       For JTT or GTR, we are computing P(A & B) and the posterior profiles are scaled to take
+       the prior into account, so we do not need any correction.
+       codeFreq[NOCODE] is scaled x higher so that P(-) = 1 not P(-)=1/nCodes, so gaps
+       do not need to be corrected either.
+     */
+
+    if (options.nCodes == 4 && !transmat) {
+        int64_t nGaps = 0;
+        double logNCodes = std::log((double) options.nCodes);
+        for (int64_t i = 0; i < nPos; i++) {
+            int nGapsThisPos = 0;
+            for (node = 0; node < (int64_t) seqs.size(); node++) {
+                std::string &codes = profiles[node].codes;
+                if (codes[i] == NOCODE) {
+                    nGapsThisPos++;
+                }
+            }
+            nGaps += nGapsThisPos;
+            if (site_loglk != nullptr) {
+                site_loglk[i] += nGapsThisPos * logNCodes;
+                if (options.nCodes == 4 && !transmat) {
+                    site_loglk[i] -= logNCodes;
+                }
+            }
+        }
+        loglk -= nPos * logNCodes;
+        loglk += nGaps * logNCodes;    /* do not pay for gaps -- only Jukes-Cantor */
+    }
+    return loglk;
+}
+
+AbsNeighbourJoining(double)::MLQuartetLogLk(Profile &pA, Profile &pB, Profile &pC, Profile &pD, double branchLengths[5],
+                                            double siteLikelihoods[]) {
+    Profile pAB(nPos, /*nConstraints*/0);
+    Profile pCD(nPos, /*nConstraints*/0);
+
+    posteriorProfile(pAB, pA, pB, branchLengths[0], branchLengths[1]);
+    posteriorProfile(pCD, pC, pD, branchLengths[2], branchLengths[3]);
+    if (siteLikelihoods != nullptr) {
+        for (int64_t i = 0; i < nPos; i++) {
+            siteLikelihoods[i] = 1.0;
+        }
+    }
+    /* Roughly, P(A,B,C,D) = P(A) P(B|A) P(D|C) P(AB | CD) */
+    return pairLogLk(pA, pB, branchLengths[0] + branchLengths[1], siteLikelihoods)
+           + pairLogLk(pC, pD, branchLengths[2] + branchLengths[3], siteLikelihoods)
+           + pairLogLk(pAB, pCD, branchLengths[4], siteLikelihoods);
+
 }
 
 AbsNeighbourJoining(void)::readTreeError(const std::string &err, const std::string &token) {
@@ -3043,7 +4200,7 @@ AbsNeighbourJoining(int64_t)::NNI(int64_t iRound, int64_t nRounds, bool useML, s
                 && stats[node].age >= 2
                 && stats[node].subtreeAge >= 2
                 && stats[node].support > supportThreshold) {
-                int nodeABCD[4];
+                int64_t nodeABCD[4];
                 setupABCD(node, nullptr, nullptr, nodeABCD, useML);
                 int i;
                 for (i = 0; i < 4; i++) {
@@ -3098,16 +4255,16 @@ AbsNeighbourJoining(int64_t)::NNI(int64_t iRound, int64_t nRounds, bool useML, s
         iDone++;
 
         Profile *profiles4[4] = {nullptr, nullptr, nullptr, nullptr};
-        int nodeABCD[4];
+        int64_t nodeABCD[4];
         /* Note -- during the first round of ML NNIs, we use the min-evo-based branch lengths,
            which may be suboptimal */
         setupABCD(node, profiles4, upProfiles.data(), nodeABCD, useML);
 
         /* Given our 4 profiles, consider doing a swap */
-        int nodeA = nodeABCD[0];
-        int nodeB = nodeABCD[1];
-        int nodeC = nodeABCD[2];
-        int nodeD = nodeABCD[3];
+        int64_t nodeA = nodeABCD[0];
+        int64_t nodeB = nodeABCD[1];
+        int64_t nodeC = nodeABCD[2];
+        int64_t nodeD = nodeABCD[3];
 
         auto choice = ABvsCD;
 
@@ -3326,7 +4483,7 @@ AbsNeighbourJoining(void)::updateBranchLengths() {
                 profileC = &profiles[sibs[1]];
             } else {
                 profileB = &profiles[sib];
-                profileC = getUpProfile(upProfiles, parent[node], /*useML*/false);
+                profileC = getUpProfile(upProfiles.data(), parent[node], /*useML*/false);
             }
             Profile *profiles3[3] = {profileA, profileB, profileC};
             double d[3]; /*AB,AC,BC*/
@@ -3381,6 +4538,173 @@ AbsNeighbourJoining(void)::initNNIStats(std::vector<NNIStats> &stats) {
         }
     }
 }
+
+/* one-dimensional minimization - as input a lower and an upper limit and a trial
+  value for the minimum is needed: xmin < xguess < xmax
+  the function and a fractional tolerance has to be specified
+  onedimenmin returns the optimal x value and the value of the function
+  and its second derivative at this point
+  */
+AbsNeighbourJoining(template<typename Function, typename Data> double)::
+onedimenmin(double xmin, double xguess, double xmax, Function f, Data &data, double ftol, double atol, double &fx,
+            double &f2x) {
+    double optx, ax, bx, cx, fa, fb, fc;
+
+    /* first attempt to bracketize minimum */
+    if (xguess == xmin) {
+        ax = xmin;
+        bx = 2.0 * xguess;
+        cx = 10.0 * xguess;
+    } else if (xguess <= 2.0 * xmin) {
+        ax = xmin;
+        bx = xguess;
+        cx = 5.0 * xguess;
+    } else {
+        ax = 0.5 * xguess;
+        bx = xguess;
+        cx = 2.0 * xguess;
+    }
+    if (cx > xmax) {
+        cx = xmax;
+    }
+    if (bx >= cx) {
+        bx = 0.5 * (ax + cx);
+    }
+    if (options.verbose > 4) {
+        log << strformat("onedimenmin lo %.4f guess %.4f hi %.4f range %.4f %.4f", ax, bx, cx, xmin, xmax) << std::endl;
+    }
+    /* ideally this range includes the true minimum, i.e.,
+       fb < fa and fb < fc
+       if not, we gradually expand the boundaries until it does,
+       or we near the boundary of the allowed range and use that
+    */
+    fa = f(ax, data);
+    fb = f(bx, data);
+    fc = f(cx, data);
+    while (fa < fb && ax > xmin) {
+        ax = (ax + xmin) / 2.0;
+        if (ax < 2.0 * xmin) {    /* give up on shrinking the region */
+            ax = xmin;
+        }
+        fa = f(ax, data);
+    }
+    while (fc < fb && cx < xmax) {
+        cx = (cx + xmax) / 2.0;
+        if (cx > xmax * 0.95) {
+            cx = xmax;
+        }
+        fc = f(cx, data);
+    }
+    optx = brent(ax, bx, cx, f, data, ftol, atol, fx, f2x, fa, fb, fc);
+
+    if (options.verbose > 4) {
+        log << strformat("onedimenmin reaches optimum f(%.4f) = %.4f f2x %.4f", optx, fx, f2x) << std::endl;
+    }
+    return optx; /* return optimal x */
+}
+
+/******************************************************************************/
+/* Minimization of a 1-dimensional function by Brent's method (Numerical Recipes)
+ * Borrowed from Tree-Puzzle 5.1 util.c under GPL
+ * Modified by M.N.P to pass in the accessory data for the optimization function,
+ * to use 2x bounds around the starting guess and expand them if necessary,
+ * and to use both a fractional and an absolute tolerance
+ */
+
+#define ITMAX 100
+#define CGOLD 0.3819660
+#define TINY 1.0e-20
+#define ZEPS 1.0e-10
+#define SHFT(a, b, c, d) (a)=(b);(b)=(c);(c)=(d);
+#define SIGN(a, b) ((b) >= 0.0 ? fabs(a) : -fabs(a))
+
+AbsNeighbourJoining(template<typename Function, typename Data> double)::
+brent(double ax, double bx, double cx, Function f, Data &data, double ftol, double atol, double &foptx, double &f2optx,
+      double fax, double fbx, double fcx) {
+    double a, b, d = 0, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
+    double xw, wv, vx;
+    double e = 0.0;
+
+    a = (ax < cx ? ax : cx);
+    b = (ax > cx ? ax : cx);
+    x = bx;
+    fx = fbx;
+    if (fax < fcx) {
+        w = ax;
+        fw = fax;
+        v = cx;
+        fv = fcx;
+    } else {
+        w = cx;
+        fw = fcx;
+        v = ax;
+        fv = fax;
+    }
+    for (int64_t iter = 1; iter <= ITMAX; iter++) {
+        xm = 0.5 * (a + b);
+        tol1 = ftol * std::fabs(x);
+        tol2 = 2.0 * (tol1 + ZEPS);
+        if (std::fabs(x - xm) <= (tol2 - 0.5 * (b - a)) || std::fabs(a - b) < atol) {
+            foptx = fx;
+            xw = x - w;
+            wv = w - v;
+            vx = v - x;
+            f2optx = 2.0 * (fv * xw + fx * wv + fw * vx) / (v * v * xw + x * x * wv + w * w * vx);
+            return x;
+        }
+        if (std::fabs(e) > tol1) {
+            r = (x - w) * (fx - fv);
+            q = (x - v) * (fx - fw);
+            p = (x - v) * q - (x - w) * r;
+            q = 2.0 * (q - r);
+            if (q > 0.0) p = -p;
+            q = std::fabs(q);
+            etemp = e;
+            e = d;
+            if (std::fabs(p) >= std::fabs(0.5 * q * etemp) || p <= q * (a - x) || p >= q * (b - x)) {
+                d = CGOLD * (e = (x >= xm ? a - x : b - x));
+            } else {
+                d = p / q;
+                u = x + d;
+                if (u - a < tol2 || b - u < tol2)
+                    d = SIGN(tol1, xm - x);
+            }
+        } else {
+            d = CGOLD * (e = (x >= xm ? a - x : b - x));
+        }
+        u = (std::fabs(d) >= tol1 ? x + d : x + SIGN(tol1, d));
+        fu = f(u, data);
+        if (fu <= fx) {
+            if (u >= x) a = x; else b = x;
+            SHFT(v, w, x, u)
+            SHFT(fv, fw, fx, fu)
+        } else {
+            if (u < x) { a = u; } else { b = u; }
+            if (fu <= fw || w == x) {
+                v = w;
+                w = u;
+                fv = fw;
+                fw = fu;
+            } else if (fu <= fv || v == x || v == w) {
+                v = u;
+                fv = fu;
+            }
+        }
+    }
+    foptx = fx;
+    xw = x - w;
+    wv = w - v;
+    vx = v - x;
+    f2optx = 2.0 * (fv * xw + fx * wv + fw * vx) / (v * v * xw + x * x * wv + w * w * vx);
+    return x;
+}
+
+#undef ITMAX
+#undef CGOLD
+#undef TINY
+#undef ZEPS
+#undef SHFT
+#undef SIGN
 
 AbsNeighbourJoining()::CompareSeeds::CompareSeeds(const std::vector<numeric_t> &outDistances,
                                                   const std::vector<int64_t> &compareSeedGaps) :

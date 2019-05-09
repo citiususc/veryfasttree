@@ -9,7 +9,10 @@ namespace fasttree {
     template<typename Precision>
     class BasicOperations {
     public:
+        static constexpr int ALIGNMENT = 0;
         typedef Precision numeric_t;
+
+        void vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]);
 
         numeric_t vector_multiply_sum(numeric_t f1[], numeric_t f2[], int64_t n);
 

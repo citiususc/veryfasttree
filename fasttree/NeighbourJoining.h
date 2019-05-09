@@ -80,6 +80,7 @@ namespace fasttree {
 
     private:
         typedef Precision numeric_t;
+        typedef Operations<Precision> op_t;
 
         struct Profile {
             /* alignment profile */
@@ -291,6 +292,17 @@ namespace fasttree {
         */
         bool updateBestHit(int64_t nActive, Besthit &join, bool bUpdateDist);
 
+        /* Returns the resulting log likelihood. Optionally returns whether other
+           topologies should be abandoned, based on the difference between AB|CD and
+           the "star topology" (AB|CD with a branch length of MLMinBranchLength) exceeding
+           closeLogLkLimit.
+           If bStarTest is passed in, it only optimized the internal branch if
+           the star test is true. Otherwise, it optimized all 5 branch lengths
+           in turn.
+         */
+        double MLQuartetOptimize(Profile &pA, Profile &pB, Profile &pC, Profile &pD, double branch_lengths[5],
+                                 bool *pStarTest, double *site_likelihoods);
+
         /* Update the profile of node and its ancestor, and delete nearby out-profiles */
         void updateForNNI(int64_t node, std::unique_ptr<Profile> upProfiles[], bool useML);
 
@@ -310,11 +322,20 @@ namespace fasttree {
            Call this with profiles=NULL to get the nodes, without fetching or
            computing profiles
         */
-        void setupABCD(int64_t node, Profile *profiles[4], std::unique_ptr<Profile> upProfiles[], int nodeABCD[4],
+        void setupABCD(int64_t node, Profile *profiles[4], std::unique_ptr<Profile> upProfiles[], int64_t nodeABCD[4],
                        bool useML);
 
         int64_t sibling(int64_t node); /* At root, no unique sibling so returns -1 */
         void rootSiblings(int64_t node, /*OUT*/int64_t sibs[2]);
+
+        /* JC probability of nucleotide not changing, for each rate category */
+        void pSameVector(double length, std::vector<double> &pSame);
+
+        /* JC probability of nucleotide not changing, for each rate category */
+        void pDiffVector(std::vector<double> &pSame, std::vector<double> &pDiff);
+
+        /* expeigen[iRate*nCodes + j] = exp(length * rate iRate * eigenvalue j) */
+        void expEigenRates(double length, std::vector<numeric_t> &expeigenRates);
 
         /* E.g. GET_FREQ(profile,iPos,iVector)
            Gets the next element of the vectors (and updates iVector), or
@@ -350,6 +371,12 @@ namespace fasttree {
         */
         void profileDist(Profile &profile1, Profile &profile2, Besthit &hit);
 
+        /* P(A & B | len) = P(B | A, len) * P(A)
+           If site_likelihoods is present, multiplies those values by the site likelihood at each point
+           (Note it does not handle underflow)
+         */
+        double pairLogLk(Profile &p1, Profile &p2, double length, double site_likelihoods[]);
+
         /* Computes all pairs of profile distances, applies pseudocounts
            if pseudoWeight > 0, and applies log-correction if logdist is true.
            The lower index is compared to the higher index, e.g. for profiles
@@ -359,12 +386,45 @@ namespace fasttree {
             qAB, qAC, qAD, qBC, qBD, qCD
         };
 
+        struct QuartetOpt {
+            int64_t nEval;            /* number of likelihood evaluations */
+            /* The pair to optimize */
+            Profile *pair1;
+            Profile *pair2;
+        };
+
+        double pairNegLogLk(double x, QuartetOpt &qo);
+
         /* Branch lengths for 4-taxon tree ((A,B),C,D); I means internal */
         enum QuartetLength {
             LEN_A, LEN_B, LEN_C, LEN_D, LEN_I
         };
 
         void correctedPairDistances(Profile *profiles[], int nProfiles, double distances[6]);
+
+        /* output is indexed by nni_t
+           To ensure good behavior while evaluating a subtree-prune-regraft move as a series
+           of nearest-neighbor interchanges, this uses a distance-ish model of constraints,
+           as given by PairConstraintDistance(), rather than
+           counting the number of violated splits (which is what FastTree does
+           during neighbor-joining).
+           Thus, penalty values may well be >0 even if no constraints are violated, but the
+           relative scores for the three NNIs will be correct.
+         */
+        void quartetConstraintPenalties(Profile *profiles[4], double penalty[3]);
+
+        double pairConstraintDistance(int64_t nOn1, int64_t nOff1, int64_t nOn2, int64_t nOff2);
+
+        /* the split is consistent with the constraint if any of the profiles have no data
+           or if three of the profiles have the same uniform value (all on or all off)
+           or if AB|CD = 00|11 or 11|00 (all uniform)
+         */
+        bool splitViolatesConstraint(Profile *profiles[4], int64_t iConstraint);
+
+        /* If false, no values were set because this constraint was not relevant.
+           output is for the 3 splits
+        */
+        bool quartetConstraintPenaltiesPiece(Profile *profiles[4], int64_t iConstraint, double piece[3]);
 
         void seqDist(std::string &codes1, std::string &codes2, Besthit &hit);
 
@@ -415,6 +475,8 @@ namespace fasttree {
         */
         int64_t traversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
 
+        Profile *getUpProfile(std::unique_ptr<Profile> upProfiles[], int64_t outnode, bool useML);
+
         /* Recomputes the profile for a node, presumably to reflect topology changes
            If bionj is set, does a weighted join -- which requires using upProfiles
            If useML is set, computes the posterior probability instead of averaging
@@ -434,6 +496,9 @@ namespace fasttree {
            (A and B are the first two profiles in the array)
         */
         double quartetWeight(Profile *profiles[4]);
+
+        /* Returns a list of nodes, starting with node and ending with root */
+        void pathToRoot(int64_t node, std::vector<int64_t> &path);
 
         /* The allhits list contains the distances of the node to all other active nodes
            This is useful for the "reset" improvement to the visible set
@@ -549,6 +614,16 @@ namespace fasttree {
            The caller must free it.
         */
         void MLSiteLikelihoodsByRate(std::vector<numeric_t> &rates, std::vector<double> &site_loglk);
+
+        /* One-dimensional minimization using brent's function, with
+        a fractional and an absolute tolerance */
+        template<typename Function, typename Data>
+        double onedimenmin(double xmin, double xguess, double xmax, Function f, Data &data, double ftol, double atol,
+                           double &fx, double &f2x);
+
+        template<typename Function, typename Data>
+        double brent(double ax, double bx, double cx, Function f, Data &data, double ftol, double atol,
+                     double &foptx, double &f2optx, double fax, double fbx, double fcx);
 
         /************************Sort comparators************************/
 

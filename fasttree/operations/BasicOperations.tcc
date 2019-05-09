@@ -8,6 +8,12 @@
 template<typename Precision> \
 __VA_ARGS__ fasttree::BasicOperations<Precision>
 
+AbsBasicOperations(void)::vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]){
+    for (int64_t i = 0; i < n; i++) {
+        fOut[i] = f1[i] * f2[i];
+    }
+}
+
 AbsBasicOperations(Precision)::vector_multiply_sum(numeric_t f1[], numeric_t f2[], int64_t n){
     numeric_t out = 0.0;
     for (int64_t i=0; i < n; i++) {

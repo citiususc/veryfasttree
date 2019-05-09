@@ -5,6 +5,8 @@
 
 #include <iostream>
 #include <chrono>
+#include "assert.h"
+#include <omp.h>
 #include "boost/sort/sample_sort/sample_sort.hpp"
 
 #if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
@@ -80,6 +82,7 @@ namespace fasttree {
 
     template<typename Iter, typename Compare>
     inline void psort(Iter first, Iter last, int64_t threads, const Compare &comp) {
+        assert(!(omp_in_parallel() && threads > 1));
         boost::sort::sample_sort(first, last, comp, threads);
     }
 
