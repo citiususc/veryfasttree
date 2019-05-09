@@ -1,5 +1,5 @@
 
-#include "CLI11.hpp"
+#include <CLI11.hpp>
 #include "fasttree/Options.h"
 #include "fasttree/FastTree.h"
 #include "fasttree/Utils.h"
@@ -424,8 +424,11 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
             group(optimizations);
-    app.add_flag("-sse", options.doublePrecision, "compute multiple processing elements with one operation")->
-            group(optimizations);
+
+    app.add_set_ignore_case ("-ext", options.extension, {"NONE","SSE3","AVX","AVX2","AVX512"},
+                "compute multiple processing elements with one operation. Available: none, SSE3, AVX, AVX2 or AVX512")
+                ->type_name("name")->group(optimizations);
+    for(auto& c:options.extension) {c = (char)std::toupper(c);}
 
 
     auto deprecated = "Deprecated";

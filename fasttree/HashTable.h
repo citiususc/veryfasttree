@@ -3,8 +3,8 @@
 #define FASTTREE_HASHTABLE_H
 
 #include <vector>
-#include "tsl/robin_map.h"
-#include "xxh64.hpp"
+#include <tsl/robin_map.h>
+#include <xxh64.hpp>
 
 namespace fasttree {
 

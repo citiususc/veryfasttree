@@ -148,7 +148,7 @@ AbsFastTreeImpl(void)::run() {
                 for (int64_t i = 0; i < nniToDo; i++) {
                     double maxDelta;
                     if (!bConverged) {
-                        int64_t nChange = nj.NNI(i, nniToDo,/*use ml*/false, nni_stats, maxDelta);
+                        int64_t nChange = nj.DoNNI(i, nniToDo,/*use ml*/false, nni_stats, maxDelta);
 
                         nj.logTree("ME_NNI%d", i + 1, aln.names, unique);
                         if (nChange == 0) {

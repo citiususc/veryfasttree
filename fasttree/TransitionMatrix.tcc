@@ -62,14 +62,14 @@ AbsTransitionMatrix(void)::createGTR(const Options &options, double r[], double 
 }
 
 AbsTransitionMatrix(void)::
-createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAXCODES], const double stat[MAXCODES]) {
+createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAXCODES], const double _stat[MAXCODES]) {
     double sqrtstat[20];
     auto nCodes = options.nCodes;
 
     for (int i = 0; i < options.nCodes; i++) {
-        this->stat[i] = stat[i];
-        this->statinv[i] = 1.0 / stat[i];
-        sqrtstat[i] = sqrt(stat[i]);
+        stat[i] = _stat[i];
+        statinv[i] = 1.0 / _stat[i];
+        sqrtstat[i] = sqrt(_stat[i]);
     }
 
     double sym[20 * 20];        /* symmetrized matrix M' */
@@ -155,30 +155,30 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
     }
     /* nearP[i][j] = P(parent = j | both children are i) = P(j | i,i) ~ stat(j) * P(j->i | t)**2 */
     for (int i = 0; i < nCodes; i++) {
-        double nearP[MAXCODES];
+        double _nearP[MAXCODES];
         double tot = 0;
         for (int j = 0; j < nCodes; j++) {
             assert(transt[j][i] > 0);
             assert(this->stat[j] > 0);
-            nearP[j] = this->stat[j] * transt[i][j] * transt[i][j];
-            tot += nearP[j];
+            _nearP[j] = this->stat[j] * transt[i][j] * transt[i][j];
+            tot += _nearP[j];
         }
         assert(tot > 0);
         for (int j = 0; j < nCodes; j++) {
-            nearP[j] *= 1.0 / tot;
+            _nearP[j] *= 1.0 / tot;
         }
         /* save nearP in transmat->nearP[i][] */
         for (int j = 0; j < nCodes; j++) {
-            this->nearP[i][j] = nearP[j];
+            this->nearP[i][j] = _nearP[j];
         }
         /* multiply by 1/stat and rotate nearP */
         for (int j = 0; j < nCodes; j++) {
-            nearP[j] /= this->stat[j];
+            _nearP[j] /= this->stat[j];
         }
         for (int j = 0; j < nCodes; j++) {
             double rot = 0;
             for (int k = 0; k < nCodes; k++) {
-                rot += nearP[k] * this->codeFreq[i][j];
+                rot += _nearP[k] * this->codeFreq[i][j];
             }
             this->nearFreq[i][j] = rot;
         }

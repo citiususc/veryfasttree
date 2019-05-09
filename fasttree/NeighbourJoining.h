@@ -65,7 +65,7 @@ namespace fasttree {
            Returns the # of topological changes performed
         */
         int64_t
-        NNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats, double &maxDeltaCriterion);
+        DoNNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats, double &maxDeltaCriterion);
 
         /* Recomputes all branch lengths by minimum evolution criterion*/
         void updateBranchLengths();
@@ -263,7 +263,7 @@ namespace fasttree {
         template<typename Profile_t>
         void outProfile(Profile &out, std::vector<Profile_t> &_profiles);
 
-        void updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int nActiveOld);
+        void updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int64_t nActiveOld);
 
         /* Use out-profile and NJ->totdiam to recompute out-distance for node iNode
            Only does this computation if the out-distance is "stale" (nOutDistActive[iNode] != nActive)

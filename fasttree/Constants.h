@@ -44,7 +44,8 @@ namespace fasttree {
 				   likelihood by less than this also are considered unimportant
 				   by some heuristics */
         const double approxMLminf = 0.95;    /* Only try to approximate posterior distributions if max. value is at least this high */
-        const double approxMLminratio = 2 / 3.0;/* Ratio of approximated/true posterior values must be at least this high */
+        const double approxMLminratio =
+                2 / 3.0;/* Ratio of approximated/true posterior values must be at least this high */
         const double approxMLnearT = 0.2;    /* 2nd component of near-constant posterior distribution uses this time scale */
         const int nDefaultRateCats = 20;
 
@@ -53,7 +54,21 @@ namespace fasttree {
         const std::string codesStringNT = "ACGT";
 
         const std::string version = "x.x.x";
-        const std::string compileFlags = "";//TODO set with pragma
+        const std::string compileFlags =
+                "(OpenMP"
+                #ifdef USE_SSE3
+                ", SSE3"
+                #endif
+                #ifdef USE_AVX
+                ", AVX"
+                #endif
+                #ifdef USE_AVX
+                ", AVX2"
+                #endif
+                #ifdef USE_AVX
+                ", AVX512"
+                #endif
+                ")";
     };
 
 }

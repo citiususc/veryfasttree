@@ -2,9 +2,21 @@
 #include "FastTree.h"
 #include "Utils.h"
 #include "Debug.h"
-#include "operations/BasicOperations.h"
-#include "operations/SSEOperations.h"
 #include <omp.h>
+#include "operations/BasicOperations.h"
+
+#ifdef USE_SSE3
+#include "operations/SSEOperations.h"
+#endif
+#ifdef USE_AVX
+#include "operations/AVXOperations.h"
+#endif
+#ifdef USE_AVX2
+#include "operations/AV2XOperations.h"
+#endif
+#ifdef USE_AVX512
+#include "operations/AVX512Operations.h"
+#endif
 
 using namespace fasttree;
 
@@ -154,7 +166,49 @@ void FastTree::configOpenMP() {
 void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
     settings(out);
     configOpenMP();
-    FastTreeImpl<double, BasicOperations> impl(options, in, out, log);
-    impl.run();
+
+    if (options.extension == "NONE") {
+        if (options.doublePrecision) {
+            FastTreeImpl<double, BasicOperations>(options, in, out, log).run();
+        } else {
+            FastTreeImpl<float, BasicOperations>(options, in, out, log).run();
+        }
+    }
+    #ifdef USE_SSE3
+    else if(options.extension == "SSE3"){
+        if(options.doublePrecision){
+            FastTreeImpl<double, SSE3Operations>(options, in, out, log).run();
+        }else{
+            FastTreeImpl<float, SSE3Operations>(options, in, out, log).run();
+        }
+    }
+    #endif
+    #ifdef USE_AVX
+    else if(options.extension == "AVX"){
+        if(options.doublePrecision){
+            FastTreeImpl<double, AVXOperations>(options, in, out, log).run();
+        }else{
+            FastTreeImpl<float, AVXOperations>(options, in, out, log).run();
+        }
+    }
+    #endif
+    #ifdef USE_AVX2
+    else if(options.extension == "AVX2"){
+        if(options.doublePrecision){
+            FastTreeImpl<double, AVX2Operations>(options, in, out, log).run();
+        }else{
+            FastTreeImpl<float, AVX2Operations>(options, in, out, log).run();
+        }
+    }
+    #endif
+    #ifdef USE_AVX512
+    else if(options.extension == "AVX512"){
+        if(options.doublePrecision){
+            FastTreeImpl<double, AVX512Operations>(options, in, out, log).run();
+        }else{
+            FastTreeImpl<float, AVX512Operations>(options, in, out, log).run();
+        }
+    }
+    #endif
 
 }

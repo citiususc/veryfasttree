@@ -96,7 +96,7 @@ namespace fasttree {
         /*Optimizations*/
         int threads = 1;
         bool doublePrecision = false;
-        bool sse = false;
+        std::string extension;
 
         /*Precision*/
         double MLMinBranchLengthTolerance;

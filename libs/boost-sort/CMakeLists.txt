@@ -1,4 +1,4 @@
-project(CLI11)
+project(boost-sort)
 
 add_library(boost-sort INTERFACE)
 

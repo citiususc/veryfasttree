@@ -1,16 +1,16 @@
 
-#ifndef FASTTREE_BASICOPERATIONS_H
-#define FASTTREE_BASICOPERATIONS_H
+#ifndef FASTTREE_AVX512OPERATIONS_H
+#define FASTTREE_AVX512OPERATIONS_H
 
 #include "../DistanceMatrix.h"
+#include <boost/align/aligned_allocator.hpp>
 
 namespace fasttree {
-
     template<typename Precision>
-    class BasicOperations {
+    class AVX512Operations {
     public:
-        static constexpr int ALIGNMENT = 0;
-        using Allocator = std::allocator<Precision>;
+        static constexpr int ALIGNMENT = 64;
+        using Allocator = boost::alignment::aligned_allocator<Precision, ALIGNMENT>;
         typedef Precision numeric_t;
 
         void vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]);
@@ -32,6 +32,6 @@ namespace fasttree {
     };
 }
 
-#include "BasicOperations.tcc"
+#include "AVX512Operations.tcc"
 
 #endif

@@ -3,15 +3,10 @@
 #ifndef FASTTREE_UTILS_H
 #define FASTTREE_UTILS_H
 
-#include <iostream>
-#include <chrono>
-#include "assert.h"
-#include <omp.h>
-#include "boost/sort/sample_sort/sample_sort.hpp"
-
 #if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
 
 #include <io.h>
+#include <ciso646>
 
 namespace fasttree {
     inline bool isWindows(){return true;}
@@ -36,6 +31,12 @@ namespace fasttree {
     inline bool isattyErr() { return ::isatty(STDERR_FILENO); }
 }
 #endif
+
+#include <iostream>
+#include <chrono>
+#include "assert.h"
+#include <omp.h>
+#include <boost/sort/sample_sort/sample_sort.hpp>
 
 namespace fasttree {
     class TeeStream : public std::streambuf {
@@ -81,7 +82,7 @@ namespace fasttree {
     }
 
     template<typename Iter, typename Compare>
-    inline void psort(Iter first, Iter last, int64_t threads, const Compare &comp) {
+    inline void psort(Iter first, Iter last, uint32_t threads, const Compare &comp) {
         assert(!(omp_in_parallel() && threads > 1));
         boost::sort::sample_sort(first, last, comp, threads);
     }

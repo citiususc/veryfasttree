@@ -304,7 +304,7 @@ AbsNeighbourJoining(bool)::getVisible(int64_t nActive, TopHits &tophits, int64_t
 
 AbsNeighbourJoining(int64_t)::joinConstraintPenalty(int64_t node1, int64_t node2) {
     if (constraintSeqs.size() == 0) {
-        return 0.0;
+        return 0;
     }
     int64_t penalty = 0;
     for (int64_t iC = 0; iC < (int64_t) constraintSeqs.size(); iC++) {
@@ -328,7 +328,7 @@ AbsNeighbourJoining(int64_t)::joinConstraintPenaltyPiece(int64_t node1, int64_t 
         /* code is -1 for split, 0 for off, 1 for on */
         int64_t code1 = (nOn1 > 0 && nOff1 > 0) ? -1 : (nOn1 > 0 ? 1 : 0);
         int64_t code2 = (nOn2 > 0 && nOff2 > 0) ? -1 : (nOn2 > 0 ? 1 : 0);
-        int64_t code3 = (nOnOut > 0 && nOffOut) > 0 ? -1 : (nOnOut > 0 ? 1 : 0);
+        int64_t code3 = (nOnOut > 0 && nOffOut > 0) ? -1 : (nOnOut > 0 ? 1 : 0);
         int64_t nSplit = (code1 == -1 ? 1 : 0) + (code2 == -1 ? 1 : 0) + (code3 == -1 ? 1 : 0);
         int64_t nOn = (code1 == 1 ? 1 : 0) + (code2 == 1 ? 1 : 0) + (code3 == 1 ? 1 : 0);
         if (nSplit == 1 && nOn == 1) {
@@ -514,7 +514,7 @@ profileDistPiece(int64_t code1, int64_t code2, numeric_t f1[], numeric_t f2[], n
     }
 }
 
-AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int nActiveOld) {
+AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int64_t nActiveOld) {
     int64_t iFreqOut = 0;
     int64_t iFreq1 = 0;
     int64_t iFreq2 = 0;
@@ -798,7 +798,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
         numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
 
         for (int64_t i = 0; i < nPos; i++) {
-            int iRate = rates.ratecat[i];
+            int64_t iRate = rates.ratecat[i];
             numeric_t *expeigen = &expeigenRates[iRate * 4];
             double wA = p1.weights[i];
             double wB = p2.weights[i];
@@ -854,7 +854,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
         numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
 
         for (int64_t i = 0; i < nPos; i++) {
-            int iRate = rates.ratecat[i];
+            int64_t iRate = rates.ratecat[i];
             numeric_t *expeigen = &expeigenRates[iRate * 20];
             double wA = p1.weights[i];
             double wB = p2.weights[i];
@@ -1052,7 +1052,7 @@ AbsNeighbourJoining(double)::pairConstraintDistance(int64_t nOn1, int64_t nOff1,
     return (f1 + f2 - 2.0 * f1 * f2);
 }
 
-AbsNeighbourJoining(bool)::quartetConstraintPenaltiesPiece(Profile *profiles[4], int64_t iC, double piece[3]) {
+AbsNeighbourJoining(bool)::quartetConstraintPenaltiesPiece(Profile *profiles4[4], int64_t iC, double piece[3]) {
     int64_t nOn[4];
     int64_t nOff[4];
 
@@ -1061,8 +1061,8 @@ AbsNeighbourJoining(bool)::quartetConstraintPenaltiesPiece(Profile *profiles[4],
     int64_t nMinus = 0;
 
     for (int64_t i = 0; i < 4; i++) {
-        nOn[i] = profiles[i]->nOn[iC];
-        nOff[i] = profiles[i]->nOff[iC];
+        nOn[i] = profiles4[i]->nOn[iC];
+        nOff[i] = profiles4[i]->nOff[iC];
         if (nOn[i] + nOff[i] == 0)
             return (false);        /* ignore */
         else if (nOn[i] > 0 && nOff[i] > 0)
@@ -1563,8 +1563,8 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
             int64_t iRate = rates.ratecat[i];
             double w1 = p1.weights[i];
             double w2 = p2.weights[i];
-            int64_t code1 = p1.codes[i];
-            int64_t code2 = p2.codes[i];
+            int code1 = p1.codes[i];
+            int code2 = p2.codes[i];
             numeric_t *f1 = getFreq(p1, i,/*IN/OUT*/iFreq1);
             numeric_t *f2 = getFreq(p2, i,/*IN/OUT*/iFreq2);
 
@@ -1579,15 +1579,15 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
                        = PSame() for matching characters and 1-PSame() for the rest
                        = (pSame - pDiff) * character + (1-(pSame-pDiff)) * gap
                     */
-                    out.codes[i] = code2;
+                    out.codes[i] = (char)code2;
                     out.weights[i] = w2 * (PSame2[iRate] - PDiff2[iRate]);
                     continue;
                 } else if (code2 == NOCODE) {
-                    out.codes[i] = code1;
+                    out.codes[i] = (char)code1;
                     out.weights[i] = w1 * (PSame1[iRate] - PDiff1[iRate]);
                     continue;
-                } else if (code1 == code2) {
-                    out.codes[i] = code1;
+                } else if (code1 == (char)code2) {
+                    out.codes[i] = (char)code1;
                     double f12code = (w1 * PSame1[iRate] + (1 - w1) * 0.25) * (w2 * PSame2[iRate] + (1 - w2) * 0.25);
                     double f12other = (w1 * PDiff1[iRate] + (1 - w1) * 0.25) * (w2 * PDiff2[iRate] + (1 - w2) * 0.25);
                     /* posterior probability of code1/code2 after scaling */
@@ -1852,7 +1852,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     int64_t nUp = 0;
 
     std::string token;
-    token.reserve(5000);
+    token.reserve(5000l);
 
     if (readTreeToken(fpInTree, token) || token[0] != '(') {
         readTreeError("No '(' at start", token);
@@ -1952,7 +1952,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
         stack_size = 1;
         stack[0] = root;
         while (stack_size > 0) {
-            int node = stack[--stack_size];
+            int64_t node = stack[--stack_size];
             if (node >= (int64_t) unique.uniqueSeq.size()) { /* internal node */
                 if (children[node].nChild <= 1) {
                     if (node != root) {
@@ -1986,10 +1986,10 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     /* Simplify the root node to 3 children if it has 2 */
     if (children[root].nChild == 2) {
         for (int64_t i = 0; i < 2; i++) {
-            int64_t child = children[root].child[i];
-            assert(child >= 0 && child < maxnodes);
-            if (children[child].nChild == 2) {
-                readTreeRemove(parents, children, child); /* replace root -> child -> A,B with root->A,B */
+            int64_t ichild = children[root].child[i];
+            assert(ichild >= 0 && ichild < maxnodes);
+            if (children[ichild].nChild == 2) {
+                readTreeRemove(parents, children, ichild); /* replace root -> child -> A,B with root->A,B */
                 break;
             }
         }
@@ -2032,7 +2032,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     root = map[root];
     int64_t node;
     for (node = 0; node < maxnodes; node++) {
-        int njnode = map[node];
+        int64_t njnode = map[node];
         if (njnode >= 0) {
             child[njnode].nChild = children[node].nChild;
             for (int64_t i = 0; i < children[node].nChild; i++) {
@@ -2160,7 +2160,7 @@ AbsNeighbourJoining(void)::fastNJ() {
     assert(seqs.size() >= 1);
     if (seqs.size() < 3) {
         root = maxnode++;
-        child[root].nChild = seqs.size();
+        child[root].nChild = (int)seqs.size();
         for (int64_t iNode = 0; iNode < (int64_t) seqs.size(); iNode++) {
             parent[iNode] = root;
             child[root].child[iNode] = iNode;
@@ -2513,16 +2513,16 @@ AbsNeighbourJoining(void)::fastNJ() {
 }
 
 AbsNeighbourJoining(void)::
-readTreeAddChild(int64_t parent, int64_t child, std::vector<int64_t> &parents, std::vector<Children> &children) {
-    assert(parent >= 0);
-    assert(child >= 0);
-    assert(parents[child] < 0);
-    assert(children[parent].nChild < 3);
-    parents[child] = parent;
-    children[parent].child[children[parent].nChild++] = child;
+readTreeAddChild(int64_t iparent, int64_t ichild, std::vector<int64_t> &parents, std::vector<Children> &children) {
+    assert(iparent >= 0);
+    assert(ichild >= 0);
+    assert(parents[ichild] < 0);
+    assert(children[iparent].nChild < 3);
+    parents[ichild] = iparent;
+    children[iparent].child[children[iparent].nChild++] = ichild;
 }
 
-AbsNeighbourJoining(void)::readTreeMaybeAddLeaf(int64_t parent, std::string &name, HashTable &hashnames,
+AbsNeighbourJoining(void)::readTreeMaybeAddLeaf(int64_t iparent, std::string &name, HashTable &hashnames,
                                                 Uniquify &unique,
                                                 std::vector<int64_t> &parents, std::vector<Children> &children) {
     auto hi = hashnames.find(name);
@@ -2535,9 +2535,9 @@ AbsNeighbourJoining(void)::readTreeMaybeAddLeaf(int64_t parent, std::string &nam
     assert(iSeqUnique >= 0 && iSeqUnique < (int64_t) unique.uniqueSeq.size());
     /* Either record this leaves' parent (if it is -1) or ignore this leaf (if already seen) */
     if (parents[iSeqUnique] < 0) {
-        readTreeAddChild(parent, iSeqUnique, /*IN/OUT*/parents, /*IN/OUT*/children);
+        readTreeAddChild(iparent, iSeqUnique, /*IN/OUT*/parents, /*IN/OUT*/children);
         if (options.verbose > 5) {
-            log << strformat("Found leaf uniq%d name %s child of %d", iSeqUnique, name.c_str(), parent) << std::endl;
+            log << strformat("Found leaf uniq%d name %s child of %d", iSeqUnique, name.c_str(), iparent) << std::endl;
         }
     } else {
         if (options.verbose > 5) {
@@ -2552,9 +2552,9 @@ AbsNeighbourJoining(void)::readTreeRemove(std::vector<int64_t> &parents, std::ve
         log << strformat("Removing node %d parent %d", node, parents[node]) << std::endl;
     }
     assert(parents[node] >= 0);
-    int64_t parent = parents[node];
+    int64_t iparent = parents[node];
     parents[node] = -1;
-    Children &pc = children[parent];
+    Children &pc = children[iparent];
     int oldn = 0;
     for (; oldn < pc.nChild; oldn++) {
         if (pc.child[oldn] == node)
@@ -2576,10 +2576,10 @@ AbsNeighbourJoining(void)::readTreeRemove(std::vector<int64_t> &parents, std::ve
         assert(pc.nChild + nc.nChild <= 3);
         for (int j = 0; j < nc.nChild; j++) {
             if (options.verbose > 5) {
-                log << strformat("Repointing parent %d to child %d", parent, nc.child[j]) << std::endl;
+                log << strformat("Repointing parent %d to child %d", iparent, nc.child[j]) << std::endl;
             }
             pc.child[pc.nChild++] = nc.child[j];
-            parents[nc.child[j]] = parent;
+            parents[nc.child[j]] = iparent;
         }
         nc.nChild = 0;
     }
@@ -2592,7 +2592,7 @@ AbsNeighbourJoining(bool)::readTreeToken(std::istream &fpInTree, std::string &bu
         if (c == '(' || c == ')' || c == ':' || c == ';' || c == ',') {
             /* standalone token */
             if (buf.empty() == 0) {
-                buf += c;
+                buf += (char)c;
                 break;
             } else {
                 fpInTree.unget();
@@ -2605,7 +2605,7 @@ AbsNeighbourJoining(bool)::readTreeToken(std::istream &fpInTree, std::string &bu
             /* else ignore whitespace at beginning of token */
         } else {
             /* not whitespace or standalone token */
-            buf += c;
+            buf += (char)c;
         }
     }
     return !buf.empty();
@@ -2865,9 +2865,9 @@ AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &b
     join.dist = 1e20;
     join.weight = 0;
     join.criterion = 1e20;
-    int iNode;
-    for (iNode = 0; iNode < maxnode; iNode++) {
-        int jNode = besthits[iNode].j;
+
+    for (int64_t iNode = 0; iNode < maxnode; iNode++) {
+        int64_t jNode = besthits[iNode].j;
         if (parent[iNode] < 0 && parent[jNode] < 0) { /* both i and j still active */
             /* recompute criterion to reflect the current out-distances */
             setCriterion(nActive, besthits[iNode]);
@@ -2952,7 +2952,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
 
     #pragma omp parallel for schedule(static)
     for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
-        int seed = seeds[iSeed];
+        int64_t seed = seeds[iSeed];
         if (iSeed > 0 && (iSeed % 100) == 0) {
             #pragma omp critical
             {
@@ -3007,12 +3007,12 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
             }
 
             /* If within close-distance, or identical, use as close neighbor */
-            bool close = closehit.dist <= neardist && (closehit.weight >= nearweight
+            bool isClose = closehit.dist <= neardist && (closehit.weight >= nearweight
                                                        || closehit.weight >= (nPos - nGaps[closeNode]) * nearcover);
             bool identical = closehit.dist < 1e-6
                              && fabs(closehit.weight - (nPos - nGaps[seed])) < 1e-5
                              && fabs(closehit.weight - (nPos - nGaps[closeNode])) < 1e-5;
-            if (options.useTopHits2nd && iClose < tophits.q && (close || identical)) {
+            if (options.useTopHits2nd && iClose < tophits.q && (isClose || identical)) {
                 nHasTopHits++;
                 options.debug.nClose2Used++;
                 auto nUse = std::min(tophits.q * options.tophits2Safety, 2 * tophits.m);
@@ -3020,7 +3020,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
                 transferBestHits(seqs.size(), closeNode, besthitsSeed, nUse, besthitsClose.data(), true);
                 sortSaveBestHits(closeNode, besthitsClose, nUse, tophits.q, tophits);
                 tophits.topHitsLists[closeNode].hitSource = seed;
-            } else if (close || identical || (options.fastest && iClose < (tophits.q + 1) / 2)) {
+            } else if (isClose || identical || (options.fastest && iClose < (tophits.q + 1) / 2)) {
                 nHasTopHits++;
                 options.debug.nCloseUsed++;
                 if (options.verbose > 2) {
@@ -3040,7 +3040,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
                    small (32 for 1 million sequences), so we do not make any close checks.
                  */
                 for (int64_t iClose2 = 0; iClose2 < tophits.q && iClose2 < 2 * tophits.m; iClose2++) {
-                    int closeNode2 = besthitsNeighbor[iClose2].j;
+                    int64_t closeNode2 = besthitsNeighbor[iClose2].j;
                     assert(closeNode2 >= 0);
                     if (tophits.topHitsLists[closeNode2].hits.empty()) {
                         options.debug.nClose2Used++;
@@ -3350,7 +3350,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
        limit of log2(m) would mean a refresh after
        m joins, which is about what we want.
     */
-    int64_t tophitAgeLimit = std::max(1l, (int64_t) (0.5 + std::log((double) tophits.m) / std::log(2.0)));
+    int64_t tophitAgeLimit = std::max((int64_t)1, (int64_t) (0.5 + std::log((double) tophits.m) / std::log(2.0)));
 
     /* Either use the merged list as candidate top hits, or
        move from 2nd level to 1st level, or do a refresh
@@ -3822,12 +3822,12 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
 }
 
 
-AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::NNI)::chooseNNI(Profile *profiles[4],
+AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::NNI)::chooseNNI(Profile *profiles4[4],
                                                                                             double criteria[3]) {
     double d[6];
-    correctedPairDistances(profiles, 4, d);
+    correctedPairDistances(profiles4, 4, d);
     double penalty[3];        /* indexed as nni_t */
-    quartetConstraintPenalties(profiles, penalty);
+    quartetConstraintPenalties(profiles4, penalty);
     criteria[ABvsCD] = d[qAB] + d[qCD] + penalty[ABvsCD];
     criteria[ACvsBD] = d[qAC] + d[qBD] + penalty[ACvsBD];
     criteria[ADvsBC] = d[qAD] + d[qBC] + penalty[ADvsBC];
@@ -3845,15 +3845,15 @@ AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::NNI)
 
         for (int64_t iC = 0; iC < (int64_t) constraintSeqs.size(); iC++) {
             double ppart[3];
-            if (quartetConstraintPenaltiesPiece(profiles, iC, ppart)) {
+            if (quartetConstraintPenaltiesPiece(profiles4, iC, ppart)) {
                 double old_penalty = ppart[ABvsCD];
                 double new_penalty = ppart[choice];
                 if (new_penalty > old_penalty + 1e-6) {
                     log << strformat(" %d (%d/%d %d/%d %d/%d %d/%d)", iC,
-                                     profiles[0]->nOn[iC], profiles[0]->nOff[iC],
-                                     profiles[1]->nOn[iC], profiles[1]->nOff[iC],
-                                     profiles[2]->nOn[iC], profiles[2]->nOff[iC],
-                                     profiles[3]->nOn[iC], profiles[3]->nOff[iC]);
+                                     profiles4[0]->nOn[iC], profiles4[0]->nOff[iC],
+                                     profiles4[1]->nOn[iC], profiles4[1]->nOff[iC],
+                                     profiles4[2]->nOn[iC], profiles4[2]->nOff[iC],
+                                     profiles4[3]->nOn[iC], profiles4[3]->nOff[iC]);
                 }
             }
         }
@@ -3867,7 +3867,7 @@ AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::NNI)
     return (choice);
 }
 
-AbsNeighbourJoining(enum fasttree::NeighbourJoining<Precision, Operations>::NNI)::
+AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::NNI)::
 MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool bFast) {
     double lenABvsCD[5] = {len[LEN_A], len[LEN_B], len[LEN_C], len[LEN_D], len[LEN_I]};
     double lenACvsBD[5] = {len[LEN_A], len[LEN_C], len[LEN_B], len[LEN_D], len[LEN_I]};   /* Swap B & C */
@@ -4141,7 +4141,7 @@ AbsNeighbourJoining(void)::logTree(const std::string &format, int64_t i, std::ve
     }
 }
 
-AbsNeighbourJoining(int64_t)::NNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats,
+AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats,
                                   double &dMaxDelta) {
 /* For each non-root node N, with children A,B, sibling C, and uncle D,
      we compare the current topology AB|CD to the alternate topologies

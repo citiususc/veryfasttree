@@ -199,7 +199,7 @@ Uniquify::Uniquify(const Alignment &aln) {
             alnToUniq[i] = nUniqueSeq;
             nUniqueSeq++;
         } else {
-            int last = first;
+            int64_t last = first;
             while (alnNext[last] != -1) {
                 last = alnNext[last];
             }
