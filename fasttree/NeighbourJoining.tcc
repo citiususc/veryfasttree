@@ -130,6 +130,38 @@ AbsNeighbourJoining(void)::printDistances(std::vector<std::string> &names, std::
     }
 }
 
+AbsNeighbourJoining(double)::totalLen() {
+    double total_len = 0;
+    for (int64_t iNode = 0; iNode < maxnode; iNode++) {
+        total_len += std::fabs(branchlength[iNode]);
+    }
+    return total_len;
+}
+
+AbsNeighbourJoining(void)::branchlengthScale() {
+    std::vector<numeric_t> rates;
+    std::vector<double> site_loglk;
+    MLSiteRates(rates);
+    MLSiteLikelihoodsByRate(rates, site_loglk);
+    double scale = rescaleGammaLogLk(site_loglk);
+
+    for (int64_t i = 0; i < maxnodes; i++) {
+        branchlength[i] *= scale;
+    }
+}
+
+AbsNeighbourJoining(const std::vector<Precision>&)::getBranchlength() {
+    return branchlength;
+}
+
+AbsNeighbourJoining(int64_t)::getMaxnode() {
+    return maxnode;
+}
+
+AbsNeighbourJoining(int64_t)::getRateCategories() {
+    return (int64_t) rates.rates.size();
+}
+
 AbsNeighbourJoining(double)::logCorrect(double dist) {
     const double maxscore = 3.0;
     if (options.nCodes == 4 && !options.useMatrix) { /* Jukes-Cantor */
@@ -350,6 +382,16 @@ AbsNeighbourJoining(int64_t)::splitConstraintPenalty(int64_t nOn1, int64_t nOff1
                                         : (nOn2 < nOff1 ? nOn2 : nOff1));
 }
 
+AbsNeighbourJoining(double)::
+splitSupport(Profile &p1, Profile &p2, Profile &p3, Profile &p4, std::vector<int64_t> &col) {
+    //TODO
+    return 0;
+}
+
+AbsNeighbourJoining(void)::resampleColumns(std::vector<int64_t> &col) {
+    //TODO
+}
+
 AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out, std::vector<Profile_t> &_profiles) {
     double inweight = 1.0 / (double) _profiles.size();   /* The maximal output weight is 1.0 */
 
@@ -392,7 +434,7 @@ AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out,
     for (int64_t i = 0; i < nPos; i++) {
         numeric_t *fOut = getFreq(out, i, iFreqOut);
         if (fOut != nullptr) {
-            normalizeFreq(fOut);
+            normalizeFreq(fOut, distanceMatrix);
         }
     }
     assert(iFreqOut == (int64_t) out.vectors.size());
@@ -414,12 +456,17 @@ AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out,
 }
 
 AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[]) {
+    addToFreq(fOut, weight, codeIn, fIn, distanceMatrix);
+}
+
+AbsNeighbourJoining(void)::
+addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[], DistanceMatrix <Precision> &dmat) {
     assert(fOut != nullptr);
     if (fIn != nullptr) {
         operations.vector_add_mult(fOut, fIn, weight, options.nCodes);
-    } else if (distanceMatrix) {
+    } else if (dmat) {
         assert(codeIn != NOCODE);
-        operations.vector_add_mult(fOut, distanceMatrix.codeFreq[codeIn], weight, options.nCodes);
+        operations.vector_add_mult(fOut, dmat.codeFreq[codeIn], weight, options.nCodes);
     } else {
         assert(codeIn != NOCODE);
         fOut[codeIn] += weight;
@@ -430,13 +477,17 @@ AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t co
    Simply dividing by total_weight is not ideal because of roundoff error
    So compute total_freq instead
 */
-AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[]) {
+AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[]){
+    normalizeFreq(freq, distanceMatrix);
+}
+
+AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Precision> &dmat) {
     double total_freq = 0;
-    if (distanceMatrix) {
+    if (dmat) {
         /* The total frequency is dot_product(true_frequencies, 1)
            So we rotate the 1 vector by eigeninv (stored in eigentot)
         */
-        total_freq = operations.vector_multiply_sum(freq, distanceMatrix.eigentot, options.nCodes);
+        total_freq = operations.vector_multiply_sum(freq, dmat.eigentot, options.nCodes);
     } else {
         for (int k = 0; k < options.nCodes; k++)
             total_freq += freq[k];
@@ -447,12 +498,12 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[]) {
     } else {
         /* This can happen if we are in a very low-weight region, e.g. if a mostly-gap position gets weighted down
            repeatedly; just set them all to arbitrary but legal values */
-        if (!distanceMatrix) {
+        if (!dmat) {
             for (int k = 0; k < options.nCodes; k++)
                 freq[k] = 1.0 / options.nCodes;
         } else {
             for (int k = 0; k < options.nCodes; k++)
-                freq[k] = distanceMatrix.codeFreq[0][k];
+                freq[k] = dmat.codeFreq[0][k];
         }
     }
 }
@@ -514,7 +565,8 @@ profileDistPiece(int64_t code1, int64_t code2, numeric_t f1[], numeric_t f2[], n
     }
 }
 
-AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int64_t nActiveOld) {
+AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new,
+                                            int64_t nActiveOld) {
     int64_t iFreqOut = 0;
     int64_t iFreq1 = 0;
     int64_t iFreq2 = 0;
@@ -1147,7 +1199,7 @@ AbsNeighbourJoining(double)::MLQuartetOptimize(Profile &pA, Profile &pB, Profile
         }
     }
 
-    QuartetOpt qopt = {/*nEval*/0, /*pair1*/NULL, /*pair2*/NULL};
+    QuartetOpt qopt = {/*nEval*/0, /*pair1*/nullptr, /*pair2*/nullptr};
     double f2x, negloglk;
 
     if (pStarTest != nullptr) {
@@ -1180,8 +1232,8 @@ AbsNeighbourJoining(double)::MLQuartetOptimize(Profile &pA, Profile &pB, Profile
         double loglkStar = -pairNegLogLk(options.MLMinBranchLength, qopt);
         if (loglkStar < -negloglk - Constants::closeLogLkLimit) {
             *pStarTest = true;
-            double off = pairLogLk(pA, pB, branch_lengths[LEN_A] + branch_lengths[LEN_B],/*site_lk*/NULL)
-                         + pairLogLk(pC, pD, branch_lengths[LEN_C] + branch_lengths[LEN_D], /*site_lk*/NULL);
+            double off = pairLogLk(pA, pB, branch_lengths[LEN_A] + branch_lengths[LEN_B],/*site_lk*/nullptr)
+                         + pairLogLk(pC, pD, branch_lengths[LEN_C] + branch_lengths[LEN_D], /*site_lk*/nullptr);
             return -negloglk + off;
         }
     }
@@ -1265,7 +1317,7 @@ AbsNeighbourJoining(double)::MLQuartetOptimize(Profile &pA, Profile &pB, Profile
                           + pairLogLk(pA, pB, branch_lengths[LEN_A] + branch_lengths[LEN_B],/*IN/OUT*/site_likelihoods);
 
     if (options.verbose > 3) {
-        double loglkStart = MLQuartetLogLk(pA, pB, pC, pD, start_length, /*site_lk*/NULL);
+        double loglkStart = MLQuartetLogLk(pA, pB, pC, pD, start_length, /*site_lk*/nullptr);
         log << strformat("Optimize loglk from %.5f to %.5f eval %d lengths from\n"
                          "   %.5f %.5f %.5f %.5f %.5f to\n"
                          "   %.5f %.5f %.5f %.5f %.5f",
@@ -1448,7 +1500,12 @@ AbsNeighbourJoining(void)::setProfile(int64_t node, double weight1) {
     averageProfile(profiles[node], profiles[c.child[0]], profiles[c.child[1]], weight1);
 }
 
-AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profile &profile2, double bionjWeight) {
+AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1) {
+    averageProfile(out, profile1, profile2, weight1, distanceMatrix);
+}
+
+AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profile &profile2, double bionjWeight,
+                                          DistanceMatrix <Precision> &dmat) {
     if (bionjWeight < 0) {
         bionjWeight = 0.5;
     }
@@ -1490,12 +1547,12 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
         numeric_t *f2 = getFreq(profile2, i, iFreq2);
         if (f != nullptr) {
             if (profile1.weights[i] > 0) {
-                addToFreq(f, profile1.weights[i] * bionjWeight, profile1.codes[i], f1);
+                addToFreq(f, profile1.weights[i] * bionjWeight, profile1.codes[i], f1, dmat);
             }
             if (profile2.weights[i] > 0) {
-                addToFreq(f, profile2.weights[i] * (1.0 - bionjWeight), profile2.codes[i], f2);
+                addToFreq(f, profile2.weights[i] * (1.0 - bionjWeight), profile2.codes[i], f2, dmat);
             }
-            normalizeFreq(f);
+            normalizeFreq(f, dmat);
         } /* end if computing f */
         if (options.verbose > 10 && i < 5) {
             log << strformat("Average profiles: pos %d in-w1 %f in-w2 %f bionjWeight %f to weight %f code %d",
@@ -1579,15 +1636,15 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
                        = PSame() for matching characters and 1-PSame() for the rest
                        = (pSame - pDiff) * character + (1-(pSame-pDiff)) * gap
                     */
-                    out.codes[i] = (char)code2;
+                    out.codes[i] = (char) code2;
                     out.weights[i] = w2 * (PSame2[iRate] - PDiff2[iRate]);
                     continue;
                 } else if (code2 == NOCODE) {
-                    out.codes[i] = (char)code1;
+                    out.codes[i] = (char) code1;
                     out.weights[i] = w1 * (PSame1[iRate] - PDiff1[iRate]);
                     continue;
-                } else if (code1 == (char)code2) {
-                    out.codes[i] = (char)code1;
+                } else if (code1 == (char) code2) {
+                    out.codes[i] = (char) code1;
                     double f12code = (w1 * PSame1[iRate] + (1 - w1) * 0.25) * (w2 * PSame2[iRate] + (1 - w2) * 0.25);
                     double f12other = (w1 * PDiff1[iRate] + (1 - w1) * 0.25) * (w2 * PDiff2[iRate] + (1 - w2) * 0.25);
                     /* posterior probability of code1/code2 after scaling */
@@ -1665,7 +1722,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
             assert(fOut != nullptr);
 
             if (f1 == nullptr) {
-                f1 = &transmat.codeFreq[(int)p1.codes[i]][0]; /* codeFreq includes an entry for NOCODE */
+                f1 = &transmat.codeFreq[(int) p1.codes[i]][0]; /* codeFreq includes an entry for NOCODE */
                 double w = p1.weights[i];
                 if (w > 0.0 && w < 1.0) {
                     for (int j = 0; j < 4; j++) {
@@ -1675,7 +1732,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
                 }
             }
             if (f2 == nullptr) {
-                f2 = &transmat.codeFreq[(int)p2.codes[i]][0];
+                f2 = &transmat.codeFreq[(int) p2.codes[i]][0];
                 double w = p2.weights[i];
                 if (w > 0.0 && w < 1.0) {
                     for (int j = 0; j < 4; j++) {
@@ -1716,7 +1773,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
             }
 
             /* and finally, divide by stat again & rotate to give the new frequencies */
-            operations.matrixt_by_vector4(transmat.eigeninvT, fPost, /*OUT*/fOut);
+            operations.matrixt_by_vector4((numeric_t(*)[4]) transmat.eigeninvT, fPost, /*OUT*/fOut);
         }  /* end loop over position i */
     } else if (options.nCodes == 20) {    /* matrix model on amino acids */
         numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
@@ -1739,7 +1796,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
             assert(fOut != nullptr);
 
             if (f1 == nullptr) {
-                f1 = &transmat.codeFreq[(int)p1.codes[i]][0]; /* codeFreq includes an entry for NOCODE */
+                f1 = &transmat.codeFreq[(int) p1.codes[i]][0]; /* codeFreq includes an entry for NOCODE */
                 double w = p1.weights[i];
                 if (w > 0.0 && w < 1.0) {
                     for (int j = 0; j < 20; j++) {
@@ -1749,7 +1806,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
                 }
             }
             if (f2 == nullptr) {
-                f2 = &transmat.codeFreq[(int)p2.codes[i]][0];
+                f2 = &transmat.codeFreq[(int) p2.codes[i]][0];
                 double w = p2.weights[i];
                 if (w > 0.0 && w < 1.0) {
                     for (int j = 0; j < 20; j++) {
@@ -2160,7 +2217,7 @@ AbsNeighbourJoining(void)::fastNJ() {
     assert(seqs.size() >= 1);
     if (seqs.size() < 3) {
         root = maxnode++;
-        child[root].nChild = (int)seqs.size();
+        child[root].nChild = (int) seqs.size();
         for (int64_t iNode = 0; iNode < (int64_t) seqs.size(); iNode++) {
             parent[iNode] = root;
             child[root].child[iNode] = iNode;
@@ -2512,6 +2569,44 @@ AbsNeighbourJoining(void)::fastNJ() {
 
 }
 
+AbsNeighbourJoining(void)::reliabilityNJ() {
+    /* For each non-root node N, with children A,B, parent P, sibling C, and grandparent G,
+       we test the reliability of the split (A,B) versus rest by comparing the profiles
+       of A, B, C, and the "up-profile" of P.
+
+       Each node's upProfile is the average of its sibling's (down)-profile + its parent's up-profile
+       (If node's parent is the root, then there are two siblings and we don't need an up-profile)
+
+       To save memory, we do depth-first-search down from the root, and we only keep
+       up-profiles for nodes in the active path.
+    */
+    if (seqs.size() <= 3 || options.nBootstrap <= 0) {
+        return;            /* nothing to do */
+    }
+    std::vector<int64_t> col;
+
+    resampleColumns(col);
+
+    std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
+    std::vector<bool> traversal(maxnodes, false);
+    int64_t node = root;
+    int64_t iNodesDone = 0;
+    while ((node = traversePostorder(node,/*IN/OUT*/traversal, /*pUp*/NULL)) >= 0) {
+        if (node < (int64_t) seqs.size() || node == root)
+            continue; /* nothing to do for leaves or root */
+
+        if (iNodesDone > 0 && (iNodesDone % 100) == 0)
+            progressReport.print("Local bootstrap for %6d of %6d internal splits", iNodesDone, seqs.size() - 3);
+        iNodesDone++;
+
+        Profile *profiles4[4];
+        int64_t nodeABCD[4];
+        setupABCD(node, /*OUT*/profiles4, /*IN/OUT*/upProfiles.data(), /*OUT*/nodeABCD, /*useML*/false);
+
+        support[node] = splitSupport(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3], col);
+    }
+}
+
 AbsNeighbourJoining(void)::
 readTreeAddChild(int64_t iparent, int64_t ichild, std::vector<int64_t> &parents, std::vector<Children> &children) {
     assert(iparent >= 0);
@@ -2592,7 +2687,7 @@ AbsNeighbourJoining(bool)::readTreeToken(std::istream &fpInTree, std::string &bu
         if (c == '(' || c == ')' || c == ':' || c == ';' || c == ',') {
             /* standalone token */
             if (buf.empty() == 0) {
-                buf += (char)c;
+                buf += (char) c;
                 break;
             } else {
                 fpInTree.unget();
@@ -2605,7 +2700,7 @@ AbsNeighbourJoining(bool)::readTreeToken(std::istream &fpInTree, std::string &bu
             /* else ignore whitespace at beginning of token */
         } else {
             /* not whitespace or standalone token */
-            buf += (char)c;
+            buf += (char) c;
         }
     }
     return !buf.empty();
@@ -2741,13 +2836,13 @@ AbsNeighbourJoining(void)::recomputeProfile(std::unique_ptr<Profile> upProfiles[
     }
 }
 
-AbsNeighbourJoining(void)::recomputeProfiles() {
+AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision> &dmat) {
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
     while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
         if (child[node].nChild == 2) {
             int64_t *children = child[node].child;
-            averageProfile(profiles[node], profiles[child[0]], profiles[child[1]],  /*unweighted*/-1.0);
+            averageProfile(profiles[node], profiles[children[0]], profiles[children[1]],  /*unweighted*/-1.0);
         }
     }
 }
@@ -3008,7 +3103,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
 
             /* If within close-distance, or identical, use as close neighbor */
             bool isClose = closehit.dist <= neardist && (closehit.weight >= nearweight
-                                                       || closehit.weight >= (nPos - nGaps[closeNode]) * nearcover);
+                                                         || closehit.weight >= (nPos - nGaps[closeNode]) * nearcover);
             bool identical = closehit.dist < 1e-6
                              && fabs(closehit.weight - (nPos - nGaps[seed])) < 1e-5
                              && fabs(closehit.weight - (nPos - nGaps[closeNode])) < 1e-5;
@@ -3350,7 +3445,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
        limit of log2(m) would mean a refresh after
        m joins, which is about what we want.
     */
-    int64_t tophitAgeLimit = std::max((int64_t)1, (int64_t) (0.5 + std::log((double) tophits.m) / std::log(2.0)));
+    int64_t tophitAgeLimit = std::max((int64_t) 1, (int64_t) (0.5 + std::log((double) tophits.m) / std::log(2.0)));
 
     /* Either use the merged list as candidate top hits, or
        move from 2nd level to 1st level, or do a refresh
@@ -3823,7 +3918,7 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
 
 
 AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::NNI)::chooseNNI(Profile *profiles4[4],
-                                                                                            double criteria[3]) {
+                                                                                                double criteria[3]) {
     double d[6];
     correctedPairDistances(profiles4, 4, d);
     double penalty[3];        /* indexed as nni_t */
@@ -3977,6 +4072,10 @@ MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool b
     }
 }
 
+AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
+    //TODO
+}
+
 AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
     if (seqs.size() < 2) {
         return 0.0;
@@ -3993,7 +4092,7 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
         }
     }
 
-    std::vector<bool> traversal(maxnodes);
+    std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
     while ((node = traversePostorder(node, traversal, /*pUp*/nullptr)) >= 0) {
         int64_t nChild = child[node].nChild;
@@ -4088,6 +4187,153 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
     return loglk;
 }
 
+AbsNeighbourJoining(double)::gammaLogLk(Siteratelk &s, double gamma_loglk_sites[]) {
+    std::vector<double> dRate(options.nRateCats);
+    for (int64_t iRate = 0; iRate < (int64_t) dRate.size(); iRate++) {
+        /* The probability density for each rate is approximated by the total
+           density between the midpoints */
+        double pMin = iRate == 0 ? 0.0 : pGamma(s.mult * (rates.rates[iRate - 1] + rates.rates[iRate]) / 2.0, s.alpha);
+        double pMax = iRate == (int64_t) (rates.rates.size() - 1) ? 1.0 :
+                      pGamma(s.mult * (rates.rates[iRate] + rates.rates[iRate + 1]) / 2.0, s.alpha);
+        dRate[iRate] = pMax - pMin;
+    }
+
+    double loglk = 0.0;
+    for (int64_t iPos = 0; iPos < nPos; iPos++) {
+        /* Prevent underflow on large trees by comparing to maximum loglk */
+        double maxloglk = -1e20;
+        for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
+            double site_loglk = s.site_loglk[nPos * iRate + iPos];
+            if (site_loglk > maxloglk)
+                maxloglk = site_loglk;
+        }
+        double rellk = 0; /* likelihood scaled by exp(maxloglk) */
+        for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
+            double lk = exp(s.site_loglk[nPos * iRate + iPos] - maxloglk);
+            rellk += lk * dRate[iRate];
+        }
+        double loglk_site = maxloglk + std::log(rellk);
+        loglk += loglk_site;
+        if (gamma_loglk_sites != nullptr) {
+            gamma_loglk_sites[iPos] = loglk_site;
+        }
+    }
+    return loglk;
+}
+
+AbsNeighbourJoining(double)::rescaleGammaLogLk(std::vector<double> &site_loglk) {
+    Siteratelk s = { /*mult*/1.0, /*alpha*/1.0, site_loglk.data()};
+    double fx, f2x;
+    int i;
+    fx = -gammaLogLk(s, nullptr);
+    if (options.verbose > 2) {
+        log << strformat("Optimizing alpha, starting at loglk %.3f", -fx) << std::endl;
+    }
+    for (i = 0; i < 10; i++) {
+        progressReport.print("Optimizing alpha round %d", i + 1);
+        double start = fx;
+        s.alpha = onedimenmin(
+                0.01, s.alpha, 10.0,
+                [this](double alpha, Siteratelk &s) {/* OptAlpha */
+                    s.alpha = alpha;
+                    return (-gammaLogLk(s, nullptr));
+                },
+                s, 0.001, 0.001, fx, f2x);
+        if (options.verbose > 2) {
+            log << strformat("Optimize alpha round %d to %.3f lk %.3f", i + 1, s.alpha, -fx) << std::endl;
+        }
+        s.mult = onedimenmin(
+                0.01, s.mult, 10.0,
+                [this](double mult, Siteratelk &s) {/* OptMult */
+                    s.mult = mult;
+                    return (-gammaLogLk(s, nullptr));
+                },
+                s, 0.001, 0.001, fx, f2x);
+        if (options.verbose > 2) {
+            log << strformat("Optimize mult round %d to %.3f lk %.3f", i + 1, s.mult, -fx) << std::endl;
+        }
+        if (fx > start - 0.001) {
+            if (options.verbose > 2) {
+                log << "Optimizing alpha & mult converged" << std::endl;
+            }
+            break;
+        }
+    }
+
+    std::vector<double> gamma_loglk_sites(nPos);
+    double _gammaLogLk = gammaLogLk(s, /*OUT*/gamma_loglk_sites.data());
+    if (options.verbose > 0) {
+        log << strformat("Gamma(%d) LogLk = %.3f alpha = %.3f rescaling lengths by %.3f",
+                         options.nRateCats, _gammaLogLk, s.alpha, 1 / s.mult) << std::endl;
+    }
+    if (!options.logFileName.empty()) {
+        log << strformat("Gamma%dLogLk\t%.3f\tApproximate\tAlpha\t%.3f\tRescale\t%.3f",
+                         options.nRateCats, _gammaLogLk, s.alpha, 1 / s.mult) << std::endl;
+        log << strformat("Gamma%d\tSite\tLogLk", options.nRateCats);
+        for (int64_t iRate = 0; iRate < options.nRateCats; iRate++) {
+            log << strformat("\tr=%.3f", rates.rates[iRate] / s.mult);
+        }
+        log << std::endl;
+
+        for (int64_t iPos = 0; iPos < nPos; iPos++) {
+            log << strformat("Gamma%d\t%d\t%.3f", options.nRateCats, iPos, gamma_loglk_sites[iPos]);
+            for (int64_t iRate = 0; iRate < options.nRateCats; iRate++) {
+                log << strformat("\t%.3f", site_loglk[nPos * iRate + iPos]);
+            }
+            log << std::endl;
+        }
+    }
+    return (1.0 / s.mult);
+}
+
+
+AbsNeighbourJoining(double)::pGamma(double x, double alpha) {
+    /* scale = 1/alpha */
+    return incompleteGamma(x * alpha, alpha, lnGamma(alpha));
+}
+
+AbsNeighbourJoining(void)::MLSiteRates(std::vector<numeric_t> &_rates) {
+    _rates.resize(options.nRateCats);
+    /* Even spacing from 1/nRate to nRate */
+    double logNCat = std::log((double) options.nRateCats);
+    double logMinRate = -logNCat;
+    double logMaxRate = logNCat;
+    double logd = (logMaxRate - logMinRate) / (double) (options.nRateCats - 1);
+
+    for (int64_t i = 0; i < options.nRateCats; i++) {
+        _rates[i] = exp(logMinRate + logd * (double) i);
+    }
+}
+
+
+AbsNeighbourJoining(void)::MLSiteLikelihoodsByRate(std::vector<numeric_t> &_rates, std::vector<double> &site_loglk) {
+    site_loglk.resize(nPos * options.nRateCats);
+    /* save the original rates */
+    assert(!rates.rates.empty());
+    std::vector<numeric_t> oldRates(rates.rates);
+
+    /* Compute site likelihood for each rate */
+    for (int64_t iRate = 0; iRate < options.nRateCats; iRate++) {
+        for (int64_t i = 0; i < (int64_t) rates.rates.size(); i++) {
+            rates.rates[i] = _rates[iRate];
+        }
+        recomputeMLProfiles();
+        double loglk = treeLogLk(&site_loglk[nPos * iRate]);
+        progressReport.print("Site likelihoods with rate category %d of %d", iRate + 1, options.nRateCats);
+        if (options.verbose > 2) {
+            log << strformat("Rate %.3f Loglk %.3f SiteLogLk", _rates[iRate], loglk);
+            for (int64_t iPos = 0; iPos < nPos; iPos++) {
+                log << strformat("\t%.3f", site_loglk[nPos * iRate + iPos]);
+            }
+            log << std::endl;
+        }
+    }
+
+    /* restore original rates and profiles */
+    rates.rates = oldRates;
+    recomputeMLProfiles();
+}
+
 AbsNeighbourJoining(double)::MLQuartetLogLk(Profile &pA, Profile &pB, Profile &pC, Profile &pD, double branchLengths[5],
                                             double siteLikelihoods[]) {
     Profile pAB(nPos, /*nConstraints*/0);
@@ -4107,6 +4353,10 @@ AbsNeighbourJoining(double)::MLQuartetLogLk(Profile &pA, Profile &pB, Profile &p
 
 }
 
+AbsNeighbourJoining(void)::setMLRates() {
+    //TODO
+}
+
 AbsNeighbourJoining(void)::readTreeError(const std::string &err, const std::string &token) {
     throw std::invalid_argument(strformat("Tree parse error: unexpected token '%s' -- %s",
                                           token.empty() ? "(End of file)" : token,
@@ -4120,13 +4370,13 @@ AbsNeighbourJoining(void)::logMLRates() {
         log << "Rates";
 
         assert(!rates.rates.empty());
-        for (int64_t iRate = 0; iRate < rates->nRateCategories; iRate++) {
+        for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
             log << strformat(" %f", rates.rates[iRate]);
         }
         log << std::endl;
         log << "SiteCategories";
         for (int64_t iPos = 0; iPos < nPos; iPos++) {
-            int64_t iRate = rates->ratecat[iPos];
+            int64_t iRate = rates.ratecat[iPos];
             log << " " << iRate + 1;
         }
         log << std::endl;
@@ -4142,7 +4392,7 @@ AbsNeighbourJoining(void)::logTree(const std::string &format, int64_t i, std::ve
 }
 
 AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats,
-                                  double &dMaxDelta) {
+                                    double &dMaxDelta) {
 /* For each non-root node N, with children A,B, sibling C, and uncle D,
      we compare the current topology AB|CD to the alternate topologies
      AC|BD and AD|BC, by using the 4 relevant profiles.
@@ -4429,7 +4679,11 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
 
 
 AbsNeighbourJoining(void)::SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRounds) {
-    //TODo
+    //TODO
+}
+
+AbsNeighbourJoining(void)::setMLGtr(double gtrfreq[]) {
+    //TODO
 }
 
 /* Recomputes all branch lengths
@@ -4448,13 +4702,12 @@ AbsNeighbourJoining(void)::updateBranchLengths() {
     if (seqs.size() < 2) {
         return;
     } else if (seqs.size() == 2) {
-        int64_t root = root;
         int64_t nodeA = child[root].child[0];
         int64_t nodeB = child[root].child[1];
         Besthit h;
         profileDist(profiles[nodeA], profiles[nodeB], h);
         if (options.logdist) {
-            h.dist = LogCorrect(h.dist);
+            h.dist = logCorrect(h.dist);
         }
         branchlength[nodeA] = h.dist / 2.0;
         branchlength[nodeB] = h.dist / 2.0;
@@ -4470,8 +4723,8 @@ AbsNeighbourJoining(void)::updateBranchLengths() {
         if (node == root) {
             continue; /* no branch length to set */
         }
-        if (node < seqs.size()) { /* a leaf */
-            Profile *profileA = profiles[node];
+        if (node < (int64_t) seqs.size()) { /* a leaf */
+            Profile *profileA = &profiles[node];
             Profile *profileB = nullptr;
             Profile *profileC = nullptr;
 
@@ -4492,8 +4745,8 @@ AbsNeighbourJoining(void)::updateBranchLengths() {
             branchlength[node] = (d[0] + d[1] - d[2]) / 2.0;
         } else {
             Profile *profiles4[4];
-            int nodeABCD[4];
-            setupABCD(node, profiles4, upProfiles, nodeABCD, false);
+            int64_t nodeABCD[4];
+            setupABCD(node, profiles4, upProfiles.data(), nodeABCD, false);
             double d[6];
             correctedPairDistances(profiles4, 4, d);
             branchlength[node] = (d[qAC] + d[qAD] + d[qBC] + d[qBD]) / 4.0 - (d[qAB] + d[qCD]) / 2.0;
@@ -4521,6 +4774,15 @@ AbsNeighbourJoining(double)::treeLength(bool recomputeProfiles) {
     for (int64_t iNode = 0; iNode < maxnode; iNode++)
         total_len += branchlength[iNode];
     return total_len;
+}
+
+AbsNeighbourJoining(void)::testSplitsMinEvo(SplitCount &splitcount) {
+    //TODO
+}
+
+
+AbsNeighbourJoining(void)::testSplitsML(SplitCount &splitcount) {
+    //options.nBootstrap //TODO
 }
 
 AbsNeighbourJoining(void)::initNNIStats(std::vector<NNIStats> &stats) {
@@ -4705,6 +4967,99 @@ brent(double ax, double bx, double cx, Function f, Data &data, double ftol, doub
 #undef ZEPS
 #undef SHFT
 #undef SIGN
+
+
+/* Numerical code for the gamma distribution is modified from the PhyML 3 code
+   (GNU public license) of Stephane Guindon
+*/
+
+AbsNeighbourJoining(double)::lnGamma(double alpha) {
+/* returns ln(gamma(alpha)) for alpha>0, accurate to 10 decimal places.
+   Stirling's formula is used for the central polynomial part of the procedure.
+   Pike MC & Hill ID (1966) Algorithm 291: Logarithm of the gamma function.
+   Communications of the Association for Computing Machinery, 9:684
+*/
+    double x = alpha, f = 0, z;
+    if (x < 7) {
+        f = 1;
+        z = x - 1;
+        while (++z < 7) f *= z;
+        x = z;
+        f = -(double) std::log(f);
+    }
+    z = 1 / (x * x);
+    return f + (x - 0.5) * (double) std::log(x) - x + .918938533204673
+           + (((-.000595238095238 * z + .000793650793651) * z - .002777777777778) * z
+              + .083333333333333) / x;
+}
+
+AbsNeighbourJoining(double)::incompleteGamma(double x, double alpha, double ln_gamma_alpha) {
+/* returns the incomplete gamma ratio I(x,alpha) where x is the upper
+	   limit of the integration and alpha is the shape parameter.
+   returns (-1) if in error
+   ln_gamma_alpha = ln(Gamma(alpha)), is almost redundant.
+   (1) series expansion     if (alpha>x || x<=1)
+   (2) continued fraction   otherwise
+   RATNEST FORTRAN by
+   Bhattacharjee GP (1970) The incomplete gamma integral.  Applied Statistics,
+   19: 285-287 (AS32)
+*/
+    int i;
+    double p = alpha, g = ln_gamma_alpha;
+    double accurate = 1e-8, overflow = 1e30;
+    double factor, gin = 0, rn = 0, a = 0, b = 0, an = 0, dif = 0, term = 0, pn[6];
+
+    if (x == 0) return (0);
+    if (x < 0 || p <= 0) return (-1);
+
+    factor = (double) exp(p * (double) std::log(x) - x - g);
+    if (x > 1 && x >= p) goto l30;
+    /* (1) series expansion */
+    gin = 1;
+    term = 1;
+    rn = p;
+    l20:
+    rn++;
+    term *= x / rn;
+    gin += term;
+
+    if (term > accurate) goto l20;
+    gin *= factor / p;
+    goto l50;
+    l30:
+    /* (2) continued fraction */
+    a = 1 - p;
+    b = a + x + 1;
+    term = 0;
+    pn[0] = 1;
+    pn[1] = x;
+    pn[2] = x + 1;
+    pn[3] = x * b;
+    gin = pn[2] / pn[3];
+    l32:
+    a++;
+    b += 2;
+    term++;
+    an = a * term;
+    for (i = 0; i < 2; i++) pn[i + 4] = b * pn[i + 2] - an * pn[i];
+    if (pn[5] == 0) goto l35;
+    rn = pn[4] / pn[5];
+    dif = fabs(gin - rn);
+    if (dif > accurate) goto l34;
+    if (dif <= accurate * rn) goto l42;
+    l34:
+    gin = rn;
+    l35:
+    for (i = 0; i < 4; i++) pn[i] = pn[i + 2];
+    if (fabs(pn[4]) < overflow) goto l32;
+    for (i = 0; i < 4; i++) pn[i] /= overflow;
+    goto l32;
+    l42:
+    gin = 1 - factor * gin;
+
+    l50:
+    return (gin);
+}
 
 AbsNeighbourJoining()::CompareSeeds::CompareSeeds(const std::vector<numeric_t> &outDistances,
                                                   const std::vector<int64_t> &compareSeedGaps) :

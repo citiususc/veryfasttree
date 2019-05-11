@@ -2,7 +2,6 @@
 #ifndef FASTTREE_BASICOPERATIONS_H
 #define FASTTREE_BASICOPERATIONS_H
 
-#include "../DistanceMatrix.h"
 
 namespace fasttree {
 
@@ -27,7 +26,7 @@ namespace fasttree {
 
         void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n);
 
-        void matrixt_by_vector4(numeric_t mat[4][MAXCODES], numeric_t vec[4], numeric_t out[4]);
+        void matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]);
 
     };
 }

@@ -62,10 +62,10 @@ namespace fasttree {
                 #ifdef USE_AVX
                 ", AVX"
                 #endif
-                #ifdef USE_AVX
+                #ifdef USE_AVX2
                 ", AVX2"
                 #endif
-                #ifdef USE_AVX
+                #ifdef USE_AVX512
                 ", AVX512"
                 #endif
                 ")";

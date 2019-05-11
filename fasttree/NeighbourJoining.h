@@ -33,6 +33,8 @@ namespace fasttree {
         /* Searches the visible set */
         void fastNJ();
 
+        void reliabilityNJ();      /* Estimates the reliability of the joins */
+
         void logMLRates();
 
         void logTree(const std::string &format, int64_t i, std::vector<std::string> &names, Uniquify &unique);
@@ -73,10 +75,42 @@ namespace fasttree {
         /* Recomputes all branch lengths and, optionally, internal profiles */
         double treeLength(bool recomputeProfiles);
 
+        void testSplitsMinEvo(SplitCount &splitcount);
+
+        /* Sets SH-like support values if nBootstrap>0 */
+        void testSplitsML(SplitCount &splitcount);
+
         void initNNIStats(std::vector<NNIStats> &stats);
+
+        /* Recompute profiles going up from the leaves, using the provided distance matrix
+           and unweighted joins
+        */
+        void recomputeProfiles(DistanceMatrix<Precision> &dmat);
 
         /* One round of subtree-prune-regraft moves (minimum evolution) */
         void SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRounds);
+
+        /* Given a topology and branch lengths, optimize GTR rates and quickly reoptimize branch lengths
+           If gtrfreq is NULL, then empirical frequencies are used
+        */
+        void setMLGtr(double gtrfreq[]);
+
+        void optimizeAllBranchLengths();
+
+        double treeLogLk(double site_loglk[]);
+
+        /* Given a topology and branch lengths, estimate rates & recompute profiles */
+        void setMLRates();
+
+        double totalLen();
+
+        void branchlengthScale();
+
+        const std::vector<Precision> &getBranchlength();
+
+        int64_t getMaxnode();
+
+        int64_t getRateCategories();
 
     private:
         typedef Precision numeric_t;
@@ -257,6 +291,14 @@ namespace fasttree {
            a split, represented as counts of on and off on each side */
         int64_t splitConstraintPenalty(int64_t nOn1, int64_t nOff1, int64_t nOn2, int64_t nOff2);
 
+        /* Reports the (min. evo.) support for the (1,2) vs. (3,4) split
+           col[iBoot*nPos+j] is column j for bootstrap iBoot
+        */
+        double splitSupport(Profile &p1, Profile &p2, Profile &p3, Profile &p4, std::vector<int64_t> &col);
+
+        /* Pick columns for resampling, stored as returned_vector[iBoot*nPos + j] */
+        void resampleColumns(std::vector<int64_t> &col);
+
         /* outProfile() computes the out-profile,
          * Profile_t can be Profile or Profile*
          * */
@@ -348,11 +390,14 @@ namespace fasttree {
            do not call unless weight of input profile > 0
          */
         void addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[]);
+        void
+        addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[], DistanceMatrix<Precision> &dmat);
 
         /* Divide the vector (of length nCodes) by a constant
            so that the total (unrotated) frequency is 1.0
         */
         void normalizeFreq(numeric_t freq[]);
+        void normalizeFreq(numeric_t freq[], DistanceMatrix<Precision> &dmat);
 
         /* Allocate, if necessary, and recompute the codeDist*/
         void setCodeDist(Profile &profile);
@@ -442,6 +487,8 @@ namespace fasttree {
            Also, the weight does not affect the representation of the constraints
         */
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1);
+        void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1,
+                            DistanceMatrix<Precision> &dmat);
 
         /* PosteriorProfile() is like AverageProfile() but it computes posterior probabilities
            rather than an average
@@ -482,11 +529,6 @@ namespace fasttree {
            If useML is set, computes the posterior probability instead of averaging
          */
         void recomputeProfile(std::unique_ptr<Profile> upProfiles[], int64_t node, int64_t useML);
-
-        /* Recompute profiles going up from the leaves, using the provided distance matrix
-           and unweighted joins
-        */
-        void recomputeProfiles();
 
         void recomputeMLProfiles();
 
@@ -596,18 +638,33 @@ namespace fasttree {
         MLQuartetNNI(Profile *profiles[4], double criteria[3], /* The three potential quartet log-likelihoods */
                      numeric_t length[5], bool bFast);
 
-        void optimizeAllBranchLengths();
-
-        double treeLogLk(double site_loglk[]);
-
         double MLQuartetLogLk(Profile &pA, Profile &pB, Profile &pC, Profile &pD, double branchLengths[5],
                               double siteLikelihoods[]);
 
-        /* Given a topology and branch lengths, estimate rates & recompute profiles */
-        void setMLRates();
+        struct Siteratelk {
+            double mult;            /* multiplier for the rates / divisor for the tree-length */
+            double alpha;
+            double *site_loglk;
+        };
+
+        double gammaLogLk(Siteratelk &s, double gamma_loglk_sites[]);
+
+        /* Input site_loglk must be for each rate. Note that FastTree does not reoptimize
+           the branch lengths under the Gamma model -- it optimizes the overall scale.
+           Reports the gamma log likelihhod (and logs site likelihoods if fpLog is set),
+           and reports the rescaling value.
+        */
+        double rescaleGammaLogLk(std::vector<double> &site_loglk);
+
+        /* P(value<=x) for the gamma distribution with shape parameter alpha and scale 1/alpha */
+        double pGamma(double x, double alpha);
+
+        double incompleteGamma(double x, double alpha, double ln_gamma_alpha);
+
+        double lnGamma(double alpha);
 
         /* Returns a set of nRateCategories potential rates; the caller must free it */
-        void MLSiteRates(int64_t nRateCategories, std::vector<numeric_t> &rates);
+        void MLSiteRates(std::vector<numeric_t> &rates);
 
         /* returns site_loglk so that
            site_loglk[nPos*iRate + j] is the log likelihood of site j with rate iRate

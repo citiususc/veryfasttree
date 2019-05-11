@@ -3,7 +3,7 @@ project(FastTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
-option(USE_SSE3 "enable/disable SSE3" OFF)
+option(USE_SSE3 "enable/disable SSE3" OFF) #TODO align all arguments
 option(USE_AVX "enable/disable AVX" OFF)
 option(USE_AVX2 "enable/disable AVX2" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
@@ -27,14 +27,15 @@ endif()
 ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")
 ADD_SUBDIRECTORY("libs/xxhash")
+ADD_SUBDIRECTORY("libs/boost-core")
 ADD_SUBDIRECTORY("libs/boost-sort")
 ADD_SUBDIRECTORY("libs/boost-align")
 
 set(SOURCE_FILES
         fasttree/operations/BasicOperations.tcc
         fasttree/operations/BasicOperations.h
-        fasttree/operations/SSEOperations.tcc
-        fasttree/operations/SSEOperations.h
+        fasttree/operations/SSE3Operations.tcc
+        fasttree/operations/SSE3Operations.h
         fasttree/operations/AVXOperations.tcc
         fasttree/operations/AVXOperations.h
         fasttree/operations/AVX2Operations.tcc
@@ -61,11 +62,11 @@ set(SOURCE_FILES
         )
 
 if(MSVC)
-    set(CMAKE_CXX_FLAGS "/W4 /O2 /openmp /EHsc /wd4100")
+    set(CMAKE_CXX_FLAGS "/W4 /O2 /openmp /EHsc /wd4100 /bigobj")
 else()
     set(CMAKE_CXX_FLAGS "-Wall -fopenmp")#-O3
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} CLI11 robin-map xxhash boost-sort boost-align)
+target_link_libraries(${PROJECT_NAME} CLI11 robin-map xxhash boost-core boost-sort boost-align)
 

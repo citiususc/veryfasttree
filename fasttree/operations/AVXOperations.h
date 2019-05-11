@@ -2,8 +2,8 @@
 #ifndef FASTTREE_AVXOPERATIONS_H
 #define FASTTREE_AVXOPERATIONS_H
 
-#include "../DistanceMatrix.h"
 #include <boost/align/aligned_allocator.hpp>
+#include <immintrin.h>
 
 namespace fasttree {
     template<typename Precision>
@@ -27,8 +27,11 @@ namespace fasttree {
 
         void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n);
 
-        void matrixt_by_vector4(numeric_t mat[4][MAXCODES], numeric_t vec[4], numeric_t out[4]);
+        void matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]);
 
+    private:
+        template <typename Tp>
+        inline numeric_t mm_sum(register Tp sum);
     };
 }
 

@@ -6,7 +6,7 @@
 #include "operations/BasicOperations.h"
 
 #ifdef USE_SSE3
-#include "operations/SSEOperations.h"
+#include "operations/SSE3Operations.h"
 #endif
 #ifdef USE_AVX
 #include "operations/AVXOperations.h"
@@ -210,5 +210,8 @@ void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
         }
     }
     #endif
+    else{
+        throw std::invalid_argument("This version has not been compiled with " + options.extension + " extension");
+    }
 
 }

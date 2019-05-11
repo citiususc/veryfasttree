@@ -101,10 +101,14 @@ AbsFastTreeImpl(void)::run() {
             }
             NeighbourJoining <Precision, Operations> nj(options, log, progressReport, unique.uniqueSeq, aln.nPos,
                                                         uniqConstraints, distanceMatrix, transmat);
+            int64_t nSeq = (int64_t) aln.seqs.size();
+            int64_t unSeq = (int64_t) unique.uniqueSeq.size();
+            int64_t unConstraints = (int64_t) uniqConstraints.size();
+
             if (options.verbose > 2) {
                 log << strformat("read %s seqs %d (%d unique) positions %d nameLast %s seqLast %s",
                                  options.inFileName.empty() ? "standard input" : options.inFileName.c_str(),
-                                 aln.seqs.size(), unique.uniqueSeq.size(),
+                                 nSeq, unSeq,
                                  aln.nPos, aln.names[aln.seqs.size() - 1], aln.seqs[aln.seqs.size() - 1]) << std::endl;
             }
             aln.clearAlignmentSeqs(); /*no longer needed*/
@@ -125,11 +129,11 @@ AbsFastTreeImpl(void)::run() {
             }
             nj.logTree("NJ", 0, aln.names, unique);
 
-            int64_t nniToDo = options.nni == -1 ? (int64_t) (0.5 + 4.0 * std::log(aln.seqs.size()) / std::log(2)) :
+            int64_t nniToDo = options.nni == -1 ? (int64_t) (0.5 + 4.0 * std::log(unSeq) / std::log(2)) :
                               options.nni;
             int64_t sprRemaining = options.spr;
             int64_t MLnniToDo = (options.MLnni != -1) ? options.MLnni :
-                                (int64_t) (0.5 + 2.0 * std::log(aln.seqs.size()) / std::log(2));
+                                (int64_t) (0.5 + 2.0 * std::log(unSeq) / std::log(2));
             if (options.verbose > 0) {
                 if (!fpInTree) {
                     log << strformat("Initial topology in %.2f seconds", progressReport.clockDiff()) << std::endl;
@@ -177,10 +181,267 @@ AbsFastTreeImpl(void)::run() {
                     }
                 }
             }
-            //TODO implement
-        }
-    }
+            while (sprRemaining > 0) {    /* do any remaining SPR rounds */
+                nj.SPR(options.maxSPRLength, options.spr - sprRemaining, options.spr);
+                nj.logTree("ME_SPR%d", options.spr - sprRemaining + 1, aln.names, unique);
+                sprRemaining--;
+            }
 
+            /* In minimum-evolution mode, update branch lengths, even if no NNIs or SPRs,
+           so that they are log-corrected, do not include penalties from constraints,
+           and avoid errors due to approximation of out-distances.
+           If doing maximum-likelihood NNIs, then we'll also use these
+           to get estimates of starting distances for quartets, etc.
+          */
+            nj.updateBranchLengths();
+            nj.logTree("ME_Lengths", 0, aln.names, unique);
+
+            double total_len = nj.totalLen();
+
+            if (options.verbose > 0) {
+                log << strformat("Total branch-length %.3f after %.2f sec",
+                                 total_len, progressReport.clockDiff()) << std::endl;
+            }
+
+            typename decltype(nj)::SplitCount splitcount = {0, 0, 0, 0, 0.0, 0.0};
+
+            if (MLnniToDo > 0 || options.MLlen) {
+                bool warn_len =
+                        total_len / nj.getMaxnode() < 0.001 && options.MLMinBranchLengthTolerance > 1.0 / aln.nPos;
+                bool warn = warn_len || (total_len / nj.getMaxnode() < 0.001 && aln.nPos >= 10000);
+
+                if (warn) {
+                    log << std::endl;
+                    log << "WARNING! This alignment consists of closely-related and very-long sequences." << std::endl;
+                }
+                if (warn_len) {
+                    log << "This version of FastTree may not report reasonable branch lengths!" << std::endl;
+                    if (options.doublePrecision) {
+                        log << "Consider changing MLMinBranchLengthTolerance." << std::endl;
+                    } else {
+                        log << "Consider use FastTree with -double-precision." << std::endl;
+                    }
+                    log << "For more information, visit" << std::endl;
+                    log << "http://www.microbesonline.org/fasttree/#BranchLen" << std::endl;
+
+                }
+                if (warn) {
+                    log << "WARNING! FastTree (or other standard maximum-likelihood tools)" << std::endl;
+                    log << "may not be appropriate for aligments of very closely-related sequences" << std::endl;
+                    log << "like this one, as FastTree does not account for recombination or gene conversion"
+                        << std::endl << std::endl;
+
+                }
+
+                /* Do maximum-likelihood computations */
+                DistanceMatrix <Precision> tmatAsDist;
+                /* Convert profiles to use the transition matrix */
+                transMatToDistanceMat(tmatAsDist);
+                nj.recomputeProfiles(tmatAsDist);
+
+                double lastloglk = -1e20;
+                std::vector<typename decltype(nj)::NNIStats> nni_stats;
+                nj.initNNIStats(nni_stats);
+                bool resetGtr = options.nCodes == 4 && options.bUseGtr && !options.bUseGtrRates;
+
+                if (options.MLlen) {
+                    int64_t maxRound = (int64_t) (0.5 + std::log(unSeq) / std::log(2));
+                    double dLastLogLk = -1e20;
+                    for (int64_t iRound = 1; iRound <= maxRound; iRound++) {
+                        auto &branchlength = nj.getBranchlength();
+                        std::vector<numeric_t> oldlength(branchlength.begin(), branchlength.begin() + nj.getMaxnode());
+
+                        nj.optimizeAllBranchLengths();
+                        nj.logTree("ML_Lengths", iRound, aln.names, unique);
+                        double dMaxChange = 0; /* biggest change in branch length */
+                        for (int64_t node = 0; node < nj.getMaxnode(); node++) {
+                            double d = std::fabs(oldlength[node] - branchlength[node]);
+                            if (dMaxChange < d) {
+                                dMaxChange = d;
+                            }
+                        }
+
+                        double loglk = nj.treeLogLk(/*site_likelihoods*/nullptr);
+                        bool bConverged = iRound > 1 &&
+                                          (dMaxChange < 0.001 || loglk < (dLastLogLk + Constants::treeLogLkDelta));
+                        if (options.verbose) {
+                            log << strformat("%d rounds ML lengths: LogLk %s= %.3lf Max-change %.4lf%s Time %.2f",
+                                             iRound,
+                                             options.exactML || options.nCodes != 20 ? "" : "~",
+                                             loglk,
+                                             dMaxChange,
+                                             bConverged ? " (converged)" : "",
+                                             progressReport.clockDiff()) << std::endl;
+                        }
+                        if (!options.logFileName.empty()) {
+                            log << strformat("TreeLogLk\tLength%d\t%.4lf\tMaxChange\t%.4lf",
+                                             iRound, loglk, dMaxChange) << std::endl;
+                        }
+                        if (iRound == 1) {
+                            if (resetGtr) {
+                                nj.setMLGtr(options.bUseGtrFreq ? options.gtrfreq : nullptr);
+                            }
+                            nj.setMLRates();
+                            nj.logMLRates();
+                        }
+                        if (bConverged) {
+                            break;
+                        }
+                    }
+                }
+
+                if (MLnniToDo > 0) {
+                    /* This may help us converge faster, and is fast */
+                    nj.optimizeAllBranchLengths();
+                    nj.logTree("ML_Lengths%d", 1, aln.names, unique);
+                }
+
+                double maxDelta;
+                bool bConverged = false;
+                for (int64_t iMLnni = 0; iMLnni < MLnniToDo; iMLnni++) {
+                    int64_t changes = nj.DoNNI(iMLnni, MLnniToDo, /*use ml*/true, nni_stats, maxDelta);
+                    nj.logTree("ML_NNI%d", iMLnni + 1, aln.names, unique);
+                    double loglk = nj.treeLogLk(/*site_likelihoods*/nullptr);
+                    bool bConvergedHere = (iMLnni > 0) &&
+                                          ((loglk < lastloglk + Constants::treeLogLkDelta) ||
+                                           maxDelta < Constants::treeLogLkDelta);
+                    if (options.verbose) {
+                        log << strformat("ML-NNI round %d: LogLk %s= %.3f NNIs %d max delta %.2f Time %.2f%s",
+                                         iMLnni + 1,
+                                         options.exactML || options.nCodes != 20 ? "" : "~",
+                                         loglk, changes, maxDelta, progressReport.clockDiff(),
+                                         bConverged ? " (final)" : "") << std::endl;
+                    }
+                    if (!options.logFileName.empty())
+                        log << strformat("TreeLogLk\tML_NNI%d\t%.4lf\tMaxChange\t%.4lf",
+                                         iMLnni + 1, loglk, maxDelta) << std::endl;
+                    if (bConverged) {
+                        break;        /* we did our extra round */
+                    }
+                    if (bConvergedHere) {
+                        bConverged = true;
+                    }
+                    if (bConverged || iMLnni == MLnniToDo - 2) {
+                        /* last round uses high-accuracy seettings -- reset NNI stats to tone down heuristics */
+                        nni_stats.clear();
+                        nj.initNNIStats(nni_stats);
+                        if (options.verbose) {
+                            log << "Turning off heuristics for final round of ML NNIs"
+                                << (bConvergedHere ? " (converged)" : "") << std::endl;
+                        }
+
+                    }
+                    lastloglk = loglk;
+                    if (iMLnni == 0 && nj.getRateCategories() == 1) {
+                        if (resetGtr) {
+                            nj.setMLGtr(options.bUseGtrFreq ? options.gtrfreq : nullptr);
+                        }
+                        nj.setMLRates();
+                        nj.logMLRates();
+                    }
+                }
+                nni_stats.clear();
+                nni_stats.reserve(0);
+
+
+                /* This does not take long and improves the results */
+                if (MLnniToDo > 0) {
+                    nj.optimizeAllBranchLengths();
+                    nj.logTree("ML_Lengths%d", 2, aln.names, unique);
+                    if (options.verbose || !options.logFileName.empty()) {
+                        double loglk = nj.treeLogLk(/*site_likelihoods*/nullptr);
+                        if (options.verbose)
+                            log << strformat("Optimize all lengths: LogLk %s= %.3f Time %.2f",
+                                             options.exactML || options.nCodes != 20 ? "" : "~",
+                                             loglk,
+                                             progressReport.clockDiff()) << std::endl;
+                        if (!options.logFileName.empty()) {
+                            log << strformat("TreeLogLk\tML_Lengths%d\t%.4f", 2, loglk) << std::endl;
+                        }
+                    }
+                }
+
+                /* Count bad splits and compute SH-like supports if desired */
+                if ((MLnniToDo > 0 && !options.fastest) || options.nBootstrap > 0)
+                    nj.testSplitsML(splitcount);
+
+                /* Compute gamma-based likelihood? */
+                if (options.gammaLogLk && options.nRateCats > 1) {
+                    nj.branchlengthScale();
+                }
+            } else {
+                /* Minimum evolution supports */
+                nj.testSplitsMinEvo(splitcount);
+                if (options.nBootstrap > 0) {
+                    nj.reliabilityNJ();
+                }
+            }
+
+            log << strformat("Total time: %.2f seconds Unique: %d/%d Bad splits: %d/%d",
+                             progressReport.clockDiff(),
+                             unSeq, nSeq,
+                             splitcount.nBadSplits, splitcount.nSplits);
+            if (splitcount.dWorstDeltaUnconstrained > 0) {
+                log << strformat(" Worst %sdelta-%s %.3f",
+                                 !uniqConstraints.empty() ? "unconstrained " : "",
+                                 (MLnniToDo > 0 || options.MLlen) ? "LogLk" : "Len",
+                                 splitcount.dWorstDeltaUnconstrained);
+            }
+            log << std::endl;
+            if (unSeq > 3 && unConstraints > 0) {
+                log << strformat("Violating constraints: %d both bad: %d",
+                                 splitcount.nConstraintViolations, splitcount.nBadBoth);
+                if (splitcount.dWorstDeltaConstrained > 0) {
+                    log << strformat(" Worst delta-%s due to constraints: %.3f",
+                                     (MLnniToDo > 0 || options.MLlen) ? "LogLk" : "Len",
+                                     splitcount.dWorstDeltaConstrained);
+                }
+                log << std::endl;
+            }
+            if (options.threads > 1) {
+
+            } else if (options.verbose > 1 || !options.logFileName.empty()) {
+                double dN2 = unSeq * (double) unSeq;
+                log << strformat("Dist/N**2: by-profile %.3f (out %.3f) by-leaf %.3f avg-prof %.3f",
+                                 options.debug.profileOps / dN2,
+                                 options.debug.outprofileOps / dN2,
+                                 options.debug.seqOps / dN2,
+                                 options.debug.profileAvgOps / dN2) << std::endl;
+
+                if (options.debug.nCloseUsed > 0 || options.debug.nClose2Used > 0 ||
+                    options.debug.nRefreshTopHits > 0) {
+                    log << strformat("Top hits: close neighbors %ld/%d 2nd-level %ld refreshes %ld",
+                                     options.debug.nCloseUsed, unSeq, options.debug.nClose2Used,
+                                     options.debug.nRefreshTopHits);
+                }
+                if (!options.slow) {
+                    log << strformat(" Hill-climb: %ld Update-best: %ld", options.debug.nHillBetter,
+                                     options.debug.nVisibleUpdate) << std::endl;
+                }
+                if (nniToDo > 0 || options.spr > 0 || MLnniToDo > 0) {
+                    log << strformat("NNI: %ld SPR: %ld ML-NNI: %ld", options.debug.nNNI, options.debug.nSPR,
+                                     options.debug.nML_NNI) << std::endl;
+                }
+                if (MLnniToDo > 0) {
+                    log << strformat("Max-lk operations: lk %ld posterior %ld", options.debug.nLkCompute,
+                                     options.debug.nPosteriorCompute);
+                    if (options.debug.nAAPosteriorExact > 0 || options.debug.nAAPosteriorRough > 0) {
+                        log << strformat(" approximate-posteriors %.2f%%",
+                                         (100.0 * options.debug.nAAPosteriorRough) /
+                                         (double) (options.debug.nAAPosteriorExact + options.debug.nAAPosteriorRough));
+                    }
+                    if (options.mlAccuracy < 2) {
+                        log << strformat(" star-only %ld", options.debug.nStarTests);
+                    }
+                    log << std::endl;
+                }
+            }
+
+
+            nj.printNJ(log, aln.names, unique, /*support*/options.nBootstrap > 0);
+            log << "TreeCompleted\n" << std::endl;
+        }/* end build tree */
+    }/* end loop over alignments */
 }
 
 AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraints, Alignment &constraints,
@@ -212,6 +473,32 @@ AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraint
             uniqConstraints[iSeqUnique] = constraintSeq;
         }
     }
+}
+
+AbsFastTreeImpl(void)::transMatToDistanceMat(DistanceMatrix <Precision> &dmat) {
+    if (transmat) {
+        return;
+    }
+
+    for (int64_t i = 0; i < options.nCodes; i++) {
+        for (int64_t j = 0; j < options.nCodes; j++) {
+            dmat.distances[i][j] = 0;    /* never actually used */
+            dmat.eigeninv[i][j] = transmat.eigeninv[i][j];
+            dmat.codeFreq[i][j] = transmat.codeFreq[i][j];
+        }
+    }
+    /* eigentot . rotated-vector is the total frequency of the unrotated vector
+       (used to normalize in NormalizeFreq()
+       For transition matrices, we rotate by transpose of eigenvectors, so
+       we need to multiply by the inverse matrix by 1....1 to get this vector,
+       or in other words, sum the columns
+    */
+    for (int64_t i = 0; i < options.nCodes; i++) {
+        dmat.eigentot[i] = 0.0;
+        for (int64_t j = 0; j < options.nCodes; j++)
+            dmat.eigentot[i] += transmat.eigeninv[i][j];
+    }
+
 }
 
 

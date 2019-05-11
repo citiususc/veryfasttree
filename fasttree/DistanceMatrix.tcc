@@ -145,7 +145,7 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
         for (int k = 0; k < options.nCodes; k++) {
             gapFreqSum += codeFreq[k][code];
         }
-        gapFreq[code] = gapFreqSum / options.nCodes;
+        gapFreq[code] = (gapFreqSum / options.nCodes);
     }
 
     if (options.verbose > 10) {

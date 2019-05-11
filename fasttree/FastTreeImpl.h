@@ -23,6 +23,8 @@ namespace fasttree {
         void run();
 
     private:
+        typedef Precision numeric_t;
+
         Options &options;
         std::istream &input;
         std::ostream &output;
@@ -40,6 +42,8 @@ namespace fasttree {
         */
         void alnToConstraints(std::vector<std::string> &uniqConstraints, Alignment &constraints, Uniquify &unique,
                               HashTable &hashnames);
+
+        void transMatToDistanceMat(DistanceMatrix<Precision>& dmat);
     };
 }
 

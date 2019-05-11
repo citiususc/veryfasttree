@@ -59,7 +59,7 @@ AbsBasicOperations(void)::vector_add_mult(numeric_t  fTot[], numeric_t  fAdd[], 
     }
 }
 
-AbsBasicOperations(void)::matrixt_by_vector4(numeric_t  mat[4][MAXCODES], numeric_t  vec[4],  numeric_t out[4]){
+AbsBasicOperations(void)::matrixt_by_vector4(numeric_t  mat[4][4], numeric_t  vec[4],  numeric_t out[4]){
     for (int64_t j = 0; j < 4; j++) {
         double sum = 0;
         for (int64_t k = 0; k < 4; k++) {
