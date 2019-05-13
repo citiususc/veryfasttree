@@ -42,6 +42,8 @@ set(SOURCE_FILES
         fasttree/operations/AVX2Operations.h
         fasttree/operations/AVX512Operations.tcc
         fasttree/operations/AVX512Operations.h
+        fasttree/Knuth.cpp
+        fasttree/Knuth.h
         fasttree/Options.h
         fasttree/Constants.h
         fasttree/Debug.h

@@ -8,6 +8,9 @@
 #include "Alignment.h"
 #include <vector>
 #include <iostream>
+#include <mutex>
+#include "assert.h"
+#include "Knuth.h"
 
 
 namespace fasttree {
@@ -143,6 +146,8 @@ namespace fasttree {
                If nRateCategories=0, just deallocate
             */
             Rates(int64_t nRateCategories, int64_t nPos);
+
+            void reset(int64_t nRateCategories, int64_t nPos);
         };
 
         struct Children {
@@ -171,6 +176,13 @@ namespace fasttree {
             numeric_t criterion;    /* changes when we update the out-profile or change nActive */
         };
 
+        /* A list of these describes a chain of NNI moves in a rooted tree,
+           making up, in total, an SPR move
+        */
+        struct SprStep {
+            int64_t nodes[2];
+            double deltaLength;        /* change in tree length for this step (lower is better) */
+        };
 
         /* Keep track of hits for the top-hits heuristic without wasting memory
            j = -1 means empty
@@ -208,7 +220,7 @@ namespace fasttree {
 
 
             /* 1 lock to read or write any top hits list, no thread grabs more than one */
-            //omp_lock_t *locks;
+            std::vector<std::mutex> locks; //TODO check if lock is necesary
 
             TopHits(const Options &options, int64_t maxnodes, int64_t m);
 
@@ -345,6 +357,18 @@ namespace fasttree {
         double MLQuartetOptimize(Profile &pA, Profile &pB, Profile &pC, Profile &pD, double branch_lengths[5],
                                  bool *pStarTest, double *site_likelihoods);
 
+        /* Returns the resulting log likelihood */
+        double MLPairOptimize(Profile &pA, Profile &pB, double *branch_length);
+
+        /* Returns the number of steps considered, with the actual steps in steps[]
+           Modifies the tree by this chain of NNIs
+        */
+        int64_t findSPRSteps(int64_t node, int64_t parent, /* sibling or parent of node to NNI to start the chain */
+                             std::unique_ptr<Profile> upProfiles[], SprStep steps[], int64_t maxSteps, bool bFirstAC);
+
+        /* Undo a single NNI */
+        void unwindSPRStep(SprStep &step, std::unique_ptr<Profile> upProfiles[]);
+
         /* Update the profile of node and its ancestor, and delete nearby out-profiles */
         void updateForNNI(int64_t node, std::unique_ptr<Profile> upProfiles[], bool useML);
 
@@ -390,6 +414,7 @@ namespace fasttree {
            do not call unless weight of input profile > 0
          */
         void addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[]);
+
         void
         addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[], DistanceMatrix<Precision> &dmat);
 
@@ -397,6 +422,7 @@ namespace fasttree {
            so that the total (unrotated) frequency is 1.0
         */
         void normalizeFreq(numeric_t freq[]);
+
         void normalizeFreq(numeric_t freq[], DistanceMatrix<Precision> &dmat);
 
         /* Allocate, if necessary, and recompute the codeDist*/
@@ -407,6 +433,11 @@ namespace fasttree {
            In that case, returns an arbitrary large number.
         */
         double profileDistPiece(int64_t code1, int64_t code2, numeric_t f1[], numeric_t f2[], numeric_t codeDist2[]);
+
+        /* Returns SH-like support given resampling spec. (in col) and site likelihods
+           for the three quartets
+        */
+        double SHSupport(std::vector<int64_t> &col, double loglk[3], std::vector<double> &site_likelihoods);
 
         /* ProfileDist and SeqDist only set the dist and weight fields
            If using an outprofile, use the second argument of ProfileDist
@@ -439,6 +470,18 @@ namespace fasttree {
         };
 
         double pairNegLogLk(double x, QuartetOpt &qo);
+
+        struct GtrOpt {
+            double freq[4];
+            double rates[6];
+            int64_t iRate;            /* which rate to set x from */
+        };
+
+        /* Returns -log_likelihood for the tree with the given rates
+           data must be a gtr_opt_t and x is used to set rate iRate
+           Does not recompute profiles -- assumes that the caller will
+        */
+        double GTRNegLogLk(double x, GtrOpt &data);
 
         /* Branch lengths for 4-taxon tree ((A,B),C,D); I means internal */
         enum QuartetLength {
@@ -487,6 +530,7 @@ namespace fasttree {
            Also, the weight does not affect the representation of the constraints
         */
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1);
+
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1,
                             DistanceMatrix<Precision> &dmat);
 

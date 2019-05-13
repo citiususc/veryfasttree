@@ -420,7 +420,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     auto optimizations = "Optimizations";
 
     app.add_option("-threads", options.threads, "to use a parallel version with multiple threads")->
-            type_name("n")->check(Min(1))->group(constrains);
+            type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(constrains);
 
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
             group(optimizations);
