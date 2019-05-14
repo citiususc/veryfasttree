@@ -24,6 +24,7 @@ namespace fasttree {
 
     private:
         typedef Precision numeric_t;
+        typedef Operations<Precision> op_t;
 
         Options &options;
         std::istream &input;
@@ -33,8 +34,8 @@ namespace fasttree {
         std::ifstream fpConstraints;
         std::ifstream fpInTree;
 
-        DistanceMatrix<Precision> distanceMatrix;
-        TransitionMatrix<Precision> transmat;
+        DistanceMatrix<Precision, op_t::ALIGNMENT> distanceMatrix;
+        TransitionMatrix<Precision, op_t::ALIGNMENT> transmat;
         ProgressReport progressReport;
 
         /* Convert a constraint alignment to a list of sequences. The returned array is indexed
@@ -43,7 +44,7 @@ namespace fasttree {
         void alnToConstraints(std::vector<std::string> &uniqConstraints, Alignment &constraints, Uniquify &unique,
                               HashTable &hashnames);
 
-        void transMatToDistanceMat(DistanceMatrix<Precision>& dmat);
+        void transMatToDistanceMat(DistanceMatrix<Precision, op_t::ALIGNMENT>& dmat);
     };
 }
 

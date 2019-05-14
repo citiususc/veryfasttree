@@ -8,8 +8,8 @@
 #include <cmath>
 
 #define AbsDistanceMatrix(...) \
-template<typename Precision> \
-__VA_ARGS__ fasttree::DistanceMatrix<Precision>
+template<typename Precision, int Aligment> \
+__VA_ARGS__ fasttree::DistanceMatrix<Precision, Aligment>
 
 
 AbsDistanceMatrix(void)::readDistanceMatrix(const Options &options, std::ostream &log) {
@@ -155,8 +155,8 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
 
 
 // @formatter:off
-template<typename Precision>
-const fasttree::DistanceMatrix<Precision> fasttree::DistanceMatrix<Precision>::_matrixBLOSUM45 = {
+template<typename Precision, int Aligment>
+const fasttree::DistanceMatrix<Precision, Aligment> fasttree::DistanceMatrix<Precision, Aligment>::_matrixBLOSUM45 = {
         /*distances*/
         {
                 {0, 1.31097856157468, 1.06573001937323, 1.2682782988532, 0.90471293383305, 1.05855446876905, 1.05232790675508, 0.769574440593014, 1.27579668305679, 0.964604099952603, 0.987178199640556, 1.05007594438157, 1.05464162250736, 1.1985987403937, 0.967404475245526, 0.700490199584332, 0.880060189098976, 1.09748548316685, 1.28141710375267, 0.800038509951648},

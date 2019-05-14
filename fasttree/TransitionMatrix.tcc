@@ -5,8 +5,8 @@
 #include "TransitionMatrix.h"
 
 #define AbsTransitionMatrix(...) \
-template<typename Precision> \
-__VA_ARGS__ fasttree::TransitionMatrix<Precision>
+template<typename Precision, int Aligment> \
+__VA_ARGS__ fasttree::TransitionMatrix<Precision, Aligment>
 
 AbsTransitionMatrix()::TransitionMatrix() : setted(false) {}
 

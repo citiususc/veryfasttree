@@ -58,21 +58,21 @@
  */
 namespace fasttree {
 
-    template<typename Precision>
+    template<typename Precision, int Aligment>
     struct TransitionMatrix {
         typedef Precision numeric_t;
 
-        numeric_t stat[MAXCODES]; /* The stationary distribution */
-        numeric_t statinv[MAXCODES];    /* 1/stat */
+        alignas(Aligment) numeric_t stat[MAXCODES]; /* The stationary distribution */
+        alignas(Aligment) numeric_t statinv[MAXCODES];    /* 1/stat */
         /* the eigenmatrix, with the eigenvectors as columns and rotations of individual
            characters as rows. Also includes a NOCODE entry for gaps */
-        numeric_t codeFreq[NOCODE + 1][MAXCODES];
-        numeric_t eigeninv[MAXCODES][MAXCODES]; /* Inverse of eigenmatrix */
-        numeric_t eigeninvT[MAXCODES][MAXCODES]; /* transpose of eigeninv */
-        numeric_t eigenval[MAXCODES];    /* Eigenvalues  */
+        alignas(Aligment) numeric_t codeFreq[NOCODE + 1][MAXCODES];
+        alignas(Aligment) numeric_t eigeninv[MAXCODES][MAXCODES]; /* Inverse of eigenmatrix */
+        alignas(Aligment) numeric_t eigeninvT[MAXCODES][MAXCODES]; /* transpose of eigeninv */
+        alignas(Aligment) numeric_t eigenval[MAXCODES];    /* Eigenvalues  */
         /* These are for approximate posteriors (off by default) */
-        numeric_t nearP[MAXCODES][MAXCODES]; /* nearP[i][j] = P(parent=j | both children are i, both lengths are 0.1 */
-        numeric_t nearFreq[MAXCODES][MAXCODES]; /* rotation of nearP/stat */
+        alignas(Aligment) numeric_t nearP[MAXCODES][MAXCODES]; /* nearP[i][j] = P(parent=j | both children are i, both lengths are 0.1 */
+        alignas(Aligment) numeric_t nearFreq[MAXCODES][MAXCODES]; /* rotation of nearP/stat */
 
         TransitionMatrix();
 

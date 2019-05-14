@@ -6,7 +6,7 @@
 
 #define AbsNeighbourJoining(...) \
 template<typename Precision, template<class> class Operations> \
-__VA_ARGS__ fasttree::NeighbourJoining<Precision,Operations>
+__VA_ARGS__ fasttree::NeighbourJoining<Precision, Operations>
 
 
 AbsNeighbourJoining()::Profile::Profile() {}
@@ -14,6 +14,7 @@ AbsNeighbourJoining()::Profile::Profile() {}
 AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints) {
     weights.resize(nPos);
     codes.resize(nPos);
+    nGaps = 0;
     if (nConstraints == 0) {
         nOn.resize(nConstraints, 0);
         nOff.resize(nConstraints, 0);
@@ -38,35 +39,32 @@ AbsNeighbourJoining(void)::Rates::reset(int64_t nRateCategories, int64_t nPos) {
 
 AbsNeighbourJoining()::TopHits::TopHits() {}
 
-AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) : locks(maxnodes) {
+AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) :
+        m(_m), q(0.5 + options.tophits2Mult * sqrt(m)), maxnodes(_maxnodes), topvisibleAge(0), locks(maxnodes) {
     assert(m > 0);
-    m = _m;
-    q = (int64_t) (0.5 + options.tophits2Mult * sqrt(m));
     if (!options.useTopHits2nd || q >= m) {
         q = 0;
     }
-    maxnodes = _maxnodes;
     topHitsLists.resize(maxnodes, {{}, -1, 0});
     visible.resize(maxnodes, {-1, 1e20});
     int64_t nTopVisible = (int64_t) (0.5 + options.topvisibleMult * m);
     topvisible.resize(nTopVisible, -1);
-    topvisibleAge = 0;
 }
 
 AbsNeighbourJoining()::
 NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressReport,
                  std::vector<std::string> &seqs, int64_t nPos,
                  std::vector<std::string> &constraintSeqs,
-                 DistanceMatrix <Precision> &distanceMatrix,
-                 TransitionMatrix <Precision> &transmat) : log(log),
-                                                           options(options),
-                                                           progressReport(progressReport),
-                                                           seqs(seqs),
-                                                           distanceMatrix(distanceMatrix),
-                                                           transmat(transmat),
-                                                           constraintSeqs(constraintSeqs),
-                                                           outprofile(nPos, constraintSeqs.size()),
-                                                           rates(1, nPos) {
+                 DistanceMatrix <Precision, op_t::ALIGNMENT> &distanceMatrix,
+                 TransitionMatrix <Precision, op_t::ALIGNMENT> &transmat) : log(log),
+                                                                            options(options),
+                                                                            progressReport(progressReport),
+                                                                            seqs(seqs),
+                                                                            distanceMatrix(distanceMatrix),
+                                                                            transmat(transmat),
+                                                                            constraintSeqs(constraintSeqs),
+                                                                            outprofile(nPos, constraintSeqs.size()),
+                                                                            rates(1, nPos) {
     this->root = -1;
     this->maxnode = seqs.size();
     this->nPos = nPos;
@@ -138,7 +136,7 @@ AbsNeighbourJoining(double)::totalLen() {
 }
 
 AbsNeighbourJoining(void)::branchlengthScale() {
-    std::vector<numeric_t> rates;
+    std::vector<numeric_t, typename op_t::Allocator> rates;
     std::vector<double> site_loglk;
     MLSiteRates(rates);
     MLSiteLikelihoodsByRate(rates, site_loglk);
@@ -149,7 +147,7 @@ AbsNeighbourJoining(void)::branchlengthScale() {
     }
 }
 
-AbsNeighbourJoining(const std::vector<Precision>&)::getBranchlength() {
+AbsNeighbourJoining(const std::vector<Precision, typename Operations<Precision>::Allocator> &)::getBranchlength() {
     return branchlength;
 }
 
@@ -483,7 +481,7 @@ AbsNeighbourJoining(void)::resampleColumns(std::vector<int64_t> &col) {
     col.resize(nPos * options.nBootstrap);
     for (int64_t i = 0; i < options.nBootstrap; i++) {
         for (int64_t j = 0; j < nPos; j++) {
-            int64_t pos = (int64_t)(knuth_rand() * nPos);
+            int64_t pos = (int64_t) (knuth_rand() * nPos);
             if (pos < 0) {
                 pos = 0;
             } else if (pos == nPos) {
@@ -522,7 +520,10 @@ AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out,
 
     /* Initialize the frequencies to 0 */
     out.vectors.reserve(nVectors * options.nCodes);
-    out.vectors.resize(nVectors, 0);
+    out.vectors.resize(nVectors);
+    for (int64_t i = 0; i < nVectors * options.nCodes; i++) {
+        out.vectors[i] = 0;
+    }
 
     /* Add up the weights, going through each sequence in turn */
     #pragma omp parallel for schedule(static)
@@ -570,8 +571,8 @@ AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t co
     addToFreq(fOut, weight, codeIn, fIn, distanceMatrix);
 }
 
-AbsNeighbourJoining(void)::
-addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[], DistanceMatrix <Precision> &dmat) {
+AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[],
+                                     DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
     assert(fOut != nullptr);
     if (fIn != nullptr) {
         operations.vector_add_mult(fOut, fIn, weight, options.nCodes);
@@ -592,7 +593,7 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[]) {
     normalizeFreq(freq, distanceMatrix);
 }
 
-AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Precision> &dmat) {
+AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
     double total_freq = 0;
     if (dmat) {
         /* The total frequency is dot_product(true_frequencies, 1)
@@ -925,7 +926,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
     double loglk = 0.0;        /* stores underflow of lk during the loop over positions */
 
     assert(!rates.rates.empty());
-    std::vector<numeric_t> expeigenRates;
+    std::vector<numeric_t, typename op_t::Allocator> expeigenRates;
     if (transmat) {
         expEigenRates(length, expeigenRates);
     }
@@ -1131,7 +1132,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
                 log << "codeFreq = c(";
                 for (int j = 0; j < options.nCodes; j++) {
                     for (int k = 0; k < options.nCodes; k++) {
-                        log << (j == 0 ? "" : ",") << strformat(" %.8g", transmat.codeFreq[j][k]);
+                        log << (j == 0 && k == 0 ? "" : ",") << strformat(" %.8g", transmat.codeFreq[j][k]);
                     }
                 }
                 log << ")" << std::endl;
@@ -1139,8 +1140,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
                 log << "eigeninv = c(";
                 for (int j = 0; j < options.nCodes; j++) {
                     for (int k = 0; k < options.nCodes; k++) {
-                        fprintf(stderr, "%s %.8g", j == 0 && k == 0 ? "" : ",",
-                                transmat.eigeninv[j][k]);
+                        log << (j == 0 && k == 0 ? "" : ",") << strformat(" %.8g", transmat.eigeninv[j][k]);
                     }
                 }
                 log << ")" << std::endl;
@@ -1662,7 +1662,7 @@ AbsNeighbourJoining(void)::replaceChild(int64_t _parent, int64_t oldchild, int64
     assert(0);
 }
 
-AbsNeighbourJoining(void)::setupABCD(int64_t node, Profile *_profiles[4], std::unique_ptr<Profile> upProfiles[],
+AbsNeighbourJoining(void)::setupABCD(int64_t node, Profile *profiles4[4], std::unique_ptr<Profile> upProfiles[],
                                      int64_t nodeABCD[4], bool useML) {
     int64_t iparent = parent[node];
     assert(iparent >= 0);
@@ -1670,30 +1670,30 @@ AbsNeighbourJoining(void)::setupABCD(int64_t node, Profile *_profiles[4], std::u
     nodeABCD[0] = child[node].child[0]; /*A*/
     nodeABCD[1] = child[node].child[1]; /*B*/
 
-    Profile *profile4 = nullptr;
+    Profile *profile = nullptr;
     if (iparent == root) {
         int64_t sibs[2];
         rootSiblings(node, /*OUT*/sibs);
         nodeABCD[2] = sibs[0];
         nodeABCD[3] = sibs[1];
-        if (_profiles == nullptr) {
+        if (profiles4 == nullptr) {
             return;
         }
-        profile4 = _profiles[sibs[1]];
+        profile = &profiles[sibs[1]];
     } else {
         nodeABCD[2] = sibling(node);
         assert(nodeABCD[2] >= 0);
         nodeABCD[3] = iparent;
-        if (_profiles == nullptr) {
+        if (profiles4 == nullptr) {
             return;
         }
-        profile4 = getUpProfile(upProfiles, iparent, useML);
+        profile = getUpProfile(upProfiles, iparent, useML);
     }
     assert(upProfiles);
     for (int i = 0; i < 3; i++) {
-        _profiles[i] = _profiles[nodeABCD[i]];
+        profiles4[i] = &profiles[nodeABCD[i]];
     }
-    _profiles[3] = profile4;
+    profiles4[3] = profile;
 }
 
 AbsNeighbourJoining(int64_t)::sibling(int64_t node) {
@@ -1719,10 +1719,10 @@ AbsNeighbourJoining(void)::rootSiblings(int64_t node, /*OUT*/int64_t sibs[2]) {
     for (int64_t iChild = 0; iChild < child[root].nChild; iChild++) {
         int64_t ichild = child[root].child[iChild];
         if (ichild != node) {
+            assert(nSibs <= 2);
             sibs[nSibs++] = ichild;
         }
     }
-    assert(nSibs == 2);
 }
 
 AbsNeighbourJoining(void)::pSameVector(double length, std::vector<double> &pSame) {
@@ -1740,7 +1740,8 @@ AbsNeighbourJoining(void)::pDiffVector(std::vector<double> &pSame, std::vector<d
     }
 }
 
-AbsNeighbourJoining(void)::expEigenRates(double length, std::vector<numeric_t> &expeigenRates) {
+AbsNeighbourJoining(void)::
+expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &expeigenRates) {
     expeigenRates.resize(options.nCodes * rates.rates.size());
     for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
         for (int64_t j = 0; j < options.nCodes; j++) {
@@ -1781,7 +1782,7 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
 }
 
 AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profile &profile2, double bionjWeight,
-                                          DistanceMatrix <Precision> &dmat) {
+                                          DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
     if (bionjWeight < 0) {
         bionjWeight = 0.5;
     }
@@ -1789,6 +1790,7 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
         out.codeDist.clear();
     }
 
+    int64_t nVectors = 0;
     for (int64_t i = 0; i < nPos; i++) {
         out.weights[i] = bionjWeight * profile1.weights[i] + (1 - bionjWeight) * profile2.weights[i];
         out.codes[i] = NOCODE;
@@ -1802,14 +1804,15 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
                 out.codes[i] = profile2.codes[i];
             }
             if (out.codes[i] == NOCODE) {
-                out.vectors.resize(out.vectors.size() + 1);
+                nVectors++;
             }
         }
     }
 
     /* Allocate and set the vectors */
-    assert(out.vectors.size() == options.nCodes * out.vectors.size());
-    for (int64_t i = 0; i < options.nCodes * (int64_t) out.vectors.size(); i++) {
+    out.vectors.reserve(options.nCodes * nVectors);
+    out.vectors.resize(nVectors);
+    for (int64_t i = 0; i < options.nCodes * nVectors; i++) {
         out.vectors[i] = 0;
     }
     options.debug.nProfileFreqAlloc += out.vectors.size();
@@ -1868,12 +1871,15 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
     }
 
     out.vectors.reserve(options.nCodes * nPos);
-    out.vectors.resize(nPos, 0);
+    out.vectors.resize(nPos);
+    for (int64_t i = 0; i < options.nCodes * nPos; i++) {
+        out.vectors[i] = 0;
+    }
 
     int64_t iFreqOut = 0;
     int64_t iFreq1 = 0;
     int64_t iFreq2 = 0;
-    std::vector<numeric_t> expeigenRates1, expeigenRates2;
+    std::vector<numeric_t, typename op_t::Allocator> expeigenRates1, expeigenRates2;
 
     if (transmat) {
         expEigenRates(len1, expeigenRates1);
@@ -2442,7 +2448,7 @@ printNJ(std::ostream &out, std::vector<std::string> &names, Uniquify &unique, bo
                 out << ",";
             }
             int64_t first = unique.uniqueFirst[node];
-            assert(first >= 0 && first < (int64_t) seqs.size());
+            assert(first >= 0 && first < (int64_t) unique.alnToUniq.size());
             /* Print the name, or the subtree of duplicate names */
             if (unique.alnNext[first] == -1) {
                 quotes(out, names[first], options.bQuote);
@@ -2537,7 +2543,7 @@ AbsNeighbourJoining(void)::fastNJ() {
 
     /* Initialize top-hits or visible set */
     if (m > 0) {
-        tophits = make_unique<TopHits>(options, maxnode, m);
+        tophits = make_unique<TopHits>(options, maxnodes, m);
         setAllLeafTopHits(*tophits);
         resetTopVisible((int64_t) seqs.size(), *tophits);
     } else if (!options.slow) {
@@ -2826,7 +2832,7 @@ AbsNeighbourJoining(void)::fastNJ() {
     /* Check how accurate the outprofile is */
     if (options.verbose > 2) {
         std::vector<Profile *> tmp = {&profiles[top[0]], &profiles[top[1]], &profiles[top[2]]};
-        Profile out;
+        Profile out(nPos, constraintSeqs.size());
         /* Use swap to avoid a deep copy of Profile*/
         outProfile(out, tmp);
         double freqerror = 0;
@@ -3108,15 +3114,15 @@ AbsNeighbourJoining(void)::recomputeProfile(std::unique_ptr<Profile> upProfiles[
         }
     }
     if (useML) {
-        posteriorProfile(*profiles4[node], *profiles4[0], *profiles4[1],
+        posteriorProfile(profiles[node], *profiles4[0], *profiles4[1],
                          branchlength[child[node].child[0]],
                          branchlength[child[node].child[1]]);
     } else {
-        averageProfile(*profiles4[node], *profiles4[0], *profiles4[1], weight);
+        averageProfile(profiles[node], *profiles4[0], *profiles4[1], weight);
     }
 }
 
-AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision> &dmat) {
+AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
     while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
@@ -3700,11 +3706,11 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
     std::vector<Besthit> combinedList(nCombined);
     hitsToBestHits(lChild[0]->hits, child[newnode].child[0], combinedList.data());
     hitsToBestHits(lChild[1]->hits, child[newnode].child[1], combinedList.data() + lChild[0]->hits.size());
-    int64_t nUnique;
     /* UniqueBestHits() replaces children (used in the calls to HitsToBestHits)
        with active ancestors, so all distances & criteria will be recomputed */
     std::vector<Besthit> uniqueList;
     uniqueBestHits(nActive, combinedList, uniqueList);
+    int64_t nUnique = uniqueList.size();
 
     combinedList.clear();
     combinedList.reserve(0);
@@ -3920,8 +3926,9 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
     int64_t nSave = 0;
     int64_t jLast = -1;
     for (int64_t iBest = 0; iBest < nIn && nSave < nOut; iBest++) {
-        if (besthits[iBest].i < 0)
+        if (besthits[iBest].i < 0) {
             continue;
+        }
         assert(besthits[iBest].i == iNode);
         int64_t j = besthits[iBest].j;
         if (j != iNode && j != jLast && j >= 0) {
@@ -4394,7 +4401,7 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
                     Profile &pA = *profiles3[i];
                     int b1 = (i + 1) % 3;
                     int b2 = (i + 2) % 3;
-                    Profile pB;
+                    Profile pB(nPos, constraintSeqs.size());
                     posteriorProfile(pB, *profiles3[b1], *profiles3[b2], branchlength[nodes[b1]],
                                      branchlength[nodes[b2]]);
                     double len = branchlength[nodes[i]];
@@ -4633,7 +4640,7 @@ AbsNeighbourJoining(double)::pGamma(double x, double alpha) {
     return incompleteGamma(x * alpha, alpha, lnGamma(alpha));
 }
 
-AbsNeighbourJoining(void)::MLSiteRates(std::vector<numeric_t> &_rates) {
+AbsNeighbourJoining(void)::MLSiteRates(std::vector<numeric_t, typename op_t::Allocator> &_rates) {
     _rates.resize(options.nRateCats);
     /* Even spacing from 1/nRate to nRate */
     double logNCat = std::log((double) options.nRateCats);
@@ -4647,11 +4654,12 @@ AbsNeighbourJoining(void)::MLSiteRates(std::vector<numeric_t> &_rates) {
 }
 
 
-AbsNeighbourJoining(void)::MLSiteLikelihoodsByRate(std::vector<numeric_t> &_rates, std::vector<double> &site_loglk) {
+AbsNeighbourJoining(void)::MLSiteLikelihoodsByRate(std::vector<numeric_t, typename op_t::Allocator> &_rates,
+        std::vector<double> &site_loglk) {
     site_loglk.resize(nPos * options.nRateCats);
     /* save the original rates */
     assert(!rates.rates.empty());
-    std::vector<numeric_t> oldRates(rates.rates);
+    std::vector<numeric_t, typename op_t::Allocator> oldRates(rates.rates);
 
     /* Compute site likelihood for each rate */
     for (int64_t iRate = 0; iRate < options.nRateCats; iRate++) {
@@ -4702,7 +4710,7 @@ AbsNeighbourJoining(void)::setMLRates() {
         recomputeMLProfiles();
         return;
     }
-    std::vector<numeric_t> _rates;
+    std::vector<numeric_t, typename op_t::Allocator> _rates;
     std::vector<double> site_loglk;
 
     MLSiteRates(_rates);
@@ -5911,7 +5919,7 @@ AbsNeighbourJoining(double)::incompleteGamma(double x, double alpha, double ln_g
     return (gin);
 }
 
-AbsNeighbourJoining()::CompareSeeds::CompareSeeds(const std::vector<numeric_t> &outDistances,
+AbsNeighbourJoining()::CompareSeeds::CompareSeeds(const std::vector<numeric_t, typename op_t::Allocator> &outDistances,
                                                   const std::vector<int64_t> &compareSeedGaps) :
         outDistances(outDistances), compareSeedGaps(compareSeedGaps) {}
 

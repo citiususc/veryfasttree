@@ -3,8 +3,8 @@ project(FastTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
-option(USE_SSE3 "enable/disable SSE3" OFF) #TODO align all arguments
-option(USE_AVX "enable/disable AVX" OFF)
+option(USE_SSE3 "enable/disable SSE3" ON)
+option(USE_AVX "enable/disable AVX" ON)
 option(USE_AVX2 "enable/disable AVX2" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
 
@@ -23,6 +23,8 @@ endif()
 if(${USE_AVX512})
     add_definitions(-DUSE_AVX512)
 endif()
+
+#add_definitions(-DNDEBUG)
 
 ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")

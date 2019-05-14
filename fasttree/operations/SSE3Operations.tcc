@@ -198,7 +198,7 @@ template<>
 void fasttree::SSE3Operations<float>::
 vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
     __m128 w = _mm_set1_ps(weight);
-    for (int64_t i = 0; i < n; i += 2) {
+    for (int64_t i = 0; i < n; i += 4) {
         __m128 tot, add;
         tot = _mm_load_ps(fTot + i);
         add = _mm_load_ps(fAdd + i);

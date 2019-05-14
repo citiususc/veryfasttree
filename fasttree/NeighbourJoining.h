@@ -18,10 +18,13 @@ namespace fasttree {
     template<typename Precision, template<class> class Operations>
     class NeighbourJoining {
     public:
+        typedef Operations<Precision> op_t;
+
         NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressReport,
                          std::vector<std::string> &seqs, int64_t nPos,
                          std::vector<std::string> &constraintSeqs,
-                         DistanceMatrix<Precision> &distanceMatrix, TransitionMatrix<Precision> &transmat);
+                         DistanceMatrix<Precision, op_t::ALIGNMENT> &distanceMatrix,
+                         TransitionMatrix<Precision, op_t::ALIGNMENT> &transmat);
 
         void printDistances(std::vector<std::string> &names, std::ostream &out);
 
@@ -88,7 +91,7 @@ namespace fasttree {
         /* Recompute profiles going up from the leaves, using the provided distance matrix
            and unweighted joins
         */
-        void recomputeProfiles(DistanceMatrix<Precision> &dmat);
+        void recomputeProfiles(DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
 
         /* One round of subtree-prune-regraft moves (minimum evolution) */
         void SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRounds);
@@ -109,7 +112,7 @@ namespace fasttree {
 
         void branchlengthScale();
 
-        const std::vector<Precision> &getBranchlength();
+        const std::vector<Precision, typename op_t::Allocator> &getBranchlength();
 
         int64_t getMaxnode();
 
@@ -117,20 +120,21 @@ namespace fasttree {
 
     private:
         typedef Precision numeric_t;
-        typedef Operations<Precision> op_t;
 
         struct Profile {
             /* alignment profile */
-            std::vector<numeric_t> weights;
+            std::vector<numeric_t, typename op_t::Allocator> weights;
             std::string codes;
-            std::vector<numeric_t> vectors;        /* empty if no non-constant positions, e.g. for leaves */
-            std::vector<numeric_t> codeDist;        /* Optional -- distance to each code at each position */
+            /* empty if no non-constant positions, e.g. for leaves */
+            std::vector<numeric_t, typename op_t::Allocator> vectors;
+            /* Optional -- distance to each code at each position */
+            std::vector<numeric_t, typename op_t::Allocator> codeDist;
 
             /* constraint profile */
             std::vector<int64_t> nOn;
             std::vector<int64_t> nOff;
 
-            numeric_t nGaps; /*precalculated in construction*/
+            int64_t nGaps; /*precalculated in construction*/
 
             Profile(int64_t nPos, int64_t nConstraints);
 
@@ -138,7 +142,7 @@ namespace fasttree {
         };
 
         struct Rates {
-            std::vector<numeric_t> rates;    /* 1 per rate category */
+            std::vector<numeric_t, typename op_t::Allocator> rates;    /* 1 per rate category */
             std::vector<int64_t> ratecat;    /* 1 category per position */
 
             /* Allocate or reallocate the rate categories, and set every position
@@ -241,8 +245,8 @@ namespace fasttree {
         /* The input */
         int64_t nPos;
         std::vector<std::string> &seqs;    /* the aligment sequences array (not reallocated) */
-        DistanceMatrix<Precision> &distanceMatrix; /* a ref, not set if using %identity distance */
-        TransitionMatrix<Precision> &transmat; /* a ref, not set for Jukes-Cantor */
+        DistanceMatrix<Precision, op_t::ALIGNMENT> &distanceMatrix; /* a ref, not set if using %identity distance */
+        TransitionMatrix<Precision, op_t::ALIGNMENT> &transmat; /* a ref, not set for Jukes-Cantor */
         /* Topological constraints are represented for each sequence as binary characters
            with values of '0', '1', or '-' (for missing data)
            Sequences that have no constraint may have a NULL string
@@ -253,10 +257,10 @@ namespace fasttree {
         int64_t maxnode;            /* The next index to allocate */
         int64_t maxnodes;            /* Space allocated in data structures below */
         std::vector<Profile> profiles; /* Profiles of leaves and intermediate nodes */
-        std::vector<numeric_t> diameter;        /* To correct for distance "up" from children (if any) */
-        std::vector<numeric_t> varDiameter;        /* To correct variances for distance "up" */
-        std::vector<numeric_t> selfdist;        /* Saved for use in some formulas */
-        std::vector<numeric_t> selfweight;        /* Saved for use in some formulas */
+        std::vector<numeric_t, typename op_t::Allocator> diameter;    /* To correct for distance "up" from children (if any) */
+        std::vector<numeric_t, typename op_t::Allocator> varDiameter; /* To correct variances for distance "up" */
+        std::vector<numeric_t, typename op_t::Allocator> selfdist;    /* Saved for use in some formulas */
+        std::vector<numeric_t, typename op_t::Allocator> selfweight;  /* Saved for use in some formulas */
 
         /* Average profile of all active nodes, the "outprofile"
          * If all inputs are ungapped, this has weight 1 (not nSequences) at each position
@@ -266,15 +270,15 @@ namespace fasttree {
         double totdiam;
 
         /* We sometimes use stale out-distances, so we remember what nActive was  */
-        std::vector<numeric_t> outDistances;        /* Sum of distances to other active (parent==-1) nodes */
+        std::vector<numeric_t, typename op_t::Allocator> outDistances;        /* Sum of distances to other active (parent==-1) nodes */
         std::vector<int64_t> nOutDistActive;        /* What nActive was when this outDistance was computed */
 
         /* the inferred tree */
         int64_t root;                   /* index of the root. Unlike other internal nodes, it has 3 children */
         std::vector<int64_t> parent;    /* -1 or index of parent */
         std::vector<Children> child;
-        std::vector<numeric_t> branchlength;        /* Distance to parent */
-        std::vector<numeric_t> support;        /* 1 for high-confidence nodes */
+        std::vector<numeric_t, typename op_t::Allocator> branchlength;   /* Distance to parent */
+        std::vector<numeric_t, typename op_t::Allocator> support;        /* 1 for high-confidence nodes */
 
         /* auxilliary data for maximum likelihood (defaults to 1 category of rate=1.0) */
         Rates rates;
@@ -388,7 +392,7 @@ namespace fasttree {
            Call this with profiles=NULL to get the nodes, without fetching or
            computing profiles
         */
-        void setupABCD(int64_t node, Profile *profiles[4], std::unique_ptr<Profile> upProfiles[], int64_t nodeABCD[4],
+        void setupABCD(int64_t node, Profile *profiles4[4], std::unique_ptr<Profile> upProfiles[], int64_t nodeABCD[4],
                        bool useML);
 
         int64_t sibling(int64_t node); /* At root, no unique sibling so returns -1 */
@@ -401,7 +405,7 @@ namespace fasttree {
         void pDiffVector(std::vector<double> &pSame, std::vector<double> &pDiff);
 
         /* expeigen[iRate*nCodes + j] = exp(length * rate iRate * eigenvalue j) */
-        void expEigenRates(double length, std::vector<numeric_t> &expeigenRates);
+        void expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &expeigenRates);
 
         /* E.g. GET_FREQ(profile,iPos,iVector)
            Gets the next element of the vectors (and updates iVector), or
@@ -415,15 +419,15 @@ namespace fasttree {
          */
         void addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[]);
 
-        void
-        addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[], DistanceMatrix<Precision> &dmat);
+        void addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[],
+                       DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
 
         /* Divide the vector (of length nCodes) by a constant
            so that the total (unrotated) frequency is 1.0
         */
         void normalizeFreq(numeric_t freq[]);
 
-        void normalizeFreq(numeric_t freq[], DistanceMatrix<Precision> &dmat);
+        void normalizeFreq(numeric_t freq[], DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
 
         /* Allocate, if necessary, and recompute the codeDist*/
         void setCodeDist(Profile &profile);
@@ -532,7 +536,7 @@ namespace fasttree {
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1);
 
         void averageProfile(Profile &out, Profile &profile1, Profile &profile2, double weight1,
-                            DistanceMatrix<Precision> &dmat);
+                            DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
 
         /* PosteriorProfile() is like AverageProfile() but it computes posterior probabilities
            rather than an average
@@ -708,13 +712,14 @@ namespace fasttree {
         double lnGamma(double alpha);
 
         /* Returns a set of nRateCategories potential rates; the caller must free it */
-        void MLSiteRates(std::vector<numeric_t> &rates);
+        void MLSiteRates(std::vector<numeric_t, typename op_t::Allocator> &rates);
 
         /* returns site_loglk so that
            site_loglk[nPos*iRate + j] is the log likelihood of site j with rate iRate
            The caller must free it.
         */
-        void MLSiteLikelihoodsByRate(std::vector<numeric_t> &rates, std::vector<double> &site_loglk);
+        void MLSiteLikelihoodsByRate(std::vector<numeric_t, typename op_t::Allocator> &rates,
+                                     std::vector<double> &site_loglk);
 
         /* One-dimensional minimization using brent's function, with
         a fractional and an absolute tolerance */
@@ -732,10 +737,11 @@ namespace fasttree {
            and the global variables it needs
         */
         struct CompareSeeds {
-            const std::vector<numeric_t> &outDistances;
+            const std::vector<numeric_t, typename op_t::Allocator> &outDistances;
             const std::vector<int64_t> &compareSeedGaps;
 
-            CompareSeeds(const std::vector<numeric_t> &outDistances, const std::vector<int64_t> &compareSeedGaps);
+            CompareSeeds(const std::vector<numeric_t, typename op_t::Allocator> &outDistances,
+                         const std::vector<int64_t> &compareSeedGaps);
 
             bool operator()(int64_t seed1, int64_t seed2) const;
         };

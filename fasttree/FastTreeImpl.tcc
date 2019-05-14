@@ -26,14 +26,18 @@ AbsFastTreeImpl()::FastTreeImpl(Options &options, std::istream &input, std::ostr
         distanceMatrix.setupDistanceMatrix(options, log);
     }
 
-    if (!options.constraintsFile.empty()) {
+    if (options.constraintsFile.empty()) {
+        fpConstraints.setstate(std::ios_base::badbit);
+    } else {
         fpConstraints.open(options.constraintsFile);
         if (fpConstraints.fail()) {
             throw std::invalid_argument("Cannot read " + options.constraintsFile);
         }
     }
 
-    if (!options.intreeFile.empty()) {
+    if (options.intreeFile.empty()) {
+        fpInTree.setstate(std::ios_base::badbit);
+    } else {
         fpInTree.open(options.intreeFile);
         if (fpInTree.fail()) {
             throw std::invalid_argument("Cannot read " + options.intreeFile);
@@ -234,7 +238,7 @@ AbsFastTreeImpl(void)::run() {
                 }
 
                 /* Do maximum-likelihood computations */
-                DistanceMatrix <Precision> tmatAsDist;
+                DistanceMatrix <Precision, op_t::ALIGNMENT> tmatAsDist;
                 /* Convert profiles to use the transition matrix */
                 transMatToDistanceMat(tmatAsDist);
                 nj.recomputeProfiles(tmatAsDist);
@@ -249,7 +253,9 @@ AbsFastTreeImpl(void)::run() {
                     double dLastLogLk = -1e20;
                     for (int64_t iRound = 1; iRound <= maxRound; iRound++) {
                         auto &branchlength = nj.getBranchlength();
-                        std::vector<numeric_t> oldlength(branchlength.begin(), branchlength.begin() + nj.getMaxnode());
+                        std::vector<numeric_t, typename op_t::Allocator> oldlength(branchlength.begin(),
+                                                                                   branchlength.begin() +
+                                                                                   nj.getMaxnode());
 
                         nj.optimizeAllBranchLengths();
                         nj.logTree("ML_Lengths", iRound, aln.names, unique);
@@ -475,7 +481,7 @@ AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraint
     }
 }
 
-AbsFastTreeImpl(void)::transMatToDistanceMat(DistanceMatrix <Precision> &dmat) {
+AbsFastTreeImpl(void)::transMatToDistanceMat(DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
     if (transmat) {
         return;
     }
