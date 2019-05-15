@@ -1,13 +1,13 @@
 
-#ifndef FASTTREE_SSE3OPERATIONS_H
-#define FASTTREE_SSE3OPERATIONS_H
+#ifndef FASTTREE_SSE128OPERATIONS_H
+#define FASTTREE_SSE128OPERATIONS_H
 
 #include <boost/align/aligned_allocator.hpp>
-#include <emmintrin.h>
+#include <immintrin.h>
 
 namespace fasttree {
     template<typename Precision>
-    class SSE3Operations {
+    class SSE128Operations {
     public:
         static constexpr int ALIGNMENT = 16;
         using Allocator = boost::alignment::aligned_allocator<Precision, ALIGNMENT>;
@@ -43,6 +43,6 @@ namespace fasttree {
     };
 }
 
-#include "SSE3Operations.tcc"
+#include "SSE128Operations.tcc"
 
 #endif

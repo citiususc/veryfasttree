@@ -3,26 +3,11 @@ project(FastTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
-option(USE_SSE3 "enable/disable SSE3" ON)
-option(USE_AVX "enable/disable AVX" ON)
-option(USE_AVX2 "enable/disable AVX2" OFF)
+option(USE_NATIVE "enable/disable system's processor architecture optimization (linux)" ON)
+option(USE_SEE "enable/disable SEE (windows)" ON)
+option(USE_AVX "enable/disable AVX" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
 
-if(${USE_SSE3})
-    add_definitions(-DUSE_SSE3)
-endif()
-
-if(${USE_AVX})
-    add_definitions(-DUSE_AVX)
-endif()
-
-if(${USE_AVX2})
-    add_definitions(-DUSE_AVX2)
-endif()
-
-if(${USE_AVX512})
-    add_definitions(-DUSE_AVX512)
-endif()
 
 #add_definitions(-DNDEBUG)
 
@@ -36,12 +21,10 @@ ADD_SUBDIRECTORY("libs/boost-align")
 set(SOURCE_FILES
         fasttree/operations/BasicOperations.tcc
         fasttree/operations/BasicOperations.h
-        fasttree/operations/SSE3Operations.tcc
-        fasttree/operations/SSE3Operations.h
-        fasttree/operations/AVXOperations.tcc
-        fasttree/operations/AVXOperations.h
-        fasttree/operations/AVX2Operations.tcc
-        fasttree/operations/AVX2Operations.h
+        fasttree/operations/SSE128Operations.tcc
+        fasttree/operations/SSE128Operations.h
+        fasttree/operations/AVX256Operations.tcc
+        fasttree/operations/AVX256Operations.h
         fasttree/operations/AVX512Operations.tcc
         fasttree/operations/AVX512Operations.h
         fasttree/Knuth.cpp
@@ -67,8 +50,18 @@ set(SOURCE_FILES
 
 if(MSVC)
     set(CMAKE_CXX_FLAGS "/W4 /O2 /openmp /EHsc /wd4100 /bigobj")
+    if(USE_AVX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX /D__AVX__=1")
+    elseif(USE_SEE)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE2 /D__SSE2__=1")
+    endif()
 else()
     set(CMAKE_CXX_FLAGS "-Wall -fopenmp")#-O3
+    if(USE_AVX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
+    elseif(USE_AVX512)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f -mavx512cd")
+    endif()
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})

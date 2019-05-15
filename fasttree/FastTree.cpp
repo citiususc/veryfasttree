@@ -5,16 +5,15 @@
 #include <omp.h>
 #include "operations/BasicOperations.h"
 
-#ifdef USE_SSE3
-#include "operations/SSE3Operations.h"
+#if (defined __SSE2__) || (defined __AVX__)
+#include "operations/SSE128Operations.h"
 #endif
-#ifdef USE_AVX
-#include "operations/AVXOperations.h"
+
+#if __AVX__
+#include "operations/AVX256Operations.h"
 #endif
-#ifdef USE_AVX2
-#include "operations/AV2XOperations.h"
-#endif
-#ifdef USE_AVX512
+
+#if __AVX512F__
 #include "operations/AVX512Operations.h"
 #endif
 
@@ -174,34 +173,25 @@ void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
             FastTreeImpl<float, BasicOperations>(options, in, out, log).run();
         }
     }
-    #ifdef USE_SSE3
-    else if(options.extension == "SSE3"){
+    #if (defined __SSE2__) || (defined __AVX__)
+    else if(options.extension == "SSE" || options.extension == "AVX128"){
         if(options.doublePrecision){
-            FastTreeImpl<double, SSE3Operations>(options, in, out, log).run();
+            FastTreeImpl<double, SSE128Operations>(options, in, out, log).run();
         }else{
-            FastTreeImpl<float, SSE3Operations>(options, in, out, log).run();
+            FastTreeImpl<float, SSE128Operations>(options, in, out, log).run();
         }
     }
     #endif
-    #ifdef USE_AVX
-    else if(options.extension == "AVX"){
+    #if __AVX__
+    else if(options.extension == "AVX256"){
         if(options.doublePrecision){
-            FastTreeImpl<double, AVXOperations>(options, in, out, log).run();
+            FastTreeImpl<double, AVX256Operations>(options, in, out, log).run();
         }else{
-            FastTreeImpl<float, AVXOperations>(options, in, out, log).run();
+            FastTreeImpl<float, AVX256Operations>(options, in, out, log).run();
         }
     }
     #endif
-    #ifdef USE_AVX2
-    else if(options.extension == "AVX2"){
-        if(options.doublePrecision){
-            FastTreeImpl<double, AVX2Operations>(options, in, out, log).run();
-        }else{
-            FastTreeImpl<float, AVX2Operations>(options, in, out, log).run();
-        }
-    }
-    #endif
-    #ifdef USE_AVX512
+    #if __AVX512F__
     else if(options.extension == "AVX512"){
         if(options.doublePrecision){
             FastTreeImpl<double, AVX512Operations>(options, in, out, log).run();

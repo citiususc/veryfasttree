@@ -1,12 +1,12 @@
 
-#ifndef FASTTREE_AVXOPERATIONS_TCC
-#define FASTTREE_AVXOPERATIONS_TCC
+#ifndef FASTTREE_SSE128OPERATIONS_TCC
+#define FASTTREE_SSE128OPERATIONS_TCC
 
-#include "AVXOperations.tcc"
+#include "SSE128Operations.h"
 
 template<>
 template<>
-inline float fasttree::AVXOperations<float>::mm_sum(register __m128 sum) {
+inline float fasttree::SSE128Operations<float>::mm_sum(register __m128 sum) {
     /* stupider but faster */
     alignas(ALIGNMENT) float f[4];
     _mm_store_ps(f, sum);
@@ -15,15 +15,15 @@ inline float fasttree::AVXOperations<float>::mm_sum(register __m128 sum) {
 
 template<>
 template<>
-inline double fasttree::AVXOperations<double>::mm_sum(register __m128d sum) {
+inline double fasttree::SSE128Operations<double>::mm_sum(register __m128d sum) {
     /* stupider but faster */
-    alignas(ALIGNMENT) double f[4];;
+    alignas(ALIGNMENT) double f[2];;
     _mm_store_pd(f, sum);
-    return (f[0] + f[1] + f[2] + f[3]);
+    return (f[0] + f[1]);
 }
 
 template<>
-void fasttree::AVXOperations<float>::
+void fasttree::SSE128Operations<float>::
 vector_multiply(float f1[], float f2[], int64_t n, float fOut[]) {
     for (int64_t i = 0; i < n; i += 4) {
         __m128 a, b, c;
@@ -35,7 +35,7 @@ vector_multiply(float f1[], float f2[], int64_t n, float fOut[]) {
 }
 
 template<>
-void fasttree::AVXOperations<double>::
+void fasttree::SSE128Operations<double>::
 vector_multiply(double f1[], double f2[], int64_t n, double fOut[]) {
     for (int64_t i = 0; i < n; i += 2) {
         __m128d a, b, c;
@@ -47,7 +47,7 @@ vector_multiply(double f1[], double f2[], int64_t n, double fOut[]) {
 }
 
 template<>
-float fasttree::AVXOperations<float>
+float fasttree::SSE128Operations<float>
 ::vector_multiply_sum(float f1[], float f2[], int64_t n) {
     if (n == 4) {
         return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
@@ -64,7 +64,7 @@ float fasttree::AVXOperations<float>
 }
 
 template<>
-double fasttree::AVXOperations<double>
+double fasttree::SSE128Operations<double>
 ::vector_multiply_sum(double f1[], double f2[], int64_t n) {
     if (n == 4) {
         return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
@@ -81,7 +81,7 @@ double fasttree::AVXOperations<double>
 }
 
 template<>
-float fasttree::AVXOperations<float>::
+float fasttree::SSE128Operations<float>::
 vector_multiply3_sum(float f1[], float f2[], float f3[], int64_t n) {
     __m128 sum = _mm_setzero_ps();
     for (int64_t i = 0; i < n; i += 4) {
@@ -95,7 +95,7 @@ vector_multiply3_sum(float f1[], float f2[], float f3[], int64_t n) {
 }
 
 template<>
-double fasttree::AVXOperations<double>::
+double fasttree::SSE128Operations<double>::
 vector_multiply3_sum(double f1[], double f2[], double f3[], int64_t n) {
     __m128d sum = _mm_setzero_pd();
     for (int64_t i = 0; i < n; i += 2) {
@@ -109,7 +109,7 @@ vector_multiply3_sum(double f1[], double f2[], double f3[], int64_t n) {
 }
 
 template<>
-float fasttree::AVXOperations<float>::
+float fasttree::SSE128Operations<float>::
 vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
     __m128 sum1 = _mm_setzero_ps();
     __m128 sum2 = _mm_setzero_ps();
@@ -125,7 +125,7 @@ vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
 }
 
 template<>
-double fasttree::AVXOperations<double>::
+double fasttree::SSE128Operations<double>::
 vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
     __m128d sum1 = _mm_setzero_pd();
     __m128d sum2 = _mm_setzero_pd();
@@ -141,7 +141,7 @@ vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
 }
 
 template<>
-float fasttree::AVXOperations<float>::
+float fasttree::SSE128Operations<float>::
 vector_sum(float f1[], int64_t n) {
     if (n == 4) {
         return f1[0] + f1[1] + f1[2] + f1[3];
@@ -156,7 +156,7 @@ vector_sum(float f1[], int64_t n) {
 }
 
 template<>
-double fasttree::AVXOperations<double>::
+double fasttree::SSE128Operations<double>::
 vector_sum(double f1[], int64_t n) {
     if (n == 4) {
         return f1[0] + f1[1] + f1[2] + f1[3];
@@ -171,7 +171,7 @@ vector_sum(double f1[], int64_t n) {
 }
 
 template<>
-void fasttree::AVXOperations<float>::
+void fasttree::SSE128Operations<float>::
 vector_multiply_by(float f[], float fBy, int64_t n) {
     __m128 c = _mm_set1_ps(fBy);
     for (int64_t i = 0; i < n; i += 4) {
@@ -183,7 +183,7 @@ vector_multiply_by(float f[], float fBy, int64_t n) {
 }
 
 template<>
-void fasttree::AVXOperations<double>::
+void fasttree::SSE128Operations<double>::
 vector_multiply_by(double f[], double fBy, int64_t n) {
     __m128d c = _mm_set1_pd(fBy);
     for (int64_t i = 0; i < n; i += 2) {
@@ -195,10 +195,10 @@ vector_multiply_by(double f[], double fBy, int64_t n) {
 }
 
 template<>
-void fasttree::AVXOperations<float>::
+void fasttree::SSE128Operations<float>::
 vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
     __m128 w = _mm_set1_ps(weight);
-    for (int64_t i = 0; i < n; i += 2) {
+    for (int64_t i = 0; i < n; i += 4) {
         __m128 tot, add;
         tot = _mm_load_ps(fTot + i);
         add = _mm_load_ps(fAdd + i);
@@ -207,7 +207,7 @@ vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
 }
 
 template<>
-void fasttree::AVXOperations<double>::
+void fasttree::SSE128Operations<double>::
 vector_add_mult(double fTot[], double fAdd[], double weight, int64_t n) {
     __m128d w = _mm_set1_pd(weight);
     for (int64_t i = 0; i < n; i += 2) {
@@ -219,8 +219,8 @@ vector_add_mult(double fTot[], double fAdd[], double weight, int64_t n) {
 }
 
 template<>
-void fasttree::AVXOperations<float>::
-matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]) {
+void fasttree::SSE128Operations<float>::
+matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
     __m128 o = _mm_setzero_ps();
     /* result is a sum of vectors: sum(k) v[k] * mat[k][] */
     for (int64_t j = 0; j < 4; j++) {
@@ -232,8 +232,8 @@ matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]) {
 }
 
 template<>
-void fasttree::AVXOperations<double>::
-matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]) {
+void fasttree::SSE128Operations<double>::
+matrixt_by_vector4(double mat[4][4], double vec[4], double out[4]) {
     __m128d o1 = _mm_setzero_pd();
     __m128d o2 = _mm_setzero_pd();
     /* result is a sum of vectors: sum(k) v[k] * mat[k][] */
@@ -249,3 +249,4 @@ matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]) {
 }
 
 #endif
+

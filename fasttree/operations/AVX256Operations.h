@@ -1,13 +1,13 @@
 
-#ifndef FASTTREE_AVX2OPERATIONS_H
-#define FASTTREE_AVX2OPERATIONS_H
+#ifndef FASTTREE_AVX256OPERATIONS_H
+#define FASTTREE_AVX256OPERATIONS_H
 
-#include "../DistanceMatrix.h"
 #include <boost/align/aligned_allocator.hpp>
+#include <immintrin.h>
 
 namespace fasttree {
     template<typename Precision>
-    class AVX2Operations {
+    class AVX256Operations {
     public:
         static constexpr int ALIGNMENT = 32;
         using Allocator = boost::alignment::aligned_allocator<Precision, ALIGNMENT>;
@@ -27,11 +27,14 @@ namespace fasttree {
 
         void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n);
 
-        void matrixt_by_vector4(numeric_t mat[4][MAXCODES], numeric_t vec[4], numeric_t out[4]);
+        void matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]);
 
+    private:
+        template <typename Tp>
+        inline numeric_t mm_sum(register Tp sum);
     };
 }
 
-#include "AVX2Operations.tcc"
+#include "AVX256Operations.tcc"
 
 #endif

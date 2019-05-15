@@ -53,19 +53,15 @@ namespace fasttree {
         const std::string codesStringAA = "ARNDCQEGHILKMFPSTWYV";
         const std::string codesStringNT = "ACGT";
 
-        const std::string version = "x.x.x";
+        const std::string version = "3.0";
         const std::string compileFlags =
                 "(OpenMP"
-                #ifdef USE_SSE3
-                ", SSE3"
-                #endif
-                #ifdef USE_AVX
+                #if __AVX__
                 ", AVX"
+                #elif  __SSE2__
+                ", SSE"
                 #endif
-                #ifdef USE_AVX2
-                ", AVX2"
-                #endif
-                #ifdef USE_AVX512
+                #if __AVX512F__
                 ", AVX512"
                 #endif
                 ")";

@@ -2,8 +2,8 @@
 #ifndef FASTTREE_AVX512OPERATIONS_H
 #define FASTTREE_AVX512OPERATIONS_H
 
-#include "../DistanceMatrix.h"
 #include <boost/align/aligned_allocator.hpp>
+#include <immintrin.h>
 
 namespace fasttree {
     template<typename Precision>
