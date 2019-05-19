@@ -89,7 +89,6 @@ namespace fasttree {
         std::string inFileName;
         std::string outFileName;
         std::string logFileName;
-        bool safeLog = false;
         bool expert = false;
         long seed = static_cast<long>(std::time(nullptr));
 

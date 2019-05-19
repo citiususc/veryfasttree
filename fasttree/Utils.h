@@ -83,7 +83,9 @@ namespace fasttree {
 
     template<typename Iter, typename Compare>
     inline void psort(Iter first, Iter last, uint32_t threads, const Compare &comp) {
-        assert(!(omp_in_parallel() && threads > 1));
+        if(omp_in_parallel()){
+            threads = 1;
+        }
         boost::sort::sample_sort(first, last, comp, threads);
     }
 

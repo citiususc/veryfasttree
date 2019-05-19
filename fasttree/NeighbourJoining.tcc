@@ -2535,7 +2535,7 @@ AbsNeighbourJoining(void)::fastNJ() {
             }
         } else {
             if (options.verbose > 2) {
-                log << strformat("Top-hit-list size = %d of %d") << std::endl;
+                log << strformat("Top-hit-list size = %d of %d", m, seqs.size()) << std::endl;
             }
         }
     }

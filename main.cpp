@@ -118,9 +118,6 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    " -log also reports the per-site rates (1 means slowest category)")->type_name("logfile")->
             check(isNotEmpty)->group(io);
 
-    app.add_flag("-safelog", options.safeLog, "to write log directly without using buffer, useful when the application"
-                                              " instantly crash")->group(io);
-
     app.add_flag_function("-quote", [&options](size_t) {
                               options.bQuote = true;
                           },
@@ -425,10 +422,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
             group(optimizations);
 
-    app.add_set_ignore_case ("-ext", options.extension, {"NONE","SSE","AVX128","AVX256","AVX512"},
-                "compute multiple processing elements with one operation. Available: none, SSE3, AVX, AVX2 or AVX512")
-                ->type_name("name")->default_val("NONE")->group(optimizations);
-    for(auto& c:options.extension) {c = (char)std::toupper(c);}
+    app.add_set_ignore_case("-ext", options.extension, {"NONE", "SSE", "AVX128", "AVX256", "AVX512"},
+                            "compute multiple processing elements with one operation. Available: none, SSE3, AVX, AVX2 or AVX512")
+            ->type_name("name")->default_val("NONE")->group(optimizations);
+    for (auto &c:options.extension) { c = (char) std::toupper(c); }
 
 
     auto deprecated = "Deprecated";
@@ -530,11 +527,12 @@ int main(int argc, char *argv[]) {
     std::ifstream input;
     std::ofstream output;
     std::ofstream log;
-    std::ostream &clog = options.safeLog ? std::cerr : std::clog;
-    fasttree::TeeStream tee(log, clog);
+    fasttree::TeeStream tee(log, std::cerr);
     std::ostream teelog(&tee);
 
-    if (!options.inFileName.empty()) {
+    if (options.inFileName.empty()) {
+        input.setstate(std::ios_base::badbit);
+    }else{
         input.open(options.inFileName);
         if (input.fail()) {
             std::cerr << "Couldn't open the input file! " << options.inFileName << std::endl;
@@ -542,7 +540,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (!options.outFileName.empty()) {
+    if (options.outFileName.empty()) {
+        output.setstate(std::ios_base::badbit);
+    }else{
         output.open(options.outFileName);
         if (output.fail()) {
             std::cerr << "Couldn't open the output file! " << options.outFileName << std::endl;
@@ -550,7 +550,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (!options.logFileName.empty()) {
+    if (options.logFileName.empty()) {
+        log.setstate(std::ios_base::badbit);
+    } else {
         log.open(options.logFileName, std::ios::out | std::ios::app);
         if (log.fail()) {
             std::cerr << "Couldn't open the log file! " << options.logFileName << std::endl;
@@ -559,7 +561,7 @@ int main(int argc, char *argv[]) {
     }
 
     fasttree::FastTree fastTree(options);
-    std::ostream &applog = log ? teelog : clog;
+    std::ostream &applog = log ? teelog : std::cerr;
     applog << "Command: ";
     std::copy(argv, argv + argc - 1, std::ostream_iterator<char *>(applog, ", "));
     applog << argv[argc - 1] << std::endl;

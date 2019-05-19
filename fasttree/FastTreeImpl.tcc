@@ -444,8 +444,8 @@ AbsFastTreeImpl(void)::run() {
             }
 
 
-            nj.printNJ(log, aln.names, unique, /*support*/options.nBootstrap > 0);
-            log << "TreeCompleted\n" << std::endl;
+            nj.printNJ(output, aln.names, unique, /*support*/options.nBootstrap > 0);
+            log << "TreeCompleted" << std::endl;
         }/* end build tree */
     }/* end loop over alignments */
 }

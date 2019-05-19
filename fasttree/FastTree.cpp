@@ -163,7 +163,7 @@ void FastTree::configOpenMP() {
 }
 
 void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
-    settings(out);
+    settings(log);
     configOpenMP();
 
     if (options.extension == "NONE") {
