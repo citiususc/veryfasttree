@@ -112,8 +112,9 @@ AbsFastTreeImpl(void)::run() {
             if (options.verbose > 2) {
                 log << strformat("read %s seqs %d (%d unique) positions %d nameLast %s seqLast %s",
                                  options.inFileName.empty() ? "standard input" : options.inFileName.c_str(),
-                                 nSeq, unSeq,
-                                 aln.nPos, aln.names[aln.seqs.size() - 1], aln.seqs[aln.seqs.size() - 1]) << std::endl;
+                                 nSeq, unSeq, aln.nPos,
+                                 aln.names[aln.seqs.size() - 1].c_str(),
+                                 aln.seqs[aln.seqs.size() - 1].c_str()) << std::endl;
             }
             aln.clearAlignmentSeqs(); /*no longer needed*/
             if (fpInTree) {

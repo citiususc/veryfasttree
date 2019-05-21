@@ -319,7 +319,7 @@ namespace fasttree {
          * Profile_t can be Profile or Profile*
          * */
         template<typename Profile_t>
-        void outProfile(Profile &out, std::vector<Profile_t> &_profiles);
+        void outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles);
 
         void updateOutProfile(Profile &out, Profile &old1, Profile &old2, Profile &_new, int64_t nActiveOld);
 

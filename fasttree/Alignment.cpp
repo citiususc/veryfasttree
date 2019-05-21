@@ -121,7 +121,7 @@ void Alignment::readAlignment() {
                 }
                 if (options.verbose > 10) {
                     log << strformat("Read iSeq %d name %s seqsofar %s",
-                                     iSeq, names[iSeq].c_str(), seqs[iSeq].c_str());
+                                     iSeq, names[iSeq].c_str(), seqs[iSeq].c_str()) << std::endl;
                 }
                 iSeq++;
                 if (iSeq == nSeq && (int64_t)seqs[0].size() == nPos) {

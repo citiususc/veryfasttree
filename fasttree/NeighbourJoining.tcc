@@ -74,7 +74,7 @@ NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressRe
     seqsToProfiles();
     /* profiles from nSeq to maxnodes not yet exists */
 
-    outProfile(outprofile, profiles);
+    outProfile(outprofile, profiles, seqs.size());
 
     if (options.verbose > 10) {
         log << "Made out-profile" << std::endl;
@@ -501,8 +501,8 @@ AbsNeighbourJoining(void)::resampleColumns(std::vector<int64_t> &col) {
     }
 }
 
-AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out, std::vector<Profile_t> &_profiles) {
-    int64_t nProfiles = seqs.size();
+AbsNeighbourJoining(template<typename Profile_t> void)::
+outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     double inweight = 1.0 / (double) nProfiles;   /* The maximal output weight is 1.0 */
 
     /* First, set weights -- code is always NOCODE, prevent weight=0 */
@@ -1330,7 +1330,7 @@ AbsNeighbourJoining(bool)::quartetConstraintPenaltiesPiece(Profile *profiles4[4]
 AbsNeighbourJoining(void)::seqDist(std::string &codes1, std::string &codes2, Besthit &hit) {
     double top = 0;        /* summed over positions */
     int64_t nUse = 0;
-    if (distanceMatrix) {
+    if (!distanceMatrix) {
         int nDiff = 0;
         for (int64_t i = 0; i < nPos; i++) {
             if (codes1[i] != NOCODE && codes2[i] != NOCODE) {
@@ -1748,8 +1748,9 @@ expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &e
         for (int64_t j = 0; j < options.nCodes; j++) {
             double relLen = length * rates.rates[iRate];
             /* very short branch lengths lead to numerical problems so prevent them */
-            if (relLen < options.MLMinRelBranchLength)
+            if (relLen < options.MLMinRelBranchLength) {
                 relLen = options.MLMinRelBranchLength;
+            }
             expeigenRates[iRate * options.nCodes + j] = std::exp(relLen * transmat.eigenval[j]);
         }
     }
@@ -1836,7 +1837,8 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
         } /* end if computing f */
         if (options.verbose > 10 && i < 5) {
             log << strformat("Average profiles: pos %d in-w1 %f in-w2 %f bionjWeight %f to weight %f code %d",
-                             i, profile1.weights[i], profile2.weights[i], bionjWeight, out.weights[i], out.codes[i]);
+                             i, profile1.weights[i], profile2.weights[i], bionjWeight, out.weights[i], out.codes[i])
+                << std::endl;
             if (f != nullptr) {
                 for (int k = 0; k < options.nCodes; k++) {
                     log << strformat("\t%c:%f", options.codesString[k], f ? f[k] : -1.0);
@@ -2695,7 +2697,7 @@ AbsNeighbourJoining(void)::fastNJ() {
                              join.criterion, bionjWeight,
                              selfweight[join.i < join.j ? join.i : join.j],
                              selfweight[join.i < join.j ? join.j : join.i],
-                             newnode);
+                             newnode) << std::endl;
         }
 
         diameter[newnode] = bionjWeight * (branchlength[join.i] + diameter[join.i])
@@ -2726,7 +2728,7 @@ AbsNeighbourJoining(void)::fastNJ() {
             if (options.verbose > 2) {
                 log << strformat("Recomputing outprofile %d %d", nActive - 1) << std::endl;
             }
-            outProfile(outprofile, activeProfiles);
+            outProfile(outprofile, activeProfiles, nSaved);
             nActiveOutProfileReset = nActive - 1;
         } else {
             updateOutProfile(/*OUT*/outprofile, profiles[join.i], profiles[join.j], profiles[newnode], nActive);
@@ -2835,7 +2837,7 @@ AbsNeighbourJoining(void)::fastNJ() {
         std::vector<Profile *> tmp = {&profiles[top[0]], &profiles[top[1]], &profiles[top[2]]};
         Profile out(nPos, constraintSeqs.size());
         /* Use swap to avoid a deep copy of Profile*/
-        outProfile(out, tmp);
+        outProfile(out, tmp, 3);
         double freqerror = 0;
         double weighterror = 0;
         for (int64_t i = 0; i < nPos; i++) {
@@ -2848,8 +2850,6 @@ AbsNeighbourJoining(void)::fastNJ() {
         log << strformat("Roundoff error in outprofile@end: WeightError %f FreqError %f", weighterror, freqerror)
             << std::endl;
     }
-    return;
-
 }
 
 AbsNeighbourJoining(void)::reliabilityNJ() {
@@ -3188,7 +3188,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
     Besthit tmp;
 
     /* Note -- if we are already in a parallel region, this will be ignored */
-    #pragma omp parallel for schedule(static)
+    //#pragma omp parallel for schedule(static)
     for (int64_t j = 0; j < maxnode; j++) {
         Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
         sv.i = node;
@@ -3508,8 +3508,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
                     lReplace++;
                     /* and perhaps update visible */
                     Besthit v;
-                    bool bSuccess = getVisible(seqs.size(), tophits, bh.j, v);
-                    assert(bSuccess);
+                    assert(getVisible(seqs.size(), tophits, bh.j, v));
                     if (bh.criterion < v.criterion) {
                         tophits.visible[bh.j] = lTarget.hits[iWorst];
                     }
@@ -3608,8 +3607,7 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         log << strformat("Top-visible list size %d (nActive %d m %d)", nCandidate, nActive, tophits.m) << std::endl;
     }
     assert(iNodeBestCandidate >= 0 && parent[iNodeBestCandidate] < 0);
-    bool bSuccess = getVisible(nActive, tophits, iNodeBestCandidate, join);
-    assert(bSuccess);
+    assert(getVisible(nActive, tophits, iNodeBestCandidate, join));
     assert(join.i >= 0 && parent[join.i] < 0);
     assert(join.j >= 0 && parent[join.j] < 0);
 
@@ -3764,7 +3762,6 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
             TopHitsList &lSource = tophits.topHitsLists[source];
             assert(lSource.hitSource < 0);
             assert(!lSource.hits.empty());
-            int64_t nMerge = 1 + lSource.hits.size() + nUnique;
             std::vector<Besthit> mergeList(uniqueList); /* Copy */
 
             int64_t iMerge = nUnique;
@@ -3777,7 +3774,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
                 setDistCriterion(nActive, mergeList[iMerge]);
                 iMerge++;
             }
-            assert(iMerge == nMerge);
+            assert(iMerge == (int64_t) lSource.hits.size() + nUnique + 1);
 
             uniqueList.clear();
 

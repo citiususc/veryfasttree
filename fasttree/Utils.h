@@ -83,7 +83,7 @@ namespace fasttree {
 
     template<typename Iter, typename Compare>
     inline void psort(Iter first, Iter last, uint32_t threads, const Compare &comp) {
-        if(omp_in_parallel()){
+        if (omp_in_parallel()) {
             threads = 1;
         }
         boost::sort::sample_sort(first, last, comp, threads);
@@ -143,7 +143,8 @@ namespace fasttree {
 
             auto timeNow = Clock::now();
 
-            if (std::chrono::duration_cast<std::chrono::seconds>(timeNow - timeLast).count() > 1 || options.verbose > 1) {
+            if (std::chrono::duration_cast<std::chrono::seconds>(timeNow - timeLast).count() > 1 ||
+                options.verbose > 1) {
                 int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count();
                 std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
                 std::cerr << strformat(format, args...);

@@ -563,7 +563,7 @@ int main(int argc, char *argv[]) {
     fasttree::FastTree fastTree(options);
     std::ostream &applog = log ? teelog : std::cerr;
     applog << "Command: ";
-    std::copy(argv, argv + argc - 1, std::ostream_iterator<char *>(applog, ", "));
+    std::copy(argv, argv + argc - 1, std::ostream_iterator<char *>(applog, " "));
     applog << argv[argc - 1] << std::endl;
 
     try {
