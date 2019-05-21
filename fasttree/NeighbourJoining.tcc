@@ -502,13 +502,14 @@ AbsNeighbourJoining(void)::resampleColumns(std::vector<int64_t> &col) {
 }
 
 AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out, std::vector<Profile_t> &_profiles) {
-    double inweight = 1.0 / (double) _profiles.size();   /* The maximal output weight is 1.0 */
+    int64_t nProfiles = seqs.size();
+    double inweight = 1.0 / (double) nProfiles;   /* The maximal output weight is 1.0 */
 
     /* First, set weights -- code is always NOCODE, prevent weight=0 */
     int64_t nVectors = 0;
     for (int64_t i = 0; i < nPos; i++) {
         out.weights[i] = 0;
-        for (int64_t in = 0; in < (int64_t) _profiles.size(); in++) {
+        for (int64_t in = 0; in < nProfiles; in++) {
             out.weights[i] += asRef(_profiles[in]).weights[i] * inweight;
         }
         if (out.weights[i] <= 0) {
@@ -527,7 +528,7 @@ AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out,
 
     /* Add up the weights, going through each sequence in turn */
     #pragma omp parallel for schedule(static)
-    for (int64_t in = 0; in < (int64_t) _profiles.size(); in++) {
+    for (int64_t in = 0; in < nProfiles; in++) {
         int64_t iFreqOut = 0;
         int64_t iFreqIn = 0;
         for (int64_t i = 0; i < nPos; i++) {
@@ -551,7 +552,7 @@ AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out,
     }
     assert(iFreqOut == (int64_t) out.vectors.size());
     if (options.verbose > 10) {
-        log << strformat("Average %d profiles", _profiles.size()) << std::endl;
+        log << strformat("Average %d profiles", nProfiles) << std::endl;
     }
     if (distanceMatrix) {
         setCodeDist(out);
@@ -560,7 +561,7 @@ AbsNeighbourJoining(template<typename Profile_t> void)::outProfile(Profile &out,
     /* Compute constraints */
     #pragma omp parallel for schedule(static)
     for (int64_t i = 0; i < (int64_t) constraintSeqs.size(); i++) {
-        for (int64_t in = 0; in < (int64_t) _profiles.size(); in++) {
+        for (int64_t in = 0; in < nProfiles; in++) {
             out.nOn[i] += asRef(_profiles[in]).nOn[i];
             out.nOff[i] += asRef(_profiles[in]).nOff[i];
         }
@@ -3335,10 +3336,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
     for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
         int64_t seed = seeds[iSeed];
         if (iSeed > 0 && (iSeed % 100) == 0) {
-            #pragma omp critical
-            {
-                progressReport.print("Top hits for %6d of %6d seqs (at seed %6d)", nHasTopHits, seqs.size(), iSeed);
-            }
+            progressReport.print("Top hits for %6d of %6d seqs (at seed %6d)", nHasTopHits, seqs.size(), iSeed);
         }
         if (tophits.topHitsLists[seed].hits.size() > 0) {
             if (options.verbose > 2) {
@@ -3378,7 +3376,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
 
         if (options.verbose > 2) {
             log << strformat("Distance limit for close neighbors %f weight %f ungapped %d",
-                             neardist, nearweight, nPos - nGaps[seed]);
+                             neardist, nearweight, nPos - nGaps[seed]) << std::endl;
         }
         for (int64_t iClose = 0; iClose < tophits.m; iClose++) {
             Besthit &closehit = besthitsSeed[iClose];
@@ -4655,7 +4653,7 @@ AbsNeighbourJoining(void)::MLSiteRates(std::vector<numeric_t, typename op_t::All
 
 
 AbsNeighbourJoining(void)::MLSiteLikelihoodsByRate(std::vector<numeric_t, typename op_t::Allocator> &_rates,
-        std::vector<double> &site_loglk) {
+                                                   std::vector<double> &site_loglk) {
     site_loglk.resize(nPos * options.nRateCats);
     /* save the original rates */
     assert(!rates.rates.empty());

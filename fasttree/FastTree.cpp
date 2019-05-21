@@ -95,7 +95,7 @@ void FastTree::settings(std::ostream &log) {
         if (options.nAlign > 1) {
             log << strformat(" (%d alignments)", options.nAlign) << std::endl;
         }
-        log << strformat(
+        log << std::endl << strformat(
                 "%s distances: %s Joins: %s Support: %s",
                 options.nCodes == 20 ? "Amino acid" : "Nucleotide",
                 !options.matrixPrefix.empty() ? options.matrixPrefix.c_str() :
@@ -106,7 +106,7 @@ void FastTree::settings(std::ostream &log) {
                 supportString.c_str()
         ) << std::endl;
 
-        if (!options.intreeFile.empty()) {
+        if (options.intreeFile.empty()) {
             log << strformat(
                     "Search: %s%s %s %s %s",
                     (options.slow ? "Exhaustive (slow)" : (options.fastest ? "Fastest" : "Normal")),
