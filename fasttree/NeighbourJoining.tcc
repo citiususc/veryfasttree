@@ -4906,7 +4906,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
             std::string buf;
             buf.reserve(100);
             buf += useML ? "ML" : "ME";
-            buf += " NNI round %%ld of %%ld, %%ld of %%ld splits";
+            buf += " NNI round %ld of %ld, %ld of %ld splits";
             if (iDone > 0) {
                 buf += strformat(", %ld changes", nNNIThisRound);
             }
@@ -5081,7 +5081,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
     if (options.verbose >= 2) {
         int nUp = 0;
         for (int64_t i = 0; i < maxnodes; i++) {
-            if (!upProfiles[i]) {
+            if (upProfiles[i]) {
                 nUp++;
             }
         }
