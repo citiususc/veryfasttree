@@ -93,7 +93,7 @@ void FastTree::settings(std::ostream &log) {
         log << "Alignment: " << (options.inFileName.empty() ? "standard input" : options.inFileName);
 
         if (options.nAlign > 1) {
-            log << strformat(" (%d alignments)", options.nAlign) << std::endl;
+            log << strformat(" (%ld alignments)", options.nAlign) << std::endl;
         }
         log << std::endl << strformat(
                 "%s distances: %s Joins: %s Support: %s",

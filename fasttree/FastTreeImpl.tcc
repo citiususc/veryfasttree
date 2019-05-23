@@ -55,7 +55,7 @@ AbsFastTreeImpl(void)::run() {
         }
 
         if (!options.logFileName.empty()) {
-            log << strformat("Read %d sequences, %d positions", aln.seqs.size(), aln.nPos) << std::endl;
+            log << strformat("Read %zd sequences, %ld positions", aln.seqs.size(), aln.nPos) << std::endl;
         }
 
         progressReport.print("Read alignment");
@@ -85,7 +85,7 @@ AbsFastTreeImpl(void)::run() {
                 constraints.readAlignment();
                 if (constraints.seqs.size() < 4) {
                     log << "Warning: constraints file with less than 4 sequences ignored:" << std::endl;
-                    log << strformat("alignment #%d in ", iAln + 1) << options.constraintsFile << std::endl;
+                    log << strformat("alignment #%ld in ", iAln + 1) << options.constraintsFile << std::endl;
                 } else {
                     alnToConstraints(uniqConstraints, constraints, unique, hashnames);
                     progressReport.print("Read the constraints");
@@ -110,7 +110,7 @@ AbsFastTreeImpl(void)::run() {
             int64_t unConstraints = (int64_t) uniqConstraints.size();
 
             if (options.verbose > 2) {
-                log << strformat("read %s seqs %d (%d unique) positions %d nameLast %s seqLast %s",
+                log << strformat("read %s seqs %ld (%ld unique) positions %ld nameLast %s seqLast %s",
                                  options.inFileName.empty() ? "standard input" : options.inFileName.c_str(),
                                  nSeq, unSeq, aln.nPos,
                                  aln.names[aln.seqs.size() - 1].c_str(),
@@ -144,7 +144,7 @@ AbsFastTreeImpl(void)::run() {
                     log << strformat("Initial topology in %.2f seconds", progressReport.clockDiff()) << std::endl;
                 }
                 if (options.spr > 0 || nniToDo > 0 || MLnniToDo > 0) {
-                    log << strformat("Refining topology: %d rounds ME-NNIs, %d rounds ME-SPRs, %d rounds ML-NNIs",
+                    log << strformat("Refining topology: %ld rounds ME-NNIs, %d rounds ME-SPRs, %ld rounds ML-NNIs",
                                      nniToDo, options.spr, MLnniToDo) << std::endl;
                 }
             }
@@ -159,15 +159,15 @@ AbsFastTreeImpl(void)::run() {
                     if (!bConverged) {
                         int64_t nChange = nj.DoNNI(i, nniToDo,/*use ml*/false, nni_stats, maxDelta);
 
-                        nj.logTree("ME_NNI%d", i + 1, aln.names, unique);
+                        nj.logTree("ME_NNI%ld", i + 1, aln.names, unique);
                         if (nChange == 0) {
                             bConverged = true;
                             if (options.verbose > 1) {
-                                log << strformat("Min_evolution NNIs converged at round %d -- skipping some rounds",
+                                log << strformat("Min_evolution NNIs converged at round %ld -- skipping some rounds",
                                                  i + 1) << std::endl;
                             }
                             if (!options.logFileName.empty()) {
-                                log << strformat("Min_evolution NNIs converged at round %d -- skipping some rounds",
+                                log << strformat("Min_evolution NNIs converged at round %ld -- skipping some rounds",
                                                  i + 1) << std::endl;
                             }
                         }
@@ -178,7 +178,7 @@ AbsFastTreeImpl(void)::run() {
                         (nniToDo / (options.spr + 1) > 0 &&
                          ((i + 1) % (nniToDo / (options.spr + 1))) == 0)) {
                         nj.SPR(options.maxSPRLength, options.spr - sprRemaining, options.spr);
-                        nj.logTree("ME_SPR%d", options.spr - sprRemaining + 1, aln.names, unique);
+                        nj.logTree("ME_SPR%ld", options.spr - sprRemaining + 1, aln.names, unique);
                         sprRemaining--;
                         /* Restart the NNIs -- set all ages to 0, etc. */
                         bConverged = false;
@@ -188,7 +188,7 @@ AbsFastTreeImpl(void)::run() {
             }
             while (sprRemaining > 0) {    /* do any remaining SPR rounds */
                 nj.SPR(options.maxSPRLength, options.spr - sprRemaining, options.spr);
-                nj.logTree("ME_SPR%d", options.spr - sprRemaining + 1, aln.names, unique);
+                nj.logTree("ME_SPR%ld", options.spr - sprRemaining + 1, aln.names, unique);
                 sprRemaining--;
             }
 
@@ -272,7 +272,7 @@ AbsFastTreeImpl(void)::run() {
                         bool bConverged = iRound > 1 &&
                                           (dMaxChange < 0.001 || loglk < (dLastLogLk + Constants::treeLogLkDelta));
                         if (options.verbose) {
-                            log << strformat("%d rounds ML lengths: LogLk %s= %.3lf Max-change %.4lf%s Time %.2f",
+                            log << strformat("%ld rounds ML lengths: LogLk %s= %.3lf Max-change %.4lf%s Time %.2f",
                                              iRound,
                                              options.exactML || options.nCodes != 20 ? "" : "~",
                                              loglk,
@@ -281,7 +281,7 @@ AbsFastTreeImpl(void)::run() {
                                              progressReport.clockDiff()) << std::endl;
                         }
                         if (!options.logFileName.empty()) {
-                            log << strformat("TreeLogLk\tLength%d\t%.4lf\tMaxChange\t%.4lf",
+                            log << strformat("TreeLogLk\tLength%ld\t%.4lf\tMaxChange\t%.4lf",
                                              iRound, loglk, dMaxChange) << std::endl;
                         }
                         if (iRound == 1) {
@@ -300,27 +300,27 @@ AbsFastTreeImpl(void)::run() {
                 if (MLnniToDo > 0) {
                     /* This may help us converge faster, and is fast */
                     nj.optimizeAllBranchLengths();
-                    nj.logTree("ML_Lengths%d", 1, aln.names, unique);
+                    nj.logTree("ML_Lengths%ld", 1, aln.names, unique);
                 }
 
                 double maxDelta;
                 bool bConverged = false;
                 for (int64_t iMLnni = 0; iMLnni < MLnniToDo; iMLnni++) {
                     int64_t changes = nj.DoNNI(iMLnni, MLnniToDo, /*use ml*/true, nni_stats, maxDelta);
-                    nj.logTree("ML_NNI%d", iMLnni + 1, aln.names, unique);
+                    nj.logTree("ML_NNI%ld", iMLnni + 1, aln.names, unique);
                     double loglk = nj.treeLogLk(/*site_likelihoods*/nullptr);
                     bool bConvergedHere = (iMLnni > 0) &&
                                           ((loglk < lastloglk + Constants::treeLogLkDelta) ||
                                            maxDelta < Constants::treeLogLkDelta);
                     if (options.verbose) {
-                        log << strformat("ML-NNI round %d: LogLk %s= %.3f NNIs %d max delta %.2f Time %.2f%s",
+                        log << strformat("ML-NNI round %ld: LogLk %s= %.3f NNIs %ld max delta %.2f Time %.2f%s",
                                          iMLnni + 1,
                                          options.exactML || options.nCodes != 20 ? "" : "~",
                                          loglk, changes, maxDelta, progressReport.clockDiff(),
                                          bConverged ? " (final)" : "") << std::endl;
                     }
                     if (!options.logFileName.empty())
-                        log << strformat("TreeLogLk\tML_NNI%d\t%.4lf\tMaxChange\t%.4lf",
+                        log << strformat("TreeLogLk\tML_NNI%ld\t%.4lf\tMaxChange\t%.4lf",
                                          iMLnni + 1, loglk, maxDelta) << std::endl;
                     if (bConverged) {
                         break;        /* we did our extra round */
@@ -354,7 +354,7 @@ AbsFastTreeImpl(void)::run() {
                 /* This does not take long and improves the results */
                 if (MLnniToDo > 0) {
                     nj.optimizeAllBranchLengths();
-                    nj.logTree("ML_Lengths%d", 2, aln.names, unique);
+                    nj.logTree("ML_Lengths%ld", 2, aln.names, unique);
                     if (options.verbose || !options.logFileName.empty()) {
                         double loglk = nj.treeLogLk(/*site_likelihoods*/nullptr);
                         if (options.verbose)
@@ -384,7 +384,7 @@ AbsFastTreeImpl(void)::run() {
                 }
             }
 
-            log << strformat("Total time: %.2f seconds Unique: %d/%d Bad splits: %d/%d",
+            log << strformat("Total time: %.2f seconds Unique: %ld/%ld Bad splits: %ld/%ld",
                              progressReport.clockDiff(),
                              unSeq, nSeq,
                              splitcount.nBadSplits, splitcount.nSplits);
@@ -396,7 +396,7 @@ AbsFastTreeImpl(void)::run() {
             }
             log << std::endl;
             if (unSeq > 3 && unConstraints > 0) {
-                log << strformat("Violating constraints: %d both bad: %d",
+                log << strformat("Violating constraints: %ld both bad: %ld",
                                  splitcount.nConstraintViolations, splitcount.nBadBoth);
                 if (splitcount.dWorstDeltaConstrained > 0) {
                     log << strformat(" Worst delta-%s due to constraints: %.3f",
@@ -417,7 +417,7 @@ AbsFastTreeImpl(void)::run() {
 
                 if (options.debug.nCloseUsed > 0 || options.debug.nClose2Used > 0 ||
                     options.debug.nRefreshTopHits > 0) {
-                    log << strformat("Top hits: close neighbors %ld/%d 2nd-level %ld refreshes %ld",
+                    log << strformat("Top hits: close neighbors %ld/%ld 2nd-level %ld refreshes %ld",
                                      options.debug.nCloseUsed, unSeq, options.debug.nClose2Used,
                                      options.debug.nRefreshTopHits);
                 }

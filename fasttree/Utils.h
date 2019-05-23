@@ -43,10 +43,10 @@ namespace fasttree {
     public:
         TeeStream(std::ostream &os1, std::ostream &os2) : os1(os1), os2(os2) {}
 
-        virtual std::streamsize xsputn(const char_type *__s, std::streamsize __n) override {
-            os1 << __s;
-            os2 << __s;
-            return __n;
+        virtual std::streamsize xsputn(const char_type *s, std::streamsize n) override {
+            os1.write(s, n);
+            os2.write(s, n);
+            return n;
         }
 
         int sync() override {
@@ -81,11 +81,28 @@ namespace fasttree {
         return *value;
     }
 
+
     template<typename Iter, typename Compare>
     inline void psort(Iter first, Iter last, uint32_t threads, const Compare &comp) {
         if (omp_in_parallel()) {
             threads = 1;
         }
+        #ifndef NDEBUG
+        static thread_local const Compare *_pcomp = nullptr;
+        if (_pcomp == nullptr) {
+            std::cerr << "WARNING!!: using qsort" << std::endl;
+        }
+        _pcomp = &comp;
+        auto cmp = [](const void *a, const void *b) {
+            if ((*_pcomp)(*(typename Iter::pointer) a, *(typename Iter::pointer) b)) {
+                return -1;
+            } else {
+                return 1;
+            }
+        };
+        qsort(&(*first), std::distance(first, last), sizeof(*first), cmp);
+        return;
+        #endif
         boost::sort::sample_sort(first, last, comp, threads);
     }
 

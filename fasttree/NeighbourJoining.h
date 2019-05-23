@@ -224,7 +224,7 @@ namespace fasttree {
 
 
             /* 1 lock to read or write any top hits list, no thread grabs more than one */
-            std::vector<std::mutex> locks; //TODO check if lock is necesary
+            std::vector<std::mutex> locks;
 
             TopHits(const Options &options, int64_t maxnodes, int64_t m);
 

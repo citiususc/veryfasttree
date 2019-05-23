@@ -101,7 +101,7 @@ NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressRe
 
     if (options.verbose > 2) {
         for (int64_t i = 0; i < 4 && i < (int64_t) seqs.size(); i++) {
-            log << strformat("Node %d outdist %f", i, outDistances[i]) << std::endl;
+            log << strformat("Node %ld outdist %f", i, outDistances[i]) << std::endl;
         }
     }
 
@@ -195,7 +195,7 @@ AbsNeighbourJoining(void)::printNJInternal(std::ostream &out, bool useLen) {
                 out << strformat(":%.4f", branchlength[node]);
             }
         } else if (end) {
-            out << strformat(")%d", node);
+            out << strformat(")%ld", node);
             if (useLen) {
                 out << strformat(":%.4f", branchlength[node]);
             }
@@ -241,7 +241,7 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
             counts[character]++;
             auto c = charToCode[character];
             if (options.verbose > 10 && j < 2) {
-                log << strformat("pos %d char %c code %d", j, seq[j], c) << std::endl;
+                log << strformat("pos %ld char %c code %u", j, seq[j], c) << std::endl;
             }
             /* treat unknowns as gaps */
             if (c == options.nCodes || c == NOCODE) {
@@ -263,7 +263,7 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
                 } else if (constraintSeq[j] != '-') {
                     #pragma omp critical
                     {
-                        log << strformat("Constraint characters in unique sequence %d replaced with gap: %c%d",
+                        log << strformat("Constraint characters in unique sequence %ld replaced with gap: %c%ld",
                                          i + 1, constraintSeq[j], j + 1) << std::endl;
 
                     };
@@ -527,7 +527,7 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     }
 
     /* Add up the weights, going through each sequence in turn */
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static) if(nProfiles == (int64_t)seqs.size())
     for (int64_t in = 0; in < nProfiles; in++) {
         int64_t iFreqOut = 0;
         int64_t iFreqIn = 0;
@@ -552,7 +552,7 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     }
     assert(iFreqOut == (int64_t) out.vectors.size());
     if (options.verbose > 10) {
-        log << strformat("Average %d profiles", nProfiles) << std::endl;
+        log << strformat("Average %ld profiles", nProfiles) << std::endl;
     }
     if (distanceMatrix) {
         setCodeDist(out);
@@ -694,7 +694,7 @@ AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile
 
         assert(out.codes[i] == NOCODE && fOut != nullptr); /* No no-vector optimization for outprofiles */
         if (options.verbose > 3 && i < 3) {
-            log << strformat("Updating out-profile position %d weight %f (mult %f)",
+            log << strformat("Updating out-profile position %ld weight %f (mult %f)",
                              i, out.weights[i], out.weights[i] * nActiveOld) << std::endl;
         }
         double originalMult = out.weights[i] * nActiveOld;
@@ -720,7 +720,7 @@ AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile
         normalizeFreq(fOut);
 
         if (options.verbose > 2 && i < 3) {
-            log << strformat("Updated out-profile position %d weight %f (mult %f)",
+            log << strformat("Updated out-profile position %ld weight %f (mult %f)",
                              i, out.weights[i], out.weights[i] * nActiveOld);
             if (out.weights[i] > 0) {
                 for (int k = 0; k < options.nCodes; k++) {
@@ -791,7 +791,7 @@ AbsNeighbourJoining(void)::setOutDistance(int64_t iNode, int64_t nActive) {
     if (options.verbose > 3 && iNode < 5) {
         #pragma omp critical
         {
-            log << strformat("NewOutDist for %d %f from dist %f selfd %f diam %f totdiam %f newActive %d",
+            log << strformat("NewOutDist for %ld %f from dist %f selfd %f diam %f totdiam %f newActive %ld",
                              iNode, outDistances[iNode], dist.dist, selfdist[iNode], diameter[iNode],
                              totdiam, nActive) << std::endl;
         };
@@ -810,7 +810,7 @@ AbsNeighbourJoining(void)::setOutDistance(int64_t iNode, int64_t nActive) {
                     total += bh.dist - (diameter[iNode] + diameter[j]);
                 }
             }
-            log << strformat("OutDist for Node %d %f truth %f profiled %f truth %f pd_err %f",
+            log << strformat("OutDist for Node %ld %f truth %f profiled %f truth %f pd_err %f",
                              iNode, outDistances[iNode], total, pdistOutWithoutA, total_pd,
                              fabs(pdistOutWithoutA - total_pd)) << std::endl;
         };
@@ -841,7 +841,7 @@ AbsNeighbourJoining(void)::setCriterion(int64_t nActive, Besthit &join) {
     }
     join.criterion = join.dist - (outI + outJ) / (double) (nActive - 2);
     if (options.verbose > 2 && nActive <= 5) {
-        log << strformat("Set Criterion to join %d %d with nActive=%d dist+penalty %.3f criterion %.3f",
+        log << strformat("Set Criterion to join %ld %ld with nActive=%ld dist+penalty %.3f criterion %.3f",
                          join.i, join.j, nActive, join.dist, join.criterion) << std::endl;
     }
 }
@@ -1095,8 +1095,9 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
                 log << "# This block is intended for loading into R" << std::endl;
 
                 log << strformat("lkAB = %.8g", lkAB) << std::endl;
-                log << strformat("Branch_length= %.8g\nalignment_position=%d\nnCodes=%d\nrate_category=%d\nrate=%.8g",
-                                 length, i, options.nCodes, iRate, rates.rates[iRate]) << std::endl;
+                log << strformat(
+                        "Branch_length= %.8g\nalignment_position=%ld\nnCodes=%d\nrate_category=%ld\nrate=%.8g",
+                        length, i, options.nCodes, iRate, rates.rates[iRate]) << std::endl;
                 log << strformat("wA=%.8g\nwB=%.8g", wA, wB) << std::endl;
                 log << strformat("codeA = %d\ncodeB = %d", p1.codes[i], p2.codes[i]) << std::endl;
 
@@ -1235,7 +1236,7 @@ AbsNeighbourJoining(void)::quartetConstraintPenalties(Profile *profiles4[4], dou
             if (options.verbose > 2
                 && (std::fabs(part[ABvsCD] - part[ACvsBD]) > 0.001 || std::fabs(part[ABvsCD] - part[ADvsBC]) > 0.001)) {
                 log << strformat(
-                        "Constraint Penalties at %d: ABvsCD %.3f ACvsBD %.3f ADvsBC %.3f %d/%d %d/%d %d/%d %d/%d",
+                        "Constraint Penalties at %ld: ABvsCD %.3f ACvsBD %.3f ADvsBC %.3f %ld/%ld %ld/%ld %ld/%ld %ld/%ld",
                         iC, part[ABvsCD], part[ACvsBD], part[ADvsBC],
                         profiles4[0]->nOn[iC], profiles4[0]->nOff[iC],
                         profiles4[1]->nOn[iC], profiles4[1]->nOff[iC],
@@ -1505,7 +1506,7 @@ AbsNeighbourJoining(double)::MLQuartetOptimize(Profile &pA, Profile &pB, Profile
 
     if (options.verbose > 3) {
         double loglkStart = MLQuartetLogLk(pA, pB, pC, pD, start_length, /*site_lk*/nullptr);
-        log << strformat("Optimize loglk from %.5f to %.5f eval %d lengths from\n"
+        log << strformat("Optimize loglk from %.5f to %.5f eval %ld lengths from\n"
                          "   %.5f %.5f %.5f %.5f %.5f to\n"
                          "   %.5f %.5f %.5f %.5f %.5f",
                          loglkStart, quartetloglk, qopt.nEval,
@@ -1561,7 +1562,7 @@ AbsNeighbourJoining(int64_t)::findSPRSteps(int64_t nodeMove, int64_t nodeAround,
         }
 
         if (options.verbose > 3) {
-            log << strformat("SPR chain step %d for %d around %d swap %d %d deltaLen %.5f",
+            log << strformat("SPR chain step %ld for %ld around %ld swap %ld %ld deltaLen %.5f",
                              iStep + 1, nodeAround, nodeMove, step.nodes[0], step.nodes[1], step.deltaLength)
                 << std::endl;
             if (options.verbose > 4)
@@ -1836,7 +1837,7 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
             normalizeFreq(f, dmat);
         } /* end if computing f */
         if (options.verbose > 10 && i < 5) {
-            log << strformat("Average profiles: pos %d in-w1 %f in-w2 %f bionjWeight %f to weight %f code %d",
+            log << strformat("Average profiles: pos %ld in-w1 %f in-w2 %f bionjWeight %f to weight %f code %d",
                              i, profile1.weights[i], profile2.weights[i], bionjWeight, out.weights[i], out.codes[i])
                 << std::endl;
             if (f != nullptr) {
@@ -2214,7 +2215,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
                     assert(newnode < maxnodes);
                     readTreeAddChild(stack[stack_size - 1], newnode, parents, children);
                     if (options.verbose > 5) {
-                        log << strformat("Added internal child %d of %d, stack size increase to %d",
+                        log << strformat("Added internal child %ld of %ld, stack size increase to %ld",
                                          newnode, stack[stack_size - 1], stack_size + 1) << std::endl;
                     }
                     stack[stack_size++] = newnode;
@@ -2243,7 +2244,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
                 while (nUp-- > 0) {
                     stack_size--;
                     if (options.verbose > 5) {
-                        log << strformat("Up to nUp=%d stack size %d at %d",
+                        log << strformat("Up to nUp=%ld stack size %ld at %ld",
                                          nUp, stack_size, stack[stack_size - 1]) << std::endl;
                     }
                     if (stack_size <= 0) {
@@ -2277,7 +2278,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     for (int64_t i = 0; i < (int64_t) unique.uniqueSeq.size(); i++) {
         if (parents[i] < 0) {
             throw std::invalid_argument(
-                    strformat("Alignment sequence %d (unique %d) absent from input tree\n"
+                    strformat("Alignment sequence %ld (unique %ld) absent from input tree\n"
                               "The starting tree (the argument to -intree) must include all sequences in the alignment!",
                               unique.uniqueFirst[i], i));
         }
@@ -2306,7 +2307,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
                         children[root].nChild = 0;
                         nRemoved++;
                         if (options.verbose > 5) {
-                            log << strformat("Changed root from %d to %d", root, newroot) << std::endl;
+                            log << strformat("Changed root from %ld to %ld", root, newroot) << std::endl;
                         }
                         root = newroot;
                         stack[stack_size++] = newroot;
@@ -2317,7 +2318,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
                         assert(stack_size < maxnodes);
                         stack[stack_size++] = children[node].child[j];
                         if (options.verbose > 5) {
-                            log << strformat("Added %d to stack", stack[stack_size - 1]) << std::endl;
+                            log << strformat("Added %ld to stack", stack[stack_size - 1]) << std::endl;
                         }
                     }
                 }
@@ -2339,7 +2340,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
 
     for (int64_t i = 0; i < maxnodes; i++)
         if (options.verbose > 5) {
-            log << strformat("Simplfied node %d has parent %d nchild %d", i, parents[i], children[i].nChild)
+            log << strformat("Simplfied node %ld has parent %ld nchild %d", i, parents[i], children[i].nChild)
                 << std::endl;
         }
 
@@ -2366,7 +2367,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     }
     for (int64_t i = 0; i < maxnodes; i++)
         if (options.verbose > 5) {
-            log << strformat("Map %d to %d (parent %d nchild %d)", i, map[i], parents[i], children[i].nChild)
+            log << strformat("Map %ld to %ld (parent %ld nchild %d)", i, map[i], parents[i], children[i].nChild)
                 << std::endl;
         }
 
@@ -2538,7 +2539,7 @@ AbsNeighbourJoining(void)::fastNJ() {
             }
         } else {
             if (options.verbose > 2) {
-                log << strformat("Top-hit-list size = %d of %d", m, seqs.size()) << std::endl;
+                log << strformat("Top-hit-list size = %ld of %ld", m, seqs.size()) << std::endl;
             }
         }
     }
@@ -2561,7 +2562,7 @@ AbsNeighbourJoining(void)::fastNJ() {
     for (int64_t nActive = seqs.size(); nActive > 3; nActive--) {
         int64_t nJoinsDone = seqs.size() - nActive;
         if (nJoinsDone > 0 && (nJoinsDone % 100) == 0) {
-            progressReport.print("Joined %6d of %6d", nJoinsDone, seqs.size() - 3);
+            progressReport.print("Joined %6ld of %6ld", nJoinsDone, (int64_t) (seqs.size() - 3));
         }
 
         Besthit join;        /* the join to do */
@@ -2576,13 +2577,13 @@ AbsNeighbourJoining(void)::fastNJ() {
         if (options.verbose > 2) {
             double penalty = options.constraintWeight * (double) joinConstraintPenalty(join.i, join.j);
             if (penalty > 0.001) {
-                log << strformat("Constraint violation during neighbor-joining %d %d into %d penalty %.3f",
+                log << strformat("Constraint violation during neighbor-joining %ld %ld into %ld penalty %.3f",
                                  join.i, join.j, maxnode, penalty) << std::endl;
 
                 for (int64_t iC = 0; iC < (int64_t) constraintSeqs.size(); iC++) {
                     int64_t local = joinConstraintPenaltyPiece(join.i, join.j, iC);
                     if (local > 0)
-                        log << strformat("Constraint %d piece %d %d/%d %d/%d %d/%d", iC, local,
+                        log << strformat("Constraint %ld piece %ld %ld/%ld %ld/%ld %ld/%ld", iC, local,
                                          profiles[join.i].nOn[iC],
                                          profiles[join.i].nOff[iC],
                                          profiles[join.j].nOn[iC],
@@ -2662,7 +2663,7 @@ AbsNeighbourJoining(void)::fastNJ() {
             if (bionjWeight < 0) bionjWeight = 0;
             if (bionjWeight > 1) bionjWeight = 1;
             if (options.verbose > 2) {
-                log << strformat("dVarO %f dVarDiam %f varIJ %f from dist %f weight %f (pos %d) bionjWeight %f %f",
+                log << strformat("dVarO %f dVarDiam %f varIJ %f from dist %f weight %f (pos %ld) bionjWeight %f %f",
                                  deltaProfileVarOut, deltaVarDiam, varIJ, join.dist, join.weight, nPos, bionjWeight,
                                  1 - bionjWeight);
             }
@@ -2691,7 +2692,7 @@ AbsNeighbourJoining(void)::fastNJ() {
             }
         }
         if (options.verbose > 2) {
-            log << strformat("Join\t%d\t%d\t%.6f\tlambda\t%.6f\tselfw\t%.3f\t%.3f\tnew\t%d",
+            log << strformat("Join\t%ld\t%ld\t%.6f\tlambda\t%.6f\tselfw\t%.3f\t%.3f\tnew\t%ld",
                              join.i < join.j ? join.i : join.j,
                              join.i < join.j ? join.j : join.i,
                              join.criterion, bionjWeight,
@@ -2726,7 +2727,7 @@ AbsNeighbourJoining(void)::fastNJ() {
             }
             assert(nSaved == nActive - 1);
             if (options.verbose > 2) {
-                log << strformat("Recomputing outprofile %d %d", nActive - 1) << std::endl;
+                log << strformat("Recomputing outprofile %ld %ld", nActiveOutProfileReset, nActive - 1) << std::endl;
             }
             outProfile(outprofile, activeProfiles, nSaved);
             nActiveOutProfileReset = nActive - 1;
@@ -2756,7 +2757,7 @@ AbsNeighbourJoining(void)::fastNJ() {
             if (!visible.empty()) {
                 setBestHit(newnode, nActive - 1, visible[newnode], /*OUT OPTIONAL*/besthitNew.data());
                 if (options.verbose > 2) {
-                    log << strformat("Visible %d %d %f %f",
+                    log << strformat("Visible %ld %ld %f %f",
                                      visible[newnode].i, visible[newnode].j,
                                      visible[newnode].dist, visible[newnode].criterion) << std::endl;
                 }
@@ -2778,7 +2779,7 @@ AbsNeighbourJoining(void)::fastNJ() {
                         if (parent[iOldVisible] >= 0
                             || besthitNew[iNode].criterion < visible[iNode].criterion) {
                             if (options.verbose > 3) {
-                                log << strformat("Visible %d reset from %d to %d (%f vs. %f)",
+                                log << strformat("Visible %ld reset from %ld to %ld (%f vs. %f)",
                                                  iNode, iOldVisible,
                                                  newnode, visible[iNode].criterion, besthitNew[iNode].criterion)
                                     << std::endl;
@@ -2879,7 +2880,8 @@ AbsNeighbourJoining(void)::reliabilityNJ() {
             continue; /* nothing to do for leaves or root */
 
         if (iNodesDone > 0 && (iNodesDone % 100) == 0)
-            progressReport.print("Local bootstrap for %6d of %6d internal splits", iNodesDone, seqs.size() - 3);
+            progressReport.print("Local bootstrap for %6ld of %6ld internal splits", iNodesDone,
+                                 (int64_t) (seqs.size() - 3));
         iNodesDone++;
 
         Profile *profiles4[4];
@@ -2919,11 +2921,11 @@ AbsNeighbourJoining(void)::readTreeMaybeAddLeaf(int64_t iparent, std::string &na
     if (parents[iSeqUnique] < 0) {
         readTreeAddChild(iparent, iSeqUnique, /*IN/OUT*/parents, /*IN/OUT*/children);
         if (options.verbose > 5) {
-            log << strformat("Found leaf uniq%d name %s child of %d", iSeqUnique, name.c_str(), iparent) << std::endl;
+            log << strformat("Found leaf uniq%ld name %s child of %ld", iSeqUnique, name.c_str(), iparent) << std::endl;
         }
     } else {
         if (options.verbose > 5) {
-            log << strformat("Skipped redundant leaf uniq%d name %s", iSeqUnique, name.c_str()) << std::endl;
+            log << strformat("Skipped redundant leaf uniq%ld name %s", iSeqUnique, name.c_str()) << std::endl;
         }
     }
 }
@@ -2931,7 +2933,7 @@ AbsNeighbourJoining(void)::readTreeMaybeAddLeaf(int64_t iparent, std::string &na
 AbsNeighbourJoining(void)::readTreeRemove(std::vector<int64_t> &parents, std::vector<Children> &children,
                                           int64_t node) {
     if (options.verbose > 5) {
-        log << strformat("Removing node %d parent %d", node, parents[node]) << std::endl;
+        log << strformat("Removing node %ld parent %ld", node, parents[node]) << std::endl;
     }
     assert(parents[node] >= 0);
     int64_t iparent = parents[node];
@@ -2958,7 +2960,7 @@ AbsNeighbourJoining(void)::readTreeRemove(std::vector<int64_t> &parents, std::ve
         assert(pc.nChild + nc.nChild <= 3);
         for (int j = 0; j < nc.nChild; j++) {
             if (options.verbose > 5) {
-                log << strformat("Repointing parent %d to child %d", iparent, nc.child[j]) << std::endl;
+                log << strformat("Repointing parent %ld to child %ld", iparent, nc.child[j]) << std::endl;
             }
             pc.child[pc.nChild++] = nc.child[j];
             parents[nc.child[j]] = iparent;
@@ -3062,7 +3064,7 @@ AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::
                 double lenC = branchlength[nodeABCD[2]];
                 double lenD = branchlength[nodeABCD[3]];
                 if (options.verbose > 3) {
-                    log << strformat("Computing UpProfile for node %d with lenC %.4f lenD %.4f pair-loglk %.3f",
+                    log << strformat("Computing UpProfile for node %ld with lenC %.4f lenD %.4f pair-loglk %.3f",
                                      node, lenC, lenD,
                                      pairLogLk(*profiles4[2], *profiles4[3], lenC + lenD, /*site_lk*/ nullptr))
                         << std::endl;
@@ -3074,7 +3076,7 @@ AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::
                 double weight = quartetWeight(profiles4CDAB);
                 if (options.verbose > 3) {
                     log << strformat(
-                            "Compute upprofile of %d from %d and parents (vs. children %d %d) with weight %.3f",
+                            "Compute upprofile of %ld from %ld and parents (vs. children %ld %ld) with weight %.3f",
                             node, nodeABCD[2], nodeABCD[0], nodeABCD[1], weight) << std::endl;
                 }
                 averageProfile(*upProfiles[node], *profiles4[2], *profiles4[3], weight);
@@ -3103,15 +3105,15 @@ AbsNeighbourJoining(void)::recomputeProfile(std::unique_ptr<Profile> upProfiles[
     }
     if (options.verbose > 3) {
         if (useML) {
-            log << strformat("Recompute %d from %d %d lengths %.4f %.4f",
+            log << strformat("Recompute %ld from %ld %ld lengths %.4f %.4f",
                              node,
                              child[node].child[0],
                              child[node].child[1],
                              branchlength[child[node].child[0]],
                              branchlength[child[node].child[1]]) << std::endl;
         } else {
-            log << strformat("Recompute %d from %d %d weight %.3f\n",
-                             node, child[node].child[0], child[node].child[1], weight);
+            log << strformat("Recompute %ld from %ld %ld weight %.3f",
+                             node, child[node].child[0], child[node].child[1], weight) << std::endl;
         }
     }
     if (useML) {
@@ -3188,7 +3190,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
     Besthit tmp;
 
     /* Note -- if we are already in a parallel region, this will be ignored */
-    //#pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(dynamic)
     for (int64_t j = 0; j < maxnode; j++) {
         Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
         sv.i = node;
@@ -3209,7 +3211,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
         }
     }
     if (options.verbose > 5) {
-        log << strformat("SetBestHit %d %d %f %f", bestjoin.i, bestjoin.j, bestjoin.dist, bestjoin.criterion)
+        log << strformat("SetBestHit %ld %ld %f %f", bestjoin.i, bestjoin.j, bestjoin.dist, bestjoin.criterion)
             << std::endl;
     }
 }
@@ -3268,7 +3270,7 @@ AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &b
             if (besthits[join.i].j != join.j) {
                 changed = 1;
                 if (options.verbose > 2) {
-                    log << strformat("BetterI\t%d\t%d\t%d\t%d\t%f\t%f",
+                    log << strformat("BetterI\t%ld\t%ld\t%ld\t%ld\t%f\t%f",
                                      join.i, join.j, besthits[join.i].i, besthits[join.i].j,
                                      join.criterion, besthits[join.i].criterion) << std::endl;
                 }
@@ -3285,7 +3287,7 @@ AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &b
             if (besthits[join.j].j != join.i) {
                 changed = 1;
                 if (options.verbose > 2) {
-                    log << strformat("BetterJ\t%d\t%d\t%d\t%d\t%f\t%f",
+                    log << strformat("BetterJ\t%ld\t%ld\t%ld\t%ld\t%f\t%f",
                                      join.i, join.j, besthits[join.j].i, besthits[join.j].j,
                                      join.criterion, besthits[join.j].criterion) << std::endl;
                 }
@@ -3332,15 +3334,19 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
 
     int64_t nHasTopHits = 0;
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(dynamic)
     for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
         int64_t seed = seeds[iSeed];
-        if (iSeed > 0 && (iSeed % 100) == 0) {
-            progressReport.print("Top hits for %6d of %6d seqs (at seed %6d)", nHasTopHits, seqs.size(), iSeed);
+        if (iSeed > 0 && (iSeed % 100) == 0 && options.threads == 1) {
+            progressReport.print("Top hits for %6ld of %6ld seqs (at seed %6ld)",
+                                 nHasTopHits, (int64_t) seqs.size(), iSeed);
         }
         if (tophits.topHitsLists[seed].hits.size() > 0) {
             if (options.verbose > 2) {
-                log << strformat("Skipping seed %d", seed) << std::endl;
+                #pragma omp critical
+                {
+                    log << strformat("Skipping seed %ld", seed) << std::endl;
+                }
             }
             continue;
         }
@@ -3350,7 +3356,10 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
         Besthit bestjoin;
 
         if (options.verbose > 2) {
-            log << strformat("Trying seed %d", seed) << std::endl;
+            #pragma omp critical
+            {
+                log << strformat("Trying seed %ld", seed) << std::endl;
+            }
         }
         setBestHit(seed, seqs.size(), bestjoin, besthitsSeed.data());
 
@@ -3375,8 +3384,11 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
         double nearcover = 1.0 - neardist / 2.0;
 
         if (options.verbose > 2) {
-            log << strformat("Distance limit for close neighbors %f weight %f ungapped %d",
-                             neardist, nearweight, nPos - nGaps[seed]) << std::endl;
+            #pragma omp critical
+            {
+                log << strformat("Distance limit for close neighbors %f weight %f ungapped %ld",
+                                 neardist, nearweight, nPos - nGaps[seed]) << std::endl;
+            }
         }
         for (int64_t iClose = 0; iClose < tophits.m; iClose++) {
             Besthit &closehit = besthitsSeed[iClose];
@@ -3403,7 +3415,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
                 nHasTopHits++;
                 options.debug.nCloseUsed++;
                 if (options.verbose > 2) {
-                    log << strformat("Near neighbor %d (rank %d weight %f ungapped %d %d)",
+                    log << strformat("Near neighbor %ld (rank %ld weight %f ungapped %ld %ld)",
                                      closeNode, iClose, besthitsSeed[iClose].weight,
                                      nPos - nGaps[seed],
                                      nPos - nGaps[closeNode]) << std::endl;
@@ -3457,7 +3469,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
     int64_t nCheck = tophits.q > 0 ? tophits.q : (int64_t) (0.5 + 2.0 * sqrt(tophits.m));
     for (int64_t iNode = 0; iNode < (int64_t) seqs.size(); iNode++) {
         if ((iNode % 100) == 0) {
-            progressReport.print("Checking top hits for %6d of %6d seqs", iNode + 1, seqs.size());
+            progressReport.print("Checking top hits for %6ld of %6ld seqs", iNode + 1, (int64_t) seqs.size());
         }
         TopHitsList &lNode = tophits.topHitsLists[iNode];
         for (int64_t iHit = 0; iHit < nCheck && iHit < (int64_t) lNode.hits.size(); iHit++) {
@@ -3558,7 +3570,7 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         (3 * nCandidate < (int64_t) tophits.topvisible.size() && 3 * nCandidate < nActive)) {
         /* recompute top visible */
         if (options.verbose > 2) {
-            log << strformat("Resetting the top-visible list at nActive=%d", nActive) << std::endl;
+            log << strformat("Resetting the top-visible list at nActive=%ld", nActive) << std::endl;
         }
 
         /* If age is low, then our visible set is becoming too sparse, because we have
@@ -3569,7 +3581,7 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         */
         if (tophits.topvisibleAge <= 2) {
             if (options.verbose > 2) {
-                log << strformat("Expanding visible set by walking up to active nodes at nActive=%d", nActive)
+                log << strformat("Expanding visible set by walking up to active nodes at nActive=%ld", nActive)
                     << std::endl;
             }
             for (int64_t iNode = 0; iNode < maxnode; iNode++) {
@@ -3604,7 +3616,7 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         return;
     }
     if (options.verbose > 2) {
-        log << strformat("Top-visible list size %d (nActive %d m %d)", nCandidate, nActive, tophits.m) << std::endl;
+        log << strformat("Top-visible list size %ld (nActive %ld m %ld)", nCandidate, nActive, tophits.m) << std::endl;
     }
     assert(iNodeBestCandidate >= 0 && parent[iNodeBestCandidate] < 0);
     assert(getVisible(nActive, tophits, iNodeBestCandidate, join));
@@ -3625,7 +3637,7 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         if (bestI.j != join.j && bestI.criterion < join.criterion) {
             changed = 1;
             if (options.verbose > 2) {
-                log << strformat("BetterI\t%d\t%d\t%d\t%d\t%f\t%f",
+                log << strformat("BetterI\t%ld\t%ld\t%ld\t%ld\t%f\t%f",
                                  join.i, join.j, bestI.i, bestI.j,
                                  join.criterion, bestI.criterion) << std::endl;
             }
@@ -3638,7 +3650,7 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         if (bestJ.j != join.i && bestJ.criterion < join.criterion) {
             changed = 1;
             if (options.verbose > 2)
-                log << strformat("BetterJ\t%d\t%d\t%d\t%d\t%f\t%f\n",
+                log << strformat("BetterJ\t%ld\t%ld\t%ld\t%ld\t%f\t%f\n",
                                  join.i, join.j, bestJ.i, bestJ.j,
                                  join.criterion, bestJ.criterion) << std::endl;
             join = bestJ;
@@ -3743,7 +3755,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
                           && nUnique >= (bSecondLevel ? (int64_t) (0.5 + options.tophits2Refresh * tophits.q)
                                                       : (int64_t) (0.5 + tophits.m * options.tophitsRefresh)));
     if (bUseUnique && options.verbose > 2) {
-        log << strformat("Top hits for %d from combined %d nActive=%d tophitsage %d %s",
+        log << strformat("Top hits for %ld from combined %ld nActive=%ld tophitsage %ld %s",
                          newnode, nUnique, nActive, lNew.age, bSecondLevel ? "2ndlevel" : "1stlevel") << std::endl;
     }
 
@@ -3788,7 +3800,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
             bSecondLevel = false;
 
             if (bUseUnique && options.verbose > 2) {
-                log << strformat("Top hits for %d from children and source %d's %d hits, nUnique %d",
+                log << strformat("Top hits for %ld from children and source %ld's %zd hits, nUnique %ld",
                                  newnode, source, lSource.hits.size(), nUnique);
             }
         }
@@ -3802,7 +3814,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
         int64_t nSave = std::min(nUnique, bSecondLevel ? tophits.q : tophits.m);
         assert(nSave > 0);
         if (options.verbose > 2 && options.threads == 1) {
-            log << strformat("Combined %d ops so far %ld\n", nUnique, options.debug.profileOps - startProfileOps)
+            log << strformat("Combined %ld ops so far %ld\n", nUnique, options.debug.profileOps - startProfileOps)
                 << std::endl;
         }
         sortSaveBestHits(newnode, uniqueList, nUnique, nSave, tophits);
@@ -3814,7 +3826,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
     } else {
         /* need to refresh: set top hits for node and for its top hits */
         if (options.verbose > 2) {
-            log << strformat("Top hits for %d by refresh (%d unique age %d) nActive=%d",
+            log << strformat("Top hits for %ld by refresh (%ld unique age %ld) nActive=%ld",
                              newnode, nUnique, lNew.age, nActive) << std::endl;
         }
         options.debug.nRefreshTopHits++;
@@ -3823,7 +3835,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
         /* ensure all out-distances are up to date ahead of time
            to avoid any data overwriting issues.
         */
-        #pragma omp parallel for schedule(static)
+        #pragma omp parallel for schedule(dynamic)
         for (int64_t iNode = 0; iNode < maxnode; iNode++) {
             if (parent[iNode] < 0) {
                 if (options.fastest) {
@@ -3898,7 +3910,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
                              options.debug.profileOps - startProfileOps,
                              options.debug.outprofileOps - startOutProfileOps);
         }
-        log << strformat(": source %d age %d members ",
+        log << strformat(": source %ld age %ld members ",
                          lNew.hitSource, lNew.age);
         for (int64_t i = 0; i < (int64_t) lNew.hits.size(); i++) {
             log << " " << lNew.hits[i].j;
@@ -3911,7 +3923,6 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
                                             TopHits &tophits) {
     assert(nIn > 0);
     assert(nOut > 0);
-    TopHitsList &l = tophits.topHitsLists[iNode];
 
     psort(besthits.begin(), besthits.end(), options.threads, CompareHitsByCriterion());
 
@@ -3933,7 +3944,8 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
     }
 
     assert(nSave > 0);
-    std::lock_guard<std::mutex> lock(tophits.locks[iNode]); //TODO check how to remove the lock
+    std::lock_guard<std::mutex> lock(tophits.locks[iNode]);
+    TopHitsList &l = tophits.topHitsLists[iNode];
     l.hits.resize(nSave);
 
     int64_t iSave = 0;
@@ -4024,7 +4036,7 @@ AbsNeighbourJoining(void)::updateVisible(int64_t nActive, std::vector<Besthit> &
             v.dist = hit.dist;
             updateTopVisible(nActive, hit.j, v, tophits);
             if (options.verbose > 5) {
-                log << strformat("NewVisible %d %d %f", hit.j, v.j, v.dist) << std::endl;
+                log << strformat("NewVisible %ld %ld %f", hit.j, v.j, v.dist) << std::endl;
             }
         }
     } /* end loop over hits */
@@ -4076,7 +4088,7 @@ AbsNeighbourJoining(void)::updateTopVisible(int64_t nActive, int64_t iIn, Hit &h
         if (visible.criterion < dCriterionWorst) {
             if (options.verbose > 2) {
                 int64_t iOld = tophits.topvisible[iPosWorst];
-                log << strformat("TopVisible replace %d=>%d with %d=>%d",
+                log << strformat("TopVisible replace %ld=>%ld with %ld=>%ld",
                                  iOld, tophits.visible[iOld].j, visible.i, visible.j) << std::endl;
             }
             tophits.topvisible[iPosWorst] = iIn;
@@ -4091,7 +4103,7 @@ AbsNeighbourJoining(void)::updateTopVisible(int64_t nActive, int64_t iIn, Hit &h
                 Besthit bh;
                 hitToBestHit(iNode, tophits.visible[iNode], bh);
                 setDistCriterion(nActive, bh);
-                log << strformat(" %d=>%d:%.4f", bh.i, bh.j, bh.criterion);
+                log << strformat(" %ld=>%ld:%.4f", bh.i, bh.j, bh.criterion);
             }
         }
         log << std::endl;
@@ -4125,7 +4137,7 @@ AbsNeighbourJoining(void)::resetTopVisible(int64_t nActive, TopHits &tophits) {
         inTopVisible[i] = -1;
 
     if (options.verbose > 2) {
-        log << strformat("top-hit search: nActive %d nVisible %d considering up to %d items",
+        log << strformat("top-hit search: nActive %ld nVisible %ld considering up to %ld items",
                          nActive, nVisible, tophits.m) << std::endl;
     }
 
@@ -4150,7 +4162,7 @@ AbsNeighbourJoining(void)::resetTopVisible(int64_t nActive, TopHits &tophits) {
             if (iNode < 0) {
                 break;
             }
-            log << strformat(" %d=>%d", iNode, tophits.visible[iNode].j);
+            log << strformat(" %ld=>%ld", iNode, tophits.visible[iNode].j);
         }
         log << std::endl;;
     }
@@ -4190,9 +4202,9 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
     for (int64_t iHit = 0; iHit < (int64_t) out.size(); iHit++) {
         Besthit &hit = out[iHit];
         if (hit.dist < 0.0) {
-            setDistCriterion(nActive, /*IN/OUT*/hit);
+            setDistCriterion(nActive, hit);
         } else {
-            setCriterion(nActive, /*IN/OUT*/hit);
+            setCriterion(nActive, hit);
         }
     }
 }
@@ -4225,7 +4237,7 @@ AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::
                 double old_penalty = ppart[ABvsCD];
                 double new_penalty = ppart[choice];
                 if (new_penalty > old_penalty + 1e-6) {
-                    log << strformat(" %d (%d/%d %d/%d %d/%d %d/%d)", iC,
+                    log << strformat(" %ld (%ld/%ld %ld/%ld %ld/%ld %ld/%ld)", iC,
                                      profiles4[0]->nOn[iC], profiles4[0]->nOff[iC],
                                      profiles4[1]->nOn[iC], profiles4[1]->nOff[iC],
                                      profiles4[2]->nOn[iC], profiles4[2]->nOff[iC],
@@ -4332,7 +4344,7 @@ MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool b
     } /* end loop over rounds */
 
     if (options.verbose > 2) {
-        log << strformat("Optimized quartet for %d rounds: ABvsCD %.5f ACvsBD %.5f ADvsBC %.5f",
+        log << strformat("Optimized quartet for %ld rounds: ABvsCD %.5f ACvsBD %.5f ADvsBC %.5f",
                          iRound, criteria[ABvsCD], criteria[ACvsBD], criteria[ADvsBC]) << std::endl;
     }
     if (criteria[ACvsBD] > criteria[ABvsCD] && criteria[ACvsBD] > criteria[ADvsBC]) {
@@ -4377,7 +4389,7 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
         int64_t nChild = child[node].nChild;
         if (nChild > 0) {
             if ((iDone % 100) == 0)
-                progressReport.print("ML Lengths %d of %d splits", iDone + 1, maxnode - seqs.size());
+                progressReport.print("ML Lengths %ld of %ld splits", iDone + 1, (int64_t) (maxnode - seqs.size()));
             iDone++;
 
             /* optimize the branch lengths between self, parent, and children,
@@ -4406,7 +4418,7 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
                     MLPairOptimize(pA, pB, /*IN/OUT*/&len);
                     branchlength[nodes[i]] = len;
                     if (options.verbose > 3) {
-                        log << strformat("Optimize length for %d to %.3f", nodes[i], branchlength[nodes[i]])
+                        log << strformat("Optimize length for %ld to %.3f", nodes[i], branchlength[nodes[i]])
                             << std::endl;
                     }
                 }
@@ -4457,7 +4469,7 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
             }
         }
         if (options.verbose > 2) {
-            log << strformat("At %d: LogLk(%d:%.4f,%d:%.4f) = %.3f",
+            log << strformat("At %ld: LogLk(%ld:%.4f,%ld:%.4f) = %.3f",
                              node,
                              children[0], branchlength[children[0]],
                              children[1], branchlength[children[1]],
@@ -4472,7 +4484,7 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
             double loglkup = pairLogLk(AB, profiles[children[2]], branchlength[children[2]], site_likelihood.data());
             loglk += loglkup;
             if (options.verbose > 2) {
-                log << strformat("At root %d: LogLk((%d/%d),%d:%.3f) = %.3f",
+                log << strformat("At root %ld: LogLk((%ld/%ld),%ld:%.3f) = %.3f",
                                  node, children[0], children[1], children[2],
                                  branchlength[children[2]], loglkup) << std::endl;
             }
@@ -4573,7 +4585,7 @@ AbsNeighbourJoining(double)::rescaleGammaLogLk(std::vector<double> &site_loglk) 
         log << strformat("Optimizing alpha, starting at loglk %.3f", -fx) << std::endl;
     }
     for (i = 0; i < 10; i++) {
-        progressReport.print("Optimizing alpha round %d", i + 1);
+        progressReport.print("Optimizing alpha round %ld", i + 1);
         double start = fx;
         s.alpha = onedimenmin(
                 0.01, s.alpha, 10.0,
@@ -4619,7 +4631,7 @@ AbsNeighbourJoining(double)::rescaleGammaLogLk(std::vector<double> &site_loglk) 
         log << std::endl;
 
         for (int64_t iPos = 0; iPos < nPos; iPos++) {
-            log << strformat("Gamma%d\t%d\t%.3f", options.nRateCats, iPos, gamma_loglk_sites[iPos]);
+            log << strformat("Gamma%d\t%ld\t%.3f", options.nRateCats, iPos, gamma_loglk_sites[iPos]);
             for (int64_t iRate = 0; iRate < options.nRateCats; iRate++) {
                 log << strformat("\t%.3f", site_loglk[nPos * iRate + iPos]);
             }
@@ -4663,7 +4675,7 @@ AbsNeighbourJoining(void)::MLSiteLikelihoodsByRate(std::vector<numeric_t, typena
         }
         recomputeMLProfiles();
         double loglk = treeLogLk(&site_loglk[nPos * iRate]);
-        progressReport.print("Site likelihoods with rate category %d of %d", iRate + 1, options.nRateCats);
+        progressReport.print("Site likelihoods with rate category %ld of %d", iRate + 1, options.nRateCats);
         if (options.verbose > 2) {
             log << strformat("Rate %.3f Loglk %.3f SiteLogLk", _rates[iRate], loglk);
             for (int64_t iPos = 0; iPos < nPos; iPos++) {
@@ -4729,7 +4741,7 @@ AbsNeighbourJoining(void)::setMLRates() {
             }
         }
         if (options.verbose > 2) {
-            log << strformat("Selected rate category %d rate %.3f for position %d",
+            log << strformat("Selected rate category %ld rate %.3f for position %ld",
                              iBest, _rates[iBest], iPos + 1) << std::endl;
         }
         rates.ratecat[iPos] = iBest;
@@ -4760,9 +4772,9 @@ AbsNeighbourJoining(void)::setMLRates() {
 
 AbsNeighbourJoining(void)::readTreeError(const std::string &err, const std::string &token) {
     throw std::invalid_argument(strformat("Tree parse error: unexpected token '%s' -- %s",
-                                          token.empty() ? "(End of file)" : token,
-                                          err
-    ));
+                                          token.empty() ? "(End of file)" : token.c_str(),
+                                          err.c_str()
+                                ));
 }
 
 AbsNeighbourJoining(void)::logMLRates() {
@@ -4835,7 +4847,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
         return 0;            /* nothing to do */
     }
     if (options.verbose > 2) {
-        log << strformat("Beginning round %d of NNIs with ml? %d", iRound, useML ? 1 : 0) << std::endl;
+        log << strformat("Beginning round %ld of NNIs with ml? %d", iRound, useML ? 1 : 0) << std::endl;
         printNJInternal(log, /*useLen*/useML && iRound > 0 ? true : false);
     }
     /* For each node the upProfile or NULL */
@@ -4862,7 +4874,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
                     traversal[node] = true;
                     if (options.verbose > 2) {
                         log << strformat(
-                                "Skipping subtree at %d: child %d %d parent %d age %d subtreeAge %d support %.3f",
+                                "Skipping subtree at %ld: child %ld %ld parent %ld age %ld subtreeAge %ld support %.3f",
                                 node, nodeABCD[0], nodeABCD[1], parent[node],
                                 stats[node].age, stats[node].subtreeAge, stats[node].support) << std::endl;
                     }
@@ -4893,14 +4905,15 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
         if ((iDone % 100) == 0) {
             std::string buf;
             buf.reserve(100);
-            buf += strformat("%s NNI round %%d of %%d, %%d of %%d splits", useML ? "ML" : "ME");
+            buf += useML ? "ML" : "ME";
+            buf += " NNI round %%ld of %%ld, %%ld of %%ld splits";
             if (iDone > 0) {
-                buf += strformat(", %d changes", nNNIThisRound);
+                buf += strformat(", %ld changes", nNNIThisRound);
             }
             if (nNNIThisRound > 0) {
                 buf += strformat(" (max delta %.3f)", dMaxDelta);
             }
-            progressReport.print(buf, iRound + 1, nRounds, iDone + 1, maxnode - seqs.size());
+            progressReport.print(buf, iRound + 1, nRounds, iDone + 1, (int64_t) (maxnode - seqs.size()));
         }
         iDone++;
 
@@ -4919,7 +4932,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
         auto choice = ABvsCD;
 
         if (options.verbose > 2) {
-            log << strformat("Considering NNI around %d: Swap A=%d B=%d C=%d D=up(%d) or parent %d",
+            log << strformat("Considering NNI around %ld: Swap A=%ld B=%ld C=%ld D=up(%ld) or parent %ld",
                              node, nodeA, nodeB, nodeC, nodeD, parent[node]) << std::endl;
         }
         if (options.verbose > 3 && useML) {
@@ -4995,7 +5008,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
         }
 
         if (options.verbose > 2 && (choice != ABvsCD || options.verbose > 2)) {
-            log << strformat("NNI around %d: Swap A=%d B=%d C=%d D=out(C) -- choose %s %s %.4f",
+            log << strformat("NNI around %ld: Swap A=%ld B=%ld C=%ld D=out(C) -- choose %s %s %.4f",
                              node, nodeA, nodeB, nodeC,
                              choice == ACvsBD ? "AC|BD" : (choice == ABvsCD ? "AB|CD" : "AD|BC"),
                              useML ? "delta-loglk" : "-deltaLen",
@@ -5117,7 +5130,7 @@ AbsNeighbourJoining(void)::SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRo
     for (int64_t i = 0; i < nodeListLen; i++) {
         node = nodeList[i];
         if ((i % 100) == 0) {
-            progressReport.print("SPR round %3d of %3d, %d of %d nodes",
+            progressReport.print("SPR round %3ld of %3ld, %ld of %ld nodes",
                                  iRound + 1, nRounds, i + 1, nodeListLen);
         }
         if (node == root) {
@@ -5149,11 +5162,12 @@ AbsNeighbourJoining(void)::SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRo
                 }
 
                 if (options.verbose > 3) {
-                    log << strformat("SPR %s %d around %d chainLength %d of %d deltaLength %.5f swaps:",
+                    log << strformat("SPR %s %ld around %ld chainLength %ld of %ld deltaLength %.5f swaps:",
                                      iCBest >= 0 ? "move" : "abandoned",
                                      node, nodeAround[iAround], iCBest + 1, chainLength, dMinDelta);
                     for (int64_t iC = 0; iC < chainLength; iC++) {
-                        log << strformat(" (%d,%d)%.4f", steps[iC].nodes[0], steps[iC].nodes[1], steps[iC].deltaLength);
+                        log << strformat(" (%ld,%ld)%.4f", steps[iC].nodes[0], steps[iC].nodes[1],
+                                         steps[iC].deltaLength);
                     }
                     log << std::endl;
                 }
@@ -5175,7 +5189,7 @@ AbsNeighbourJoining(void)::SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRo
                         break;        /* no rewinding necessary */
                     }
                     if (options.verbose > 2) {
-                        log << strformat("Rewinding SPR to %d", iCBest) << std::endl;
+                        log << strformat("Rewinding SPR to %ld", iCBest) << std::endl;
                     }
                     unwindSPRStep(steps[iCBest], upProfiles.data());
                     dMinDelta -= steps[iCBest].deltaLength;
@@ -5263,7 +5277,7 @@ AbsNeighbourJoining(void)::setMLGtr(double freq_in[]) {
 
     for (int64_t i = 0; i < nRounds; i++) {
         for (gtr.iRate = 0; gtr.iRate < 6; gtr.iRate++) {
-            progressReport.print("Optimizing GTR model, step %d of %d", i * 6 + gtr.iRate + 1, 12);
+            progressReport.print("Optimizing GTR model, step %ld of %d", i * 6 + gtr.iRate + 1, 12);
             double negloglk, f2x;
             gtr.rates[gtr.iRate] = onedimenmin(/*xmin*/0.05,
                     /*xguess*/gtr.rates[gtr.iRate],
@@ -5408,7 +5422,7 @@ AbsNeighbourJoining(void)::testSplitsMinEvo(SplitCount &splitcount) {
         setupABCD(node, /*OUT*/profiles4, /*IN/OUT*/upProfiles.data(), /*OUT*/nodeABCD, /*useML*/false);
 
         if (options.verbose > 2) {
-            log << strformat("Testing Split around %d: A=%d B=%d C=%d D=up(%d) or node parent %d",
+            log << strformat("Testing Split around %ld: A=%ld B=%ld C=%ld D=up(%ld) or node parent %ld",
                              node, nodeABCD[0], nodeABCD[1], nodeABCD[2], nodeABCD[3], parent[node]) << std::endl;
         }
 
@@ -5432,7 +5446,8 @@ AbsNeighbourJoining(void)::testSplitsMinEvo(SplitCount &splitcount) {
                     double penalty[3] = {0.0, 0.0, 0.0};
                     quartetConstraintPenaltiesPiece(profiles4, iC, /*OUT*/penalty);
                     log << strformat(
-                            "Violate constraint %d at %d (children %d %d) penalties %.3f %.3f %.3f %d/%d %d/%d %d/%d %d/%d",
+                            "Violate constraint %ld at %ld (children %ld %ld) penalties"
+                            " %.3f %.3f %.3f %ld/%ld %ld/%ld %ld/%ld %ld/%ld",
                             iC, node, child[node].child[0], child[node].child[1],
                             penalty[ABvsCD], penalty[ACvsBD], penalty[ADvsBC],
                             profiles4[0]->nOn[iC], profiles4[0]->nOff[iC],
@@ -5475,9 +5490,10 @@ AbsNeighbourJoining(void)::testSplitsMinEvo(SplitCount &splitcount) {
                 dist_advantage = sADvsBC - sABvsCD;
                 constraint_penalty = p[ABvsCD] - p[ADvsBC];
             }
-            log << strformat("Violate constraints %d distance_advantage %.3f constraint_penalty %.3f (children %d %d):",
-                             node, dist_advantage, constraint_penalty,
-                             child[node].child[0], child[node].child[1]);
+            log << strformat(
+                    "Violate constraints %ld distance_advantage %.3f constraint_penalty %.3f (children %ld %ld):",
+                    node, dist_advantage, constraint_penalty,
+                    child[node].child[0], child[node].child[1]);
             /* list the constraints with a penalty, meaning that ABCD all have non-zero
                values and that AB|CD worse than others */
             for (int64_t iC = 0; iC < (int64_t) constraintSeqs.size(); iC++) {
@@ -5485,7 +5501,7 @@ AbsNeighbourJoining(void)::testSplitsMinEvo(SplitCount &splitcount) {
                 if (quartetConstraintPenaltiesPiece(profiles4, iC, /*OUT*/ppart)) {
                     if (ppart[qAB] + ppart[qCD] > ppart[qAD] + ppart[qBC] + tolerance
                         || ppart[qAB] + ppart[qCD] > ppart[qAC] + ppart[qBD] + tolerance) {
-                        log << strformat(" %d (%d/%d %d/%d %d/%d %d/%d)", iC,
+                        log << strformat(" %ld (%ld/%ld %ld/%ld %ld/%ld %ld/%ld)", iC,
                                          profiles4[0]->nOn[iC], profiles4[0]->nOff[iC],
                                          profiles4[1]->nOn[iC], profiles4[1]->nOff[iC],
                                          profiles4[2]->nOn[iC], profiles4[2]->nOff[iC],
@@ -5529,7 +5545,8 @@ AbsNeighbourJoining(void)::testSplitsML(SplitCount &splitcount) {
         }
 
         if (iNodesDone > 0 && (iNodesDone % 100) == 0) {
-            progressReport.print("ML split tests for %6d of %6d internal splits", iNodesDone, seqs.size() - 3);
+            progressReport.print("ML split tests for %6ld of %6ld internal splits", iNodesDone,
+                                 (int64_t) (seqs.size() - 3));
         }
         iNodesDone++;
 

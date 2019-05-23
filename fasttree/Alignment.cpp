@@ -110,7 +110,7 @@ void Alignment::readAlignment() {
                     if (buf[j] != ' ') {
                         if ((int64_t)seqs[iSeq].size() >= nPos) {
                             throw std::invalid_argument(strformat(
-                                    "Too many characters (expected %d) for sequence named %s\\nSo far have:\\n%s",
+                                    "Too many characters (expected %ld) for sequence named %s\nSo far have:\n%s",
                                     nPos, names[iSeq].c_str(), seqs[iSeq].c_str()));
                         }
                         if (seqs[iSeq].empty()) {
@@ -120,7 +120,7 @@ void Alignment::readAlignment() {
                     }
                 }
                 if (options.verbose > 10) {
-                    log << strformat("Read iSeq %d name %s seqsofar %s",
+                    log << strformat("Read iSeq %ld name %s seqsofar %s",
                                      iSeq, names[iSeq].c_str(), seqs[iSeq].c_str()) << std::endl;
                 }
                 iSeq++;
@@ -130,14 +130,14 @@ void Alignment::readAlignment() {
             }/* end else non-empty phylip line */
         }
         if (iSeq != nSeq && iSeq != 0) {
-            throw std::invalid_argument(strformat("Wrong number of sequences: expected %d", nSeq));
+            throw std::invalid_argument(strformat("Wrong number of sequences: expected %ld", nSeq));
         }
     }
     /* Check lengths of sequences */
     for (int64_t i = 0; i < (int64_t)seqs.size(); i++) {
         if ((int64_t)seqs[i].size() != nPos) {
             throw std::invalid_argument(strformat(
-                    "Wrong number of characters for %s: expected %d but have %d instead.\n"
+                    "Wrong number of characters for %s: expected %ld but have %ld instead.\n"
                     "This sequence may be truncated, or another sequence may be too long.",
                     names[i].c_str(), nPos, seqs[i].size()));
         }
