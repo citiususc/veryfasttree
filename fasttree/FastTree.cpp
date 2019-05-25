@@ -38,11 +38,11 @@ void FastTree::settings(std::ostream &log) {
         options.MLMinRelBranchLength = Constants::MLMinRelBranchLengthDouble;
         options.fPostTotalTolerance = Constants::fPostTotalToleranceDouble;
     } else {
-        options.MLMinBranchLengthTolerance = Constants::MLMinBranchLengthTolerance;
-        options.MLFTolBranchLength = Constants::MLFTolBranchLength;
-        options.MLMinBranchLength = Constants::MLMinBranchLength;
-        options.MLMinRelBranchLength = Constants::MLMinRelBranchLength;
-        options.fPostTotalTolerance = Constants::fPostTotalTolerance;
+        options.MLMinBranchLengthTolerance = Constants::MLMinBranchLengthToleranceFloat;
+        options.MLFTolBranchLength = Constants::MLFTolBranchLengthFloat;
+        options.MLMinBranchLength = Constants::MLMinBranchLengthFloat;
+        options.MLMinRelBranchLength = Constants::MLMinRelBranchLengthFloat;
+        options.fPostTotalTolerance = Constants::fPostTotalToleranceFloat;
     }
 
     if (!options.makeMatrix) {        /* Report settings */

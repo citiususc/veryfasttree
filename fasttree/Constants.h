@@ -23,20 +23,20 @@ namespace fasttree {
         */
 
         /* absolute tolerance for optimizing branch lengths */
-        const double MLMinBranchLengthTolerance = 1.0e-9;
-        const double MLMinBranchLengthToleranceDouble = 1.0e-4;
+        const double MLMinBranchLengthToleranceDouble = 1.0e-9;
+        const double MLMinBranchLengthToleranceFloat = 1.0e-4;
         /* fractional tolerance for optimizing branch lengths */
-        const double MLFTolBranchLength = 0.001;
         const double MLFTolBranchLengthDouble = 0.001;
+        const double MLFTolBranchLengthFloat = 0.001;
         /* minimum value for branch length */
-        const double MLMinBranchLength = 5.0e-9;
-        const double MLMinBranchLengthDouble = 5.0e-4;
+        const double MLMinBranchLengthDouble = 5.0e-9;
+        const double MLMinBranchLengthFloat = 5.0e-4;
         /* minimum of rate * length */
-        const double MLMinRelBranchLength = 2.5e-9;
-        const double MLMinRelBranchLengthDouble = 2.5e-4;
+        const double MLMinRelBranchLengthDouble = 2.5e-9;
+        const double MLMinRelBranchLengthFloat = 2.5e-4;
         /* posterior vector must sum to at least this before rescaling */
-        const double fPostTotalTolerance = 1.0e-20;
-        const double fPostTotalToleranceDouble = 1.0e-10;
+        const double fPostTotalToleranceDouble = 1.0e-20;
+        const double fPostTotalToleranceFloat = 1.0e-10;
 
         const double closeLogLkLimit = 5.0;    /* If partial optimization of an NNI looks like it would decrease the log likelihood
 				   by this much or more then do not optimize it further */

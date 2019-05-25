@@ -3131,7 +3131,7 @@ AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision, op_t::AL
     while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
         if (child[node].nChild == 2) {
             int64_t *children = child[node].child;
-            averageProfile(profiles[node], profiles[children[0]], profiles[children[1]],  /*unweighted*/-1.0);
+            averageProfile(profiles[node], profiles[children[0]], profiles[children[1]],  /*unweighted*/-1.0, dmat);
         }
     }
 }

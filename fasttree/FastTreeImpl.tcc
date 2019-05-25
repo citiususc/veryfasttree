@@ -483,7 +483,7 @@ AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraint
 }
 
 AbsFastTreeImpl(void)::transMatToDistanceMat(DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
-    if (transmat) {
+    if (!transmat) {
         return;
     }
 

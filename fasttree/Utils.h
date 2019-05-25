@@ -131,11 +131,14 @@ namespace fasttree {
 
     template<typename _CharT, typename _Traits, typename _Alloc>
     inline bool readline(std::basic_istream<_CharT, _Traits> &__is, std::basic_string<_CharT, _Traits, _Alloc> &__str) {
-        std::getline(__is, __str);
-        if (__str.back() == '\r') {
-            __str.resize(__str.size() - 1);
+        if(!__is.eof()) {
+            std::getline(__is, __str);
+            if (__str.back() == '\r') {
+                __str.resize(__str.size() - 1);
+            }
+            return true;
         }
-        return !__is.eof();
+        return false;
     }
 
     class ProgressReport {
@@ -159,10 +162,9 @@ namespace fasttree {
             }
 
             auto timeNow = Clock::now();
+            int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count();
 
-            if (std::chrono::duration_cast<std::chrono::seconds>(timeNow - timeLast).count() > 1 ||
-                options.verbose > 1) {
-                int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count();
+            if (mili > 100 || options.verbose > 1) {
                 std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
                 std::cerr << strformat(format, args...);
                 if (options.verbose > 1 || !isattyErr()) {
