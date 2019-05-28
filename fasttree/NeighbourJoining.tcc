@@ -3522,7 +3522,8 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
                     lReplace++;
                     /* and perhaps update visible */
                     Besthit v;
-                    assert(getVisible(seqs.size(), tophits, bh.j, v));
+                    bool bSuccess = getVisible(seqs.size(), tophits, bh.j, v);
+                    assert(bSuccess);
                     if (bh.criterion < v.criterion) {
                         tophits.visible[bh.j] = lTarget.hits[iWorst];
                     }
