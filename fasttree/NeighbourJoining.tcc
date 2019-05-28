@@ -3623,7 +3623,9 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         log << strformat("Top-visible list size %ld (nActive %ld m %ld)", nCandidate, nActive, tophits.m) << std::endl;
     }
     assert(iNodeBestCandidate >= 0 && parent[iNodeBestCandidate] < 0);
-    assert(getVisible(nActive, tophits, iNodeBestCandidate, join));
+    bool bSuccess = getVisible(nActive, tophits, iNodeBestCandidate, join);
+    (void) bSuccess;
+    assert(bSuccess);
     assert(join.i >= 0 && parent[join.i] < 0);
     assert(join.j >= 0 && parent[join.j] < 0);
 
