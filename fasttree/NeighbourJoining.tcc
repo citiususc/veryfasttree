@@ -1071,16 +1071,18 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
             }
             numeric_t *fA = getFreq(p1, i, iFreqA);
             numeric_t *fB = getFreq(p2, i, iFreqB);
-            if (fA == nullptr)
+            if (fA == nullptr) {
                 fA = &transmat.codeFreq[(int) p1.codes[i]][0];
+            }
             if (wA > 0.0 && wA < 1.0) {
                 for (int j = 0; j < 20; j++) {
                     fAmix[j] = wA * fA[j] + (1.0 - wA) * fGap[j];
                 }
                 fA = fAmix;
             }
-            if (fB == nullptr)
+            if (fB == nullptr) {
                 fB = &transmat.codeFreq[(int) p2.codes[i]][0];
+            }
             if (wB > 0.0 && wB < 1.0) {
                 for (int j = 0; j < 20; j++) {
                     fBmix[j] = wB * fB[j] + (1.0 - wB) * fGap[j];
@@ -4284,9 +4286,19 @@ MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool b
                 len[LEN_I] = lenABvsCD[LEN_I];
                 return ABvsCD;
             }
-            continue;
-        }
-        {
+
+            if (bConsiderAC) {
+                criteria[ACvsBD] = MLQuartetOptimize(*profiles4[0], *profiles4[2], *profiles4[1], *profiles4[3],
+                                                     lenACvsBD, nullptr, /*site_likelihoods*/nullptr)
+                                   - penalty[ACvsBD];
+            }
+
+            if (bConsiderAD) {
+                criteria[ADvsBC] = MLQuartetOptimize(*profiles4[0], *profiles4[3], *profiles4[2], *profiles4[1],
+                                                     lenADvsBC, nullptr, /*site_likelihoods*/nullptr)
+                                   - penalty[ADvsBC];
+            }
+        } else {
             #pragma omp parallel
             #pragma omp sections
             {
@@ -4774,7 +4786,7 @@ AbsNeighbourJoining(void)::readTreeError(const std::string &err, const std::stri
     throw std::invalid_argument(strformat("Tree parse error: unexpected token '%s' -- %s",
                                           token.empty() ? "(End of file)" : token.c_str(),
                                           err.c_str()
-                                ));
+    ));
 }
 
 AbsNeighbourJoining(void)::logMLRates() {
@@ -5041,9 +5053,11 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
 
         /* support is improvement of score for self over better of alternatives */
         stats[node].support = 1e20;
-        for (int i = 0; i < 3; i++)
-            if (choice != i && criteria[choice] - criteria[i] < stats[node].support)
+        for (int i = 0; i < 3; i++) {
+            if (choice != i && criteria[choice] - criteria[i] < stats[node].support) {
                 stats[node].support = criteria[choice] - criteria[i];
+            }
+        }
 
         /* subtreeAge is the number of rounds since self or descendent had a significant improvement */
         if (stats[node].delta > supportThreshold) {

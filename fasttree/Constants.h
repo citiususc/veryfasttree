@@ -64,6 +64,9 @@ namespace fasttree {
                 #if __AVX512F__
                 ", AVX512"
                 #endif
+                #ifndef NDEBUG
+                ", DEBUG"
+                #endif
                 ")";
     };
 

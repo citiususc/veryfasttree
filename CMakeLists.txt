@@ -9,7 +9,7 @@ option(USE_AVX "enable/disable AVX" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
 
 
-#add_definitions(-DNDEBUG)
+add_definitions(-DNDEBUG)
 
 ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")
@@ -56,11 +56,14 @@ if(MSVC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE2 /D__SSE2__=1")
     endif()
 else()
-    set(CMAKE_CXX_FLAGS "-Wall -fopenmp")#-O3
+    set(CMAKE_CXX_FLAGS "-Wall -fopenmp -O3")
     if(USE_AVX)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx")
     elseif(USE_AVX512)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f -mavx512cd")
+    endif()
+    if(USE_NATIVE)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
     endif()
 endif()
 

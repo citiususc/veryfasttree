@@ -89,9 +89,6 @@ namespace fasttree {
         }
         #ifndef NDEBUG
         static thread_local const Compare *_pcomp = nullptr;
-        if (_pcomp == nullptr) {
-            std::cerr << "WARNING!!: using qsort" << std::endl;
-        }
         _pcomp = &comp;
         auto cmp = [](const void *a, const void *b) {
             if ((*_pcomp)(*(typename Iter::pointer) a, *(typename Iter::pointer) b)) {

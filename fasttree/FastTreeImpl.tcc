@@ -505,7 +505,7 @@ AbsFastTreeImpl(void)::transMatToDistanceMat(DistanceMatrix <Precision, op_t::AL
         for (int64_t j = 0; j < options.nCodes; j++)
             dmat.eigentot[i] += transmat.eigeninv[i][j];
     }
-
+    dmat.setted = true;
 }
 
 
