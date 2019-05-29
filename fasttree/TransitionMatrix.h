@@ -66,8 +66,9 @@ namespace fasttree {
         alignas(Aligment) numeric_t statinv[MAXCODES];    /* 1/stat */
         /* the eigenmatrix, with the eigenvectors as columns and rotations of individual
            characters as rows. Also includes a NOCODE entry for gaps */
-        alignas(Aligment) numeric_t codeFreq[NOCODE + 1][MAXCODES];
-        alignas(Aligment) numeric_t eigeninv[MAXCODES][MAXCODES]; /* Inverse of eigenmatrix */
+        alignas(Aligment) numeric_t codeFreq[NOCODE + 1][alignsz(MAXCODES, Aligment / sizeof(numeric_t))];
+        /* Inverse of eigenmatrix */
+        alignas(Aligment) numeric_t eigeninv[MAXCODES][alignsz(MAXCODES, Aligment / sizeof(numeric_t))];
         alignas(Aligment) numeric_t eigeninvT[MAXCODES][MAXCODES]; /* transpose of eigeninv */
         alignas(Aligment) numeric_t eigenval[MAXCODES];    /* Eigenvalues  */
         /* These are for approximate posteriors (off by default) */

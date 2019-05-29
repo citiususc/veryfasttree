@@ -29,7 +29,7 @@ namespace fasttree {
 
         /* codeFreq is the transpose of the eigeninv matrix is
            the rotated frequency vector for each code */
-        alignas(Aligment) numeric_t codeFreq[MAXCODES][MAXCODES];
+        alignas(Aligment) numeric_t codeFreq[MAXCODES][alignsz(MAXCODES, Aligment/ sizeof(numeric_t))];
         alignas(Aligment) numeric_t gapFreq[MAXCODES];
 
         bool setted;

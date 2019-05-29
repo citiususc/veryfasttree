@@ -127,6 +127,7 @@ namespace fasttree {
             std::string codes;
             /* empty if no non-constant positions, e.g. for leaves */
             std::vector<numeric_t, typename op_t::Allocator> vectors;
+            int64_t nVectors;
             /* Optional -- distance to each code at each position */
             std::vector<numeric_t, typename op_t::Allocator> codeDist;
 
@@ -139,6 +140,8 @@ namespace fasttree {
             Profile(int64_t nPos, int64_t nConstraints);
 
             Profile();
+
+            void reset();
         };
 
         struct Rates {
@@ -244,6 +247,7 @@ namespace fasttree {
         ProgressReport &progressReport;
         /* The input */
         int64_t nPos;
+        int64_t nCodeSize;
         std::vector<std::string> &seqs;    /* the aligment sequences array (not reallocated) */
         DistanceMatrix<Precision, op_t::ALIGNMENT> &distanceMatrix; /* a ref, not set if using %identity distance */
         TransitionMatrix<Precision, op_t::ALIGNMENT> &transmat; /* a ref, not set for Jukes-Cantor */

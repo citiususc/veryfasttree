@@ -90,9 +90,8 @@ float fasttree::AVX256Operations<float>
         a = _mm_load_ps(f1 + m);
         b = _mm_load_ps(f2 + m);
         c = _mm_mul_ps(a, b);
-        sum = _mm256_add_ps(_mm256_broadcast_ps(&c), sum);
+        sum = _mm256_add_ps(_mm256_castps128_ps256(c), sum);
     }
-
     return mm_sum(sum);
 }
 
@@ -128,7 +127,7 @@ vector_multiply3_sum(float f1[], float f2[], float f3[], int64_t n) {
         a2 = _mm_load_ps(f2 + m);
         a3 = _mm_load_ps(f3 + m);
         r = _mm_mul_ps(_mm_mul_ps(a1, a2), a3);
-        sum = _mm256_add_ps(_mm256_broadcast_ps(&r), sum);
+        sum = _mm256_add_ps(_mm256_castps128_ps256(r), sum);
     }
     return mm_sum(sum);
 }
@@ -170,8 +169,8 @@ vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
         aBy = _mm_load_ps(fBy + m);
         r1 = _mm_mul_ps(a1, aBy);
         r2 = _mm_mul_ps(a2, aBy);
-        sum1 = _mm256_add_ps(_mm256_broadcast_ps(&r1), sum1);
-        sum2 = _mm256_add_ps(_mm256_broadcast_ps(&r2), sum2);
+        sum1 = _mm256_add_ps(_mm256_castps128_ps256(r1), sum1);
+        sum2 = _mm256_add_ps(_mm256_castps128_ps256(r2), sum2);
     }
     return mm_sum(sum1) * mm_sum(sum2);
 }
@@ -206,7 +205,7 @@ vector_sum(float f1[], int64_t n) {
     }
     if (n != m) {
         __m128 a = _mm_load_ps(f1 + m);
-        sum = _mm256_add_ps(_mm256_broadcast_ps(&a), sum);
+        sum = _mm256_add_ps(_mm256_castps128_ps256(a), sum);
     }
     return mm_sum(sum);
 }
@@ -235,10 +234,9 @@ vector_multiply_by(float f[], float fBy, int64_t n) {
         _mm256_store_ps(f + i, b);
     }
     if (n != m) {
-        __m128 a, b, c2;
-        c2 = _mm_set1_ps(fBy);
+        __m128 a, b;
         a = _mm_load_ps(f + m);
-        b = _mm_mul_ps(a, c2);
+        b = _mm_mul_ps(a, _mm256_castps256_ps128(c));
         _mm_store_ps(f + m, b);
     }
 }
@@ -267,11 +265,10 @@ vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
         _mm256_store_ps(fTot + i, _mm256_add_ps(tot, _mm256_mul_ps(add, w)));
     }
     if (n != m) {
-        __m128 tot, add, w2;
-        w2 = _mm_set1_ps(weight);
+        __m128 tot, add;
         tot = _mm_load_ps(fTot + m);
         add = _mm_load_ps(fAdd + m);
-        _mm_store_ps(fTot + m, _mm_add_ps(tot, _mm_mul_ps(add, w2)));
+        _mm_store_ps(fTot + m, _mm_add_ps(tot, _mm_mul_ps(add, _mm256_castps256_ps128(w))));
     }
 }
 
@@ -296,7 +293,7 @@ matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
     __m256 m1 = _mm256_load_ps(&mat[0][0]);
     __m256 m2 = _mm256_load_ps(&mat[2][0]);
     __m256 o1 = _mm256_mul_ps(vj1, m1);
-    __m256 o2 =  _mm256_mul_ps(vj2, m2);
+    __m256 o2 = _mm256_mul_ps(vj2, m2);
     __m256 s1 = _mm256_add_ps(o1, o2);
     __m128 s2 = _mm_add_ps(_mm256_extractf128_ps(s1, 0), _mm256_extractf128_ps(s1, 1));
     _mm_store1_ps(out, s2);

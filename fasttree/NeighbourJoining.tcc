@@ -15,10 +15,18 @@ AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints) {
     weights.resize(nPos);
     codes.resize(nPos);
     nGaps = 0;
+    nVectors = 0;
     if (nConstraints == 0) {
         nOn.resize(nConstraints, 0);
         nOff.resize(nConstraints, 0);
     }
+}
+
+AbsNeighbourJoining(void)::Profile::reset() {
+    nGaps = 0;
+    nVectors = 0;
+    vectors.resize(0);
+    codeDist.resize(0);
 }
 
 AbsNeighbourJoining()::Rates::Rates(int64_t nRateCategories, int64_t nPos) {
@@ -59,6 +67,9 @@ NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressRe
                  TransitionMatrix <Precision, op_t::ALIGNMENT> &transmat) : log(log),
                                                                             options(options),
                                                                             progressReport(progressReport),
+                                                                            nCodeSize(alignsz(options.nCodes,
+                                                                                              op_t::ALIGNMENT /
+                                                                                              sizeof(numeric_t))),
                                                                             seqs(seqs),
                                                                             distanceMatrix(distanceMatrix),
                                                                             transmat(transmat),
@@ -416,10 +427,10 @@ splitSupport(Profile &pA, Profile &pB, Profile &pC, Profile &pD, std::vector<int
         distpieces[qCD * nPos + i] =
                 weights[qCD * nPos + i] * profileDistPiece(pC.codes[i], pD.codes[i], fC, fD, nullptr);
     }
-    assert(iFreqA == (int64_t) pA.vectors.size());
-    assert(iFreqB == (int64_t) pB.vectors.size());
-    assert(iFreqC == (int64_t) pC.vectors.size());
-    assert(iFreqD == (int64_t) pD.vectors.size());
+    assert(iFreqA == pA.nVectors);
+    assert(iFreqB == pB.nVectors);
+    assert(iFreqC == pC.nVectors);
+    assert(iFreqD == pD.nVectors);
 
     double totpieces[6];
     double totweights[6];
@@ -506,7 +517,6 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     double inweight = 1.0 / (double) nProfiles;   /* The maximal output weight is 1.0 */
 
     /* First, set weights -- code is always NOCODE, prevent weight=0 */
-    int64_t nVectors = 0;
     for (int64_t i = 0; i < nPos; i++) {
         out.weights[i] = 0;
         for (int64_t in = 0; in < nProfiles; in++) {
@@ -515,16 +525,12 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
         if (out.weights[i] <= 0) {
             out.weights[i] = 1e-20;
         } /* always store a vector */
-        nVectors++;
+        out.nVectors++;
         out.codes[i] = NOCODE;        /* outprofile is normally complicated */
     }
 
     /* Initialize the frequencies to 0 */
-    out.vectors.reserve(nVectors * options.nCodes);
-    out.vectors.resize(nVectors);
-    for (int64_t i = 0; i < nVectors * options.nCodes; i++) {
-        out.vectors[i] = 0;
-    }
+    out.vectors.resize(out.nVectors * nCodeSize, 0);
 
     /* Add up the weights, going through each sequence in turn */
     #pragma omp parallel for schedule(static) if(nProfiles == (int64_t)seqs.size())
@@ -538,8 +544,8 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
                 addToFreq(fOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
             }
         }
-        assert(iFreqOut == (int64_t) out.vectors.size());
-        assert(iFreqIn == (int64_t) asRef(_profiles[in]).vectors.size());
+        assert(iFreqOut == out.nVectors);
+        assert(iFreqIn == asRef(_profiles[in]).nVectors);
     }
 
     /* And normalize the frequencies to sum to 1 */
@@ -550,7 +556,7 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
             normalizeFreq(fOut, distanceMatrix);
         }
     }
-    assert(iFreqOut == (int64_t) out.vectors.size());
+    assert(iFreqOut == out.nVectors);
     if (options.verbose > 10) {
         log << strformat("Average %ld profiles", nProfiles) << std::endl;
     }
@@ -632,7 +638,7 @@ AbsNeighbourJoining(void)::setCodeDist(Profile &profile) {
         for (int k = 0; k < options.nCodes; k++)
             profile.codeDist[i * options.nCodes + k] = profileDistPiece(profile.codes[i], k, f, nullptr, nullptr);
     }
-    assert(iFreq == (int64_t) profile.vectors.size());
+    assert(iFreq == profile.nVectors);
 }
 
 AbsNeighbourJoining(double)::
@@ -730,10 +736,10 @@ AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile
             log << std::endl;
         }
     }
-    assert(iFreqOut == (int64_t) out.vectors.size());
-    assert(iFreq1 == (int64_t) old1.vectors.size());
-    assert(iFreq2 == (int64_t) old2.vectors.size());
-    assert(iFreqNew == (int64_t) _new.vectors.size());
+    assert(iFreqOut == out.nVectors);
+    assert(iFreq1 == old1.nVectors);
+    assert(iFreq2 == old2.nVectors);
+    assert(iFreqNew == _new.nVectors);
     if (distanceMatrix) {
         setCodeDist(out);
     }
@@ -915,8 +921,8 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
             top += weight * piece;
         }
     }
-    assert(iFreq1 == (int64_t) profile1.vectors.size());
-    assert(iFreq2 == (int64_t) profile2.vectors.size());
+    assert(iFreq1 == profile1.nVectors);
+    assert(iFreq2 == profile2.nVectors);
     hit.weight = denom > 0 ? denom : 0.01; /* 0.01 is an arbitrarily low value of weight (normally >>1) */
     hit.dist = denom > 0 ? top / denom : 1;
     options.debug.profileOps++;
@@ -1005,7 +1011,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
 
         for (int64_t i = 0; i < nPos; i++) {
             int64_t iRate = rates.ratecat[i];
-            numeric_t *expeigen = &expeigenRates[iRate * 4];
+            numeric_t *expeigen = &expeigenRates[iRate * nCodeSize];
             double wA = p1.weights[i];
             double wB = p2.weights[i];
             if (wA == 0 && wB == 0 && p1.codes[i] == NOCODE && p2.codes[i] == NOCODE) {
@@ -1061,7 +1067,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
 
         for (int64_t i = 0; i < nPos; i++) {
             int64_t iRate = rates.ratecat[i];
-            numeric_t *expeigen = &expeigenRates[iRate * 20];
+            numeric_t *expeigen = &expeigenRates[iRate * nCodeSize];
             double wA = p1.weights[i];
             double wB = p2.weights[i];
             if (wA == 0 && wB == 0 && p1.codes[i] == NOCODE && p2.codes[i] == NOCODE) {
@@ -1746,7 +1752,7 @@ AbsNeighbourJoining(void)::pDiffVector(std::vector<double> &pSame, std::vector<d
 
 AbsNeighbourJoining(void)::
 expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &expeigenRates) {
-    expeigenRates.resize(options.nCodes * rates.rates.size());
+    expeigenRates.resize(nCodeSize * rates.rates.size());
     for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
         for (int64_t j = 0; j < options.nCodes; j++) {
             double relLen = length * rates.rates[iRate];
@@ -1754,13 +1760,13 @@ expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &e
             if (relLen < options.MLMinRelBranchLength) {
                 relLen = options.MLMinRelBranchLength;
             }
-            expeigenRates[iRate * options.nCodes + j] = std::exp(relLen * transmat.eigenval[j]);
+            expeigenRates[iRate * nCodeSize + j] = std::exp(relLen * transmat.eigenval[j]);
         }
     }
 }
 
 AbsNeighbourJoining(inline Precision*)::getFreq(Profile &p, int64_t &i, int64_t &ivector) {
-    return p.weights[i] > 0 && p.codes[i] == NOCODE ? &p.vectors[options.nCodes * (ivector++)] : nullptr;
+    return p.weights[i] > 0 && p.codes[i] == NOCODE ? &p.vectors[nCodeSize * (ivector++)] : nullptr;
 }
 
 AbsNeighbourJoining(int64_t)::nGaps(int64_t i) {
@@ -1791,11 +1797,8 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
     if (bionjWeight < 0) {
         bionjWeight = 0.5;
     }
-    if (!out.codeDist.empty()) {
-        out.codeDist.clear();
-    }
+    out.reset();
 
-    int64_t nVectors = 0;
     for (int64_t i = 0; i < nPos; i++) {
         out.weights[i] = bionjWeight * profile1.weights[i] + (1 - bionjWeight) * profile2.weights[i];
         out.codes[i] = NOCODE;
@@ -1809,19 +1812,16 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
                 out.codes[i] = profile2.codes[i];
             }
             if (out.codes[i] == NOCODE) {
-                nVectors++;
+                out.nVectors++;
             }
         }
     }
 
     /* Allocate and set the vectors */
-    out.vectors.reserve(options.nCodes * nVectors);
-    out.vectors.resize(nVectors);
-    for (int64_t i = 0; i < options.nCodes * nVectors; i++) {
-        out.vectors[i] = 0;
-    }
-    options.debug.nProfileFreqAlloc += out.vectors.size();
-    options.debug.nProfileFreqAvoid += nPos - out.vectors.size();
+    out.vectors.resize(out.nVectors * nCodeSize, 0);
+
+    options.debug.nProfileFreqAlloc += out.nVectors;
+    options.debug.nProfileFreqAvoid += nPos - out.nVectors;
     int64_t iFreqOut = 0;
     int64_t iFreq1 = 0;
     int64_t iFreq2 = 0;
@@ -1850,9 +1850,9 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
             }
         }
     } /* end loop over positions */
-    assert(iFreq1 == (int64_t) profile1.vectors.size());
-    assert(iFreq2 == (int64_t) profile2.vectors.size());
-    assert(iFreqOut == (int64_t) out.vectors.size());
+    assert(iFreq1 == profile1.nVectors);
+    assert(iFreq2 == profile2.nVectors);
+    assert(iFreqOut == out.nVectors);
 
     /* compute total constraints */
     for (int64_t i = 0; i < (int64_t) constraintSeqs.size(); i++) {
@@ -1876,11 +1876,8 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
         out.weights[i] = 1.0;
     }
 
-    out.vectors.reserve(options.nCodes * nPos);
-    out.vectors.resize(nPos);
-    for (int64_t i = 0; i < options.nCodes * nPos; i++) {
-        out.vectors[i] = 0;
-    }
+    out.nVectors = nPos;
+    out.vectors.resize(out.nVectors * nCodeSize, 0);
 
     int64_t iFreqOut = 0;
     int64_t iFreq1 = 0;
@@ -2002,8 +1999,8 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
                 continue;
             }
             int64_t iRate = rates.ratecat[i];
-            numeric_t *expeigen1 = &expeigenRates1[iRate * 4];
-            numeric_t *expeigen2 = &expeigenRates2[iRate * 4];
+            numeric_t *expeigen1 = &expeigenRates1[iRate * nCodeSize];
+            numeric_t *expeigen2 = &expeigenRates2[iRate * nCodeSize];
             numeric_t *f1 = getFreq(p1, i,/*IN/OUT*/iFreq1);
             numeric_t *f2 = getFreq(p2, i,/*IN/OUT*/iFreq2);
             numeric_t *fOut = getFreq(out, i,/*IN/OUT*/iFreqOut);
@@ -2076,8 +2073,8 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
                 continue;
             }
             int64_t iRate = rates.ratecat[i];
-            numeric_t *expeigen1 = &expeigenRates1[iRate * 20];
-            numeric_t *expeigen2 = &expeigenRates2[iRate * 20];
+            numeric_t *expeigen1 = &expeigenRates1[iRate * nCodeSize];
+            numeric_t *expeigen2 = &expeigenRates2[iRate * nCodeSize];
             numeric_t *f1 = getFreq(p1, i, iFreq1);
             numeric_t *f2 = getFreq(p2, i, iFreq2);
             numeric_t *fOut = getFreq(out, i, iFreqOut);
@@ -2163,11 +2160,11 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
     }
 
     /* Reallocate out->vectors to be the right size */
-    out.vectors.resize(iFreqOut);
-    out.vectors.reserve(iFreqOut); /* try to save space */
+    out.nVectors = iFreqOut;
+    out.vectors.resize(iFreqOut * nCodeSize, 0); /* try to save space */
 
-    options.debug.nProfileFreqAlloc += out.vectors.size();
-    options.debug.nProfileFreqAvoid += nPos - out.vectors.size();
+    options.debug.nProfileFreqAlloc += out.nVectors;
+    options.debug.nProfileFreqAvoid += nPos - out.nVectors;
 
     /* compute total constraints */
     for (int64_t i = 0; i < (int64_t) constraintSeqs.size(); i++) {
@@ -2846,7 +2843,7 @@ AbsNeighbourJoining(void)::fastNJ() {
         for (int64_t i = 0; i < nPos; i++) {
             weighterror += fabs(out.weights[i] - outprofile.weights[i]);
             for (int k = 0; k < options.nCodes; k++) {
-                freqerror += fabs(out.vectors[options.nCodes * i + k] - outprofile.vectors[options.nCodes * i + k]);
+                freqerror += fabs(out.vectors[nCodeSize * i + k] - outprofile.vectors[nCodeSize * i + k]);
             }
         }
 

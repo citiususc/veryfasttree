@@ -37,6 +37,7 @@ namespace fasttree {
 #include "assert.h"
 #include <omp.h>
 #include <boost/sort/sample_sort/sample_sort.hpp>
+#include <cmath>
 
 namespace fasttree {
     class TeeStream : public std::streambuf {
@@ -79,6 +80,10 @@ namespace fasttree {
     template<typename T>
     inline T &asRef(T *value) {
         return *value;
+    }
+
+    constexpr int alignsz(int sz, int aln) {
+        return aln == 0 ? sz : (std::ceil(sz / (float)aln) * aln);
     }
 
 
@@ -128,7 +133,7 @@ namespace fasttree {
 
     template<typename _CharT, typename _Traits, typename _Alloc>
     inline bool readline(std::basic_istream<_CharT, _Traits> &__is, std::basic_string<_CharT, _Traits, _Alloc> &__str) {
-        if(!__is.eof()) {
+        if (!__is.eof()) {
             std::getline(__is, __str);
             if (__str.back() == '\r') {
                 __str.resize(__str.size() - 1);
