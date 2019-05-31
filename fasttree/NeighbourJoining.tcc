@@ -3414,10 +3414,13 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
                 nHasTopHits++;
                 options.debug.nCloseUsed++;
                 if (options.verbose > 2) {
-                    log << strformat("Near neighbor %ld (rank %ld weight %f ungapped %ld %ld)",
-                                     closeNode, iClose, besthitsSeed[iClose].weight,
-                                     nPos - nGaps[seed],
-                                     nPos - nGaps[closeNode]) << std::endl;
+                    #pragma omp critical
+                    {
+                        log << strformat("Near neighbor %ld (rank %ld weight %f ungapped %ld %ld)",
+                                         closeNode, iClose, besthitsSeed[iClose].weight,
+                                         nPos - nGaps[seed],
+                                         nPos - nGaps[closeNode]) << std::endl;
+                    }
                 }
 
                 /* compute top 2*m hits */
