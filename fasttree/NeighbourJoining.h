@@ -9,7 +9,6 @@
 #include <vector>
 #include <iostream>
 #include <mutex>
-#include "assert.h"
 #include "Knuth.h"
 
 

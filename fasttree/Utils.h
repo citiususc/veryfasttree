@@ -34,7 +34,7 @@ namespace fasttree {
 
 #include <iostream>
 #include <chrono>
-#include "assert.h"
+#include "cassert"
 #include <omp.h>
 #include <boost/sort/sample_sort/sample_sort.hpp>
 #include <cmath>
@@ -82,8 +82,13 @@ namespace fasttree {
         return *value;
     }
 
+    template<typename T>
+    inline T fastexp(T v) {
+        return std::exp(v);
+    }
+
     constexpr int alignsz(int sz, int aln) {
-        return aln == 0 ? sz : (std::ceil(sz / (float)aln) * aln);
+        return aln == 0 ? sz : (std::ceil(sz / (float) aln) * aln);
     }
 
 

@@ -5,7 +5,7 @@
 #include "FastTreeImpl.h"
 #include <sstream>
 #include "NeighbourJoining.h"
-#include "assert.h"
+#include "Utils.h"
 
 #define AbsFastTreeImpl(...) \
 template<typename Precision, template<class> class Operations> \

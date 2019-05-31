@@ -514,6 +514,7 @@ AbsNeighbourJoining(void)::resampleColumns(std::vector<int64_t> &col) {
 
 AbsNeighbourJoining(template<typename Profile_t> void)::
 outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
+    out.reset();
     double inweight = 1.0 / (double) nProfiles;   /* The maximal output weight is 1.0 */
 
     /* First, set weights -- code is always NOCODE, prevent weight=0 */
@@ -1738,7 +1739,7 @@ AbsNeighbourJoining(void)::rootSiblings(int64_t node, /*OUT*/int64_t sibs[2]) {
 AbsNeighbourJoining(void)::pSameVector(double length, std::vector<double> &pSame) {
     pSame.resize(rates.rates.size());
     for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
-        pSame[iRate] = 0.25 + 0.75 * exp((-4.0 / 3.0) * fabs(length * rates.rates[iRate]));
+        pSame[iRate] = 0.25 + 0.75 * fastexp((-4.0 / 3.0) * std::abs(length * rates.rates[iRate]));
     }
 }
 
@@ -1760,7 +1761,7 @@ expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &e
             if (relLen < options.MLMinRelBranchLength) {
                 relLen = options.MLMinRelBranchLength;
             }
-            expeigenRates[iRate * nCodeSize + j] = std::exp(relLen * transmat.eigenval[j]);
+            expeigenRates[iRate * nCodeSize + j] = fastexp(relLen * transmat.eigenval[j]);
         }
     }
 }
@@ -4580,7 +4581,7 @@ AbsNeighbourJoining(double)::gammaLogLk(Siteratelk &s, double gamma_loglk_sites[
         }
         double rellk = 0; /* likelihood scaled by exp(maxloglk) */
         for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
-            double lk = exp(s.site_loglk[nPos * iRate + iPos] - maxloglk);
+            double lk = fastexp(s.site_loglk[nPos * iRate + iPos] - maxloglk);
             rellk += lk * dRate[iRate];
         }
         double loglk_site = maxloglk + std::log(rellk);
@@ -4672,7 +4673,7 @@ AbsNeighbourJoining(void)::MLSiteRates(std::vector<numeric_t, typename op_t::All
     double logd = (logMaxRate - logMinRate) / (double) (options.nRateCats - 1);
 
     for (int64_t i = 0; i < options.nRateCats; i++) {
-        _rates[i] = exp(logMinRate + logd * (double) i);
+        _rates[i] = fastexp(logMinRate + logd * (double) i);
     }
 }
 
@@ -5900,7 +5901,7 @@ AbsNeighbourJoining(double)::incompleteGamma(double x, double alpha, double ln_g
     if (x == 0) return (0);
     if (x < 0 || p <= 0) return (-1);
 
-    factor = (double) exp(p * (double) std::log(x) - x - g);
+    factor = (double) std::exp(p * (double) std::log(x) - x - g);
     if (x > 1 && x >= p) goto l30;
     /* (1) series expansion */
     gin = 1;
