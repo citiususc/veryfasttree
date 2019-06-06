@@ -48,13 +48,14 @@ AbsNeighbourJoining(void)::Rates::reset(int64_t nRateCategories, int64_t nPos) {
 AbsNeighbourJoining()::TopHits::TopHits() {}
 
 AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) :
-        m(_m), q(0.5 + options.tophits2Mult * sqrt(m)), maxnodes(_maxnodes), topvisibleAge(0), locks(maxnodes) {
+        m(_m), q((int64_t) (0.5 + options.tophits2Mult * std::sqrt(m))),
+        maxnodes(_maxnodes), topvisibleAge(0), locks(maxnodes) {
     assert(m > 0);
     if (!options.useTopHits2nd || q >= m) {
         q = 0;
     }
     topHitsLists.resize(maxnodes, {{}, -1, 0});
-    visible.resize(maxnodes, {-1, 1e20});
+    visible.resize(maxnodes, {-1, (numeric_t) 1e20});
     int64_t nTopVisible = (int64_t) (0.5 + options.topvisibleMult * m);
     topvisible.resize(nTopVisible, -1);
 }
@@ -98,7 +99,7 @@ NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressRe
     selfdist.resize(maxnodes, 0);
     selfweight.resize(maxnodes);
     for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
-        selfweight[i] = nPos - profiles[i].nGaps;
+        selfweight[i] = (numeric_t)(nPos - profiles[i].nGaps);
         assert(selfweight[i] == (nPos - nGaps(i)));
     }
 
@@ -524,7 +525,7 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
             out.weights[i] += asRef(_profiles[in]).weights[i] * inweight;
         }
         if (out.weights[i] <= 0) {
-            out.weights[i] = 1e-20;
+            out.weights[i] = (numeric_t) 1e-20;
         } /* always store a vector */
         out.nVectors++;
         out.codes[i] = NOCODE;        /* outprofile is normally complicated */
@@ -614,7 +615,7 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Preci
     }
     if (total_freq > options.fPostTotalTolerance) {
         numeric_t inverse_weight = 1.0 / total_freq;
-        operations.vector_multiply_by(freq, inverse_weight, options.nCodes);
+        operations.vector_multiply_by(freq, inverse_weight, options.nCodes, freq);
     } else {
         /* This can happen if we are in a very low-weight region, e.g. if a mostly-gap position gets weighted down
            repeatedly; just set them all to arbitrary but legal values */
@@ -707,7 +708,9 @@ AbsNeighbourJoining(void)::updateOutProfile(Profile &out, Profile &old1, Profile
         double originalMult = out.weights[i] * nActiveOld;
         double newMult = originalMult + _new.weights[i] - old1.weights[i] - old2.weights[i];
         out.weights[i] = newMult / (nActiveOld - 1);
-        if (out.weights[i] <= 0) out.weights[i] = 1e-20; /* always use the vector */
+        if (out.weights[i] <= 0) {
+            out.weights[i] = (numeric_t) 1e-20; /* always use the vector */
+        }
 
         for (int64_t k = 0; k < options.nCodes; k++) {
             fOut[k] *= originalMult;
@@ -1369,8 +1372,8 @@ AbsNeighbourJoining(bool)::updateBestHit(int64_t nActive, Besthit &hit, bool bUp
         hit.i = -1;
         hit.j = -1;
         hit.weight = 0;
-        hit.dist = 1e20;
-        hit.criterion = 1e20;
+        hit.dist = (numeric_t) 1e20;
+        hit.criterion = (numeric_t) 1e20;
         return false;
     }
     if (i != hit.i || j != hit.j) {
@@ -1379,8 +1382,8 @@ AbsNeighbourJoining(bool)::updateBestHit(int64_t nActive, Besthit &hit, bool bUp
         if (bUpdateDist) {
             setDistCriterion(nActive, hit);
         } else {
-            hit.dist = -1e20;
-            hit.criterion = 1e20;
+            hit.dist = (numeric_t) - 1e20;
+            hit.criterion = (numeric_t) 1e20;
         }
     }
     return true;
@@ -1737,9 +1740,9 @@ AbsNeighbourJoining(void)::rootSiblings(int64_t node, /*OUT*/int64_t sibs[2]) {
 }
 
 AbsNeighbourJoining(void)::pSameVector(double length, std::vector<double> &pSame) {
-    pSame.resize(rates.rates.size());
+    pSame.resize(rates.rates.size()); /* Value is 1 or 0 so vector operations can not be used*/
     for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
-        pSame[iRate] = 0.25 + 0.75 * fastexp((-4.0 / 3.0) * std::abs(length * rates.rates[iRate]));
+        pSame[iRate] = 0.25 + 0.75 * std::exp((-4.0 / 3.0) * std::abs(length * rates.rates[iRate]));
     }
 }
 
@@ -1755,14 +1758,13 @@ AbsNeighbourJoining(void)::
 expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &expeigenRates) {
     expeigenRates.resize(nCodeSize * rates.rates.size());
     for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
-        for (int64_t j = 0; j < options.nCodes; j++) {
-            double relLen = length * rates.rates[iRate];
-            /* very short branch lengths lead to numerical problems so prevent them */
-            if (relLen < options.MLMinRelBranchLength) {
-                relLen = options.MLMinRelBranchLength;
-            }
-            expeigenRates[iRate * nCodeSize + j] = fastexp(relLen * transmat.eigenval[j]);
+        double relLen = length * rates.rates[iRate];
+        /* very short branch lengths lead to numerical problems so prevent them */
+        if (relLen < options.MLMinRelBranchLength) {
+            relLen = options.MLMinRelBranchLength;
         }
+        operations.vector_multiply_by(transmat.eigenval, relLen, options.nCodes, &expeigenRates[iRate * nCodeSize]);
+        operations.fastexp(&expeigenRates[iRate * nCodeSize], options.nCodes, options.fastexp);
     }
 }
 
@@ -1949,7 +1951,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
                                     PSame1[iRate], PSame2[iRate],
                                     f12code, f12other) << std::endl;
                         }
-                        out.weights[i] = 1e-6;
+                        out.weights[i] = (numeric_t) 1e-6;
                     }
                     continue;
                 }
@@ -2115,7 +2117,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
             double fPostTot = operations.vector_sum(fPost, 20);
             assert(fPostTot > options.fPostTotalTolerance);
             double fPostInv = 1.0 / fPostTot;
-            operations.vector_multiply_by(fPost, fPostInv, 20);
+            operations.vector_multiply_by(fPost, fPostInv, 20, fPost);
             int64_t ch = -1;        /* the dominant character, if any */
             if (!options.exactML) {
                 for (int j = 0; j < 20; j++) {
@@ -3184,8 +3186,8 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
 
     bestjoin.i = node;
     bestjoin.j = -1;
-    bestjoin.dist = 1e20;
-    bestjoin.criterion = 1e20;
+    bestjoin.dist = (numeric_t) 1e20;
+    bestjoin.criterion = (numeric_t) 1e20;
 
     Besthit tmp;
 
@@ -3198,7 +3200,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
         if (parent[j] >= 0) {
             sv.i = -1;        /* illegal/empty join */
             sv.weight = 0.0;
-            sv.criterion = sv.dist = 1e20;
+            sv.criterion = sv.dist = (numeric_t) 1e20;
             continue;
         }
         /* Note that we compute self-distances (allow j==node) because the top-hit heuristic
@@ -3220,8 +3222,8 @@ AbsNeighbourJoining(void)::exhaustiveNJSearch(int64_t nActive, Besthit &join) {
     join.i = -1;
     join.j = -1;
     join.weight = 0;
-    join.dist = 1e20;
-    join.criterion = 1e20;
+    join.dist = (numeric_t) 1e20;
+    join.criterion = (numeric_t) 1e20;
     double bestCriterion = 1e20;
 
     for (int64_t i = 0; i < maxnode - 1; i++) {
@@ -3246,9 +3248,9 @@ AbsNeighbourJoining(void)::exhaustiveNJSearch(int64_t nActive, Besthit &join) {
 AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &besthits, Besthit &join) {
     join.i = -1;
     join.j = -1;
-    join.dist = 1e20;
+    join.dist = (numeric_t) 1e20;
     join.weight = 0;
-    join.criterion = 1e20;
+    join.criterion = (numeric_t) 1e20;
 
     for (int64_t iNode = 0; iNode < maxnode; iNode++) {
         int64_t jNode = besthits[iNode].j;
@@ -3608,7 +3610,7 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
                            && parent[newj] < 0);
 
                     /* Set v to point to newj */
-                    Besthit bh = {iNode, newj, -1e20, -1e20, -1e20};
+                    Besthit bh = {iNode, newj, (numeric_t) - 1e20, (numeric_t) - 1e20, (numeric_t) - 1e20};
                     setDistCriterion(nActive, bh);
                     v.j = newj;
                     v.dist = bh.dist;
@@ -3681,8 +3683,8 @@ AbsNeighbourJoining(void)::getBestFromTopHits(int64_t iNode, int64_t nActive, To
 
     bestjoin.i = -1;
     bestjoin.j = -1;
-    bestjoin.dist = 1e20;
-    bestjoin.criterion = 1e20;
+    bestjoin.dist = (numeric_t) 1e20;
+    bestjoin.criterion = (numeric_t) 1e20;
 
     int iBest;
     for (iBest = 0; iBest < (int64_t) l.hits.size(); iBest++) {
@@ -3985,20 +3987,20 @@ AbsNeighbourJoining(void)::transferBestHits(int64_t nActive, int64_t iNode, std:
 
         if (newhit.j < 0 || newhit.j == iNode) {
             newhit.weight = 0;
-            newhit.dist = -1e20;
-            newhit.criterion = 1e20;
+            newhit.dist = (numeric_t) - 1e20;
+            newhit.criterion = (numeric_t) 1e20;
         } else if (newhit.i != oldhit.i || newhit.j != oldhit.j) {
             if (updateDistances) {
                 setDistCriterion(nActive, newhit);
             } else {
-                newhit.dist = -1e20;
-                newhit.criterion = 1e20;
+                newhit.dist = (numeric_t) - 1e20;
+                newhit.criterion = (numeric_t) 1e20;
             }
         } else {
             if (updateDistances) {
                 setCriterion(nActive, newhit);
             } else {
-                newhit.criterion = 1e20;    /* leave dist alone */
+                newhit.criterion = (numeric_t) 1e20;    /* leave dist alone */
             }
         }
     }
@@ -4011,7 +4013,7 @@ AbsNeighbourJoining(void)::hitsToBestHits(std::vector<Hit> &hits, int64_t iNode,
         bh.i = iNode;
         bh.j = hit.j;
         bh.dist = hit.dist;
-        bh.criterion = 1e20;
+        bh.criterion = (numeric_t) 1e20;
         bh.weight = -1;        /* not the true value -- we compute these directly when needed */
     }
 }
@@ -4020,7 +4022,7 @@ AbsNeighbourJoining(void)::hitToBestHit(int64_t i, Hit &hit, Besthit &out) {
     out.i = i;
     out.j = hit.j;
     out.dist = hit.dist;
-    out.criterion = 1e20;
+    out.criterion = (numeric_t) 1e20;
     out.weight = -1;
 }
 
@@ -4581,7 +4583,7 @@ AbsNeighbourJoining(double)::gammaLogLk(Siteratelk &s, double gamma_loglk_sites[
         }
         double rellk = 0; /* likelihood scaled by exp(maxloglk) */
         for (int64_t iRate = 0; iRate < (int64_t) rates.rates.size(); iRate++) {
-            double lk = fastexp(s.site_loglk[nPos * iRate + iPos] - maxloglk);
+            double lk = std::exp(s.site_loglk[nPos * iRate + iPos] - maxloglk);
             rellk += lk * dRate[iRate];
         }
         double loglk_site = maxloglk + std::log(rellk);
@@ -4673,7 +4675,7 @@ AbsNeighbourJoining(void)::MLSiteRates(std::vector<numeric_t, typename op_t::All
     double logd = (logMaxRate - logMinRate) / (double) (options.nRateCats - 1);
 
     for (int64_t i = 0; i < options.nRateCats; i++) {
-        _rates[i] = fastexp(logMinRate + logd * (double) i);
+        _rates[i] = std::exp(logMinRate + logd * (double) i);
     }
 }
 

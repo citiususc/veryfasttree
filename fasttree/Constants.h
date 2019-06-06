@@ -56,13 +56,20 @@ namespace fasttree {
         const std::string version = "3.0";
         const std::string compileFlags =
                 "(OpenMP"
-                #if __AVX__
+                #ifdef __AVX__
+                #ifdef __AVX512F__
+                ", AVX512"
+                #elif  __AVX2__
+                ", AVX2"
+                #else
                 ", AVX"
+                #endif
                 #elif  __SSE2__
+                #ifdef __SSE4_1__
+                ", SSE4.1"
+                #else
                 ", SSE"
                 #endif
-                #if __AVX512F__
-                ", AVX512"
                 #endif
                 #ifndef NDEBUG
                 ", DEBUG"

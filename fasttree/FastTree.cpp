@@ -9,11 +9,11 @@
 #include "operations/SSE128Operations.h"
 #endif
 
-#if __AVX__
+#ifdef __AVX__
 #include "operations/AVX256Operations.h"
 #endif
 
-#if __AVX512F__
+#ifdef __AVX512F__
 #include "operations/AVX512Operations.h"
 #endif
 
@@ -182,7 +182,7 @@ void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
         }
     }
     #endif
-    #if __AVX__
+    #ifdef __AVX__
     else if(options.extension == "AVX256"){
         if(options.doublePrecision){
             FastTreeImpl<double, AVX256Operations>(options, in, out, log).run();
@@ -191,7 +191,7 @@ void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
         }
     }
     #endif
-    #if __AVX512F__
+    #ifdef __AVX512F__
     else if(options.extension == "AVX512"){
         if(options.doublePrecision){
             FastTreeImpl<double, AVX512Operations>(options, in, out, log).run();

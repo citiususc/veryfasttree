@@ -417,7 +417,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     auto optimizations = "Optimizations";
 
     app.add_option("-threads", options.threads, "to use a parallel version with multiple threads")->
-            type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(constrains);
+            type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
             group(optimizations);
@@ -425,6 +425,13 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_set_ignore_case("-ext", options.extension, {"NONE", "SSE", "AVX128", "AVX256", "AVX512"},
                             "compute multiple processing elements with one operation. Available: none, SSE3, AVX, AVX2 or AVX512")
             ->type_name("name")->default_val("NONE")->group(optimizations);
+
+    app.add_option("-fastexp", options.fastexp, "to use a fast implementation of exp(x) for distance matrix, in some"
+                                                " cases can reduce the final precision especially when"
+                                                " -double-precision is used. Options: "
+                                                "0 precise (default), 2 balanced, 3 fast, 1 less precise (fast than precise, use when balanced has bad results)")->
+            type_name("lvl")->check(CLI::Range(0, 2))->group(optimizations);
+
     for (auto &c:options.extension) { c = (char) std::toupper(c); }
 
 
@@ -532,7 +539,7 @@ int main(int argc, char *argv[]) {
 
     if (options.inFileName.empty()) {
         input.setstate(std::ios_base::badbit);
-    }else{
+    } else {
         input.open(options.inFileName);
         if (input.fail()) {
             std::cerr << "Couldn't open the input file! " << options.inFileName << std::endl;
@@ -542,7 +549,7 @@ int main(int argc, char *argv[]) {
 
     if (options.outFileName.empty()) {
         output.setstate(std::ios_base::badbit);
-    }else{
+    } else {
         output.open(options.outFileName);
         if (output.fail()) {
             std::cerr << "Couldn't open the output file! " << options.outFileName << std::endl;

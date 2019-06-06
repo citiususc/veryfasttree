@@ -95,6 +95,7 @@ namespace fasttree {
         /*Optimizations*/
         int threads = 1;
         bool doublePrecision = false;
+        int fastexp = 0;
         std::string extension;
 
         /*Precision*/

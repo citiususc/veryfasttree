@@ -23,15 +23,23 @@ namespace fasttree {
 
         numeric_t vector_sum(numeric_t f1[], int64_t n);
 
-        void vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n);
+        void vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fTot[]);
 
         void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n);
 
         void matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]);
 
+        void fastexp(numeric_t fTot[], int64_t n, int lvl);
+
     private:
         template <typename Tp>
         inline numeric_t mm_sum(register Tp sum);
+
+        inline __m128 fastexpImpl(__m128 vx);
+
+        inline __m256 fastexpImpl(__m256 vx);
+
+        inline __m256d fastexpImpl(__m256d vx);
     };
 }
 
