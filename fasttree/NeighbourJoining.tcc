@@ -3209,7 +3209,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
         */
         setDistCriterion(nActive, sv);
         if (sv.criterion < bestjoin.criterion && node != j) {
-            bestjoin = sv;
+            bestjoin = sv; //TODO
         }
     }
     if (options.verbose > 5) {

@@ -430,7 +430,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                                                 " cases can reduce the final precision especially when"
                                                 " -double-precision is used. Options: "
                                                 "0 precise (default), 2 balanced, 3 fast, 1 less precise (fast than precise, use when balanced has bad results)")->
-            type_name("lvl")->check(CLI::Range(0, 2))->group(optimizations);
+            type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
 
     for (auto &c:options.extension) { c = (char) std::toupper(c); }
 
