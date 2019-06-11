@@ -9,13 +9,13 @@
 template<typename Precision> \
 __VA_ARGS__ fasttree::BasicOperations<Precision>
 
-AbsBasicOperations(void)::vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]) {
+AbsBasicOperations(inline void)::vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]) {
     for (int64_t i = 0; i < n; i++) {
         fOut[i] = f1[i] * f2[i];
     }
 }
 
-AbsBasicOperations(Precision)::vector_multiply_sum(numeric_t f1[], numeric_t f2[], int64_t n) {
+AbsBasicOperations(inline Precision)::vector_multiply_sum(numeric_t f1[], numeric_t f2[], int64_t n) {
     numeric_t out = 0.0;
     for (int64_t i = 0; i < n; i++) {
         out += f1[i] * f2[i];
@@ -23,14 +23,14 @@ AbsBasicOperations(Precision)::vector_multiply_sum(numeric_t f1[], numeric_t f2[
     return out;
 }
 
-AbsBasicOperations(Precision)::vector_multiply3_sum(numeric_t f1[], numeric_t f2[], numeric_t f3[], int64_t n) {
+AbsBasicOperations(inline Precision)::vector_multiply3_sum(numeric_t f1[], numeric_t f2[], numeric_t f3[], int64_t n) {
     numeric_t sum = 0.0;
     for (int64_t i = 0; i < n; i++)
         sum += f1[i] * f2[i] * f3[i];
     return sum;
 }
 
-AbsBasicOperations(Precision)::vector_dot_product_rot(numeric_t f1[], numeric_t f2[], numeric_t fBy[], int64_t n) {
+AbsBasicOperations(inline Precision)::vector_dot_product_rot(numeric_t f1[], numeric_t f2[], numeric_t fBy[], int64_t n) {
     numeric_t out1 = 0.0;
     numeric_t out2 = 0.0;
     for (int64_t i = 0; i < n; i++) {
@@ -40,7 +40,7 @@ AbsBasicOperations(Precision)::vector_dot_product_rot(numeric_t f1[], numeric_t 
     return out1 * out2;
 }
 
-AbsBasicOperations(Precision)::vector_sum(numeric_t f1[], int64_t n) {
+AbsBasicOperations(inline Precision)::vector_sum(numeric_t f1[], int64_t n) {
     numeric_t out = 0.0;
     for (int64_t i = 0; i < n; i++) {
         out += f1[i];
@@ -48,19 +48,19 @@ AbsBasicOperations(Precision)::vector_sum(numeric_t f1[], int64_t n) {
     return (out);
 }
 
-AbsBasicOperations(void)::vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fOut[]) {
+AbsBasicOperations(inline void)::vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fOut[]) {
     for (int64_t i = 0; i < n; i++) {
         fOut[i] = f[i] * fBy;
     }
 }
 
-AbsBasicOperations(void)::vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n) {
+AbsBasicOperations(inline void)::vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n) {
     for (int64_t i = 0; i < n; i++) {
         fTot[i] += fAdd[i] * weight;
     }
 }
 
-AbsBasicOperations(void)::matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]) {
+AbsBasicOperations(inline void)::matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[4], numeric_t out[4]) {
     for (int64_t j = 0; j < 4; j++) {
         double sum = 0;
         for (int64_t k = 0; k < 4; k++) {
@@ -70,7 +70,7 @@ AbsBasicOperations(void)::matrixt_by_vector4(numeric_t mat[4][4], numeric_t vec[
     }
 }
 
-AbsBasicOperations(void)::fastexp(numeric_t fTot[], int64_t n, int lvl) {
+AbsBasicOperations(inline void)::fastexp(numeric_t fTot[], int64_t n, int lvl) {
     if (lvl == 0) {
         for (int64_t k = 0; k < n; k++) {
             fTot[k] = (numeric_t) std::exp((double) fTot[k]);
@@ -81,8 +81,8 @@ AbsBasicOperations(void)::fastexp(numeric_t fTot[], int64_t n, int lvl) {
         }
     } else if (lvl == 2) {
         int64_t m;
-        double xx, px, qx;
-        double u, x;
+        double xx, px, qx, x;
+        _Double u;
         for (int64_t k = 0; k < n; k++) {
             x = (double) fTot[k];
             px = std::floor(1.4426950408889634073599 * x + 0.5);
@@ -115,16 +115,16 @@ AbsBasicOperations(void)::fastexp(numeric_t fTot[], int64_t n, int lvl) {
             x = 1.0 + 2.0 * x;
 
             /* Build 2^n in double. */
-            u = 0;
+            u.d = 0;
             m += 1023;
-            *((int64_t *) &u) = (int64_t) (m) << 52;
+            u.i = (int64_t) (m) << 52;
 
-            fTot[k] = (numeric_t) x * u;
+            fTot[k] = (numeric_t) x * u.d;
         }
     } else {
         int32_t m;
-        float xx, px, qx;
-        float u, x;
+        float xx, px, qx, x;
+        _Float u;
         for (int64_t k = 0; k < n; k++) {
             x = (float) fTot[k];
             px = std::floor(1.4426950408889634073599f * x + 0.5f);
@@ -157,11 +157,11 @@ AbsBasicOperations(void)::fastexp(numeric_t fTot[], int64_t n, int lvl) {
             x = 1.0 + 2.0 * x;
 
             /* Build 2^n in double. */
-            u = 0;
+            u.f = 0;
             m += 127;
-            *((int32_t *) &u) = (int32_t) (m) << 23;
+            u.i = (int32_t) (m) << 23;
 
-            fTot[k] = (numeric_t) x * u;
+            fTot[k] = (numeric_t) x * u.f;
         }
     }
 }

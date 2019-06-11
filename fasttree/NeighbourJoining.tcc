@@ -152,7 +152,7 @@ AbsNeighbourJoining(void)::branchlengthScale() {
     std::vector<double> site_loglk;
     MLSiteRates(rates);
     MLSiteLikelihoodsByRate(rates, site_loglk);
-    double scale = rescaleGammaLogLk(site_loglk);
+    double scale = rescaleGammaLogLk(rates, site_loglk);
 
     for (int64_t i = 0; i < maxnodes; i++) {
         branchlength[i] *= scale;
@@ -1763,8 +1763,14 @@ expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &e
         if (relLen < options.MLMinRelBranchLength) {
             relLen = options.MLMinRelBranchLength;
         }
+        #ifndef NDEBUG
+        for (int64_t j = 0; j < options.nCodes; j++) {
+            expeigenRates[iRate * options.nCodes + j] = std::exp((double) relLen * transmat.eigenval[j]);
+        }
+        #else
         operations.vector_multiply_by(transmat.eigenval, relLen, options.nCodes, &expeigenRates[iRate * nCodeSize]);
         operations.fastexp(&expeigenRates[iRate * nCodeSize], options.nCodes, options.fastexp);
+        #endif
     }
 }
 
@@ -2423,12 +2429,12 @@ printNJ(std::ostream &out, std::vector<std::string> &names, Uniquify &unique, bo
     if (seqs.size() == 1 && unique.alnNext[unique.uniqueFirst[0]] >= 0) {
         /* Special case -- otherwise we end up with double parens */
         int64_t first = unique.uniqueFirst[0];
-        assert(first >= 0 && first < (int64_t) seqs.size());
+        assert(first >= 0 && first < (int64_t) unique.alnToUniq.size());
         out << "(";
         quotes(out, names[first], options.bQuote) << ":0.0";
         int64_t iName = unique.alnNext[first];
         while (iName >= 0) {
-            assert(iName < (int64_t) seqs.size());
+            assert(iName < (int64_t) unique.alnToUniq.size());
             out << ",";
             quotes(out, names[iName], options.bQuote) << ":0.0";
             iName = unique.alnNext[iName];
@@ -2463,7 +2469,7 @@ printNJ(std::ostream &out, std::vector<std::string> &names, Uniquify &unique, bo
                 quotes(out, names[first], options.bQuote) << ":0.0";
                 int64_t iName = unique.alnNext[first];
                 while (iName >= 0) {
-                    assert(iName < (int64_t) seqs.size());
+                    assert(iName < (int64_t) unique.alnToUniq.size());
                     out << ",";
                     quotes(out, names[iName], options.bQuote) << ":0.0";
                     iName = unique.alnNext[iName];
@@ -4566,9 +4572,9 @@ AbsNeighbourJoining(double)::gammaLogLk(Siteratelk &s, double gamma_loglk_sites[
     for (int64_t iRate = 0; iRate < (int64_t) dRate.size(); iRate++) {
         /* The probability density for each rate is approximated by the total
            density between the midpoints */
-        double pMin = iRate == 0 ? 0.0 : pGamma(s.mult * (rates.rates[iRate - 1] + rates.rates[iRate]) / 2.0, s.alpha);
+        double pMin = iRate == 0 ? 0.0 : pGamma(s.mult * (s.rates[iRate - 1] + s.rates[iRate]) / 2.0, s.alpha);
         double pMax = iRate == (int64_t) (rates.rates.size() - 1) ? 1.0 :
-                      pGamma(s.mult * (rates.rates[iRate] + rates.rates[iRate + 1]) / 2.0, s.alpha);
+                      pGamma(s.mult * (s.rates[iRate] + s.rates[iRate + 1]) / 2.0, s.alpha);
         dRate[iRate] = pMax - pMin;
     }
 
@@ -4595,8 +4601,9 @@ AbsNeighbourJoining(double)::gammaLogLk(Siteratelk &s, double gamma_loglk_sites[
     return loglk;
 }
 
-AbsNeighbourJoining(double)::rescaleGammaLogLk(std::vector<double> &site_loglk) {
-    Siteratelk s = { /*mult*/1.0, /*alpha*/1.0, site_loglk.data()};
+AbsNeighbourJoining(double)::
+rescaleGammaLogLk(std::vector<numeric_t, typename op_t::Allocator> &rates, std::vector<double> &site_loglk) {
+    Siteratelk s = { /*mult*/1.0, /*alpha*/1.0, rates.data(), site_loglk.data()};
     double fx, f2x;
     int i;
     fx = -gammaLogLk(s, nullptr);
@@ -4645,7 +4652,7 @@ AbsNeighbourJoining(double)::rescaleGammaLogLk(std::vector<double> &site_loglk) 
                          options.nRateCats, _gammaLogLk, s.alpha, 1 / s.mult) << std::endl;
         log << strformat("Gamma%d\tSite\tLogLk", options.nRateCats);
         for (int64_t iRate = 0; iRate < options.nRateCats; iRate++) {
-            log << strformat("\tr=%.3f", rates.rates[iRate] / s.mult);
+            log << strformat("\tr=%.3f", rates[iRate] / s.mult);
         }
         log << std::endl;
 
@@ -4705,7 +4712,7 @@ AbsNeighbourJoining(void)::MLSiteLikelihoodsByRate(std::vector<numeric_t, typena
     }
 
     /* restore original rates and profiles */
-    rates.rates = oldRates;
+    rates.rates = std::move(oldRates);
     recomputeMLProfiles();
 }
 

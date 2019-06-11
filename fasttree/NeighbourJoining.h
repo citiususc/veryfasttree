@@ -695,6 +695,7 @@ namespace fasttree {
         struct Siteratelk {
             double mult;            /* multiplier for the rates / divisor for the tree-length */
             double alpha;
+            numeric_t *rates;
             double *site_loglk;
         };
 
@@ -705,7 +706,8 @@ namespace fasttree {
            Reports the gamma log likelihhod (and logs site likelihoods if fpLog is set),
            and reports the rescaling value.
         */
-        double rescaleGammaLogLk(std::vector<double> &site_loglk);
+        double
+        rescaleGammaLogLk(std::vector<numeric_t, typename op_t::Allocator> &rates, std::vector<double> &site_loglk);
 
         /* P(value<=x) for the gamma distribution with shape parameter alpha and scale 1/alpha */
         double pGamma(double x, double alpha);

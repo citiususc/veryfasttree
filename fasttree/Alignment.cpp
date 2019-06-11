@@ -34,7 +34,7 @@ void Alignment::readAlignment() {
                 if (found != std::string::npos) {
                     buf.resize(found);
                 }
-                names.push_back(buf);
+                names.push_back(buf.substr(1));
                 names.back().shrink_to_fit();
                 seqs.resize(seqs.size() + 1);
             } else {

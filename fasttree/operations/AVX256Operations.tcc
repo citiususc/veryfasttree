@@ -22,7 +22,7 @@ inline float fasttree::AVX256Operations<float>::mm_sum(register __m256 sum) {
 }
 
 template<>
-void fasttree::AVX256Operations<double>::
+inline void fasttree::AVX256Operations<double>::
 vector_multiply(double f1[], double f2[], int64_t n, double fOut[]) {
     for (int64_t i = 0; i < n; i += 4) {
         __m256d a, b, c;
@@ -34,7 +34,7 @@ vector_multiply(double f1[], double f2[], int64_t n, double fOut[]) {
 }
 
 template<>
-void fasttree::AVX256Operations<float>::
+inline void fasttree::AVX256Operations<float>::
 vector_multiply(float f1[], float f2[], int64_t n, float fOut[]) {
     int64_t m = n - (n % 8);
     for (int64_t i = 0; i < m; i += 8) {
@@ -54,7 +54,7 @@ vector_multiply(float f1[], float f2[], int64_t n, float fOut[]) {
 }
 
 template<>
-double fasttree::AVX256Operations<double>
+inline double fasttree::AVX256Operations<double>
 ::vector_multiply_sum(double f1[], double f2[], int64_t n) {
     if (n == 4) {
         return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
@@ -71,7 +71,7 @@ double fasttree::AVX256Operations<double>
 }
 
 template<>
-float fasttree::AVX256Operations<float>
+inline float fasttree::AVX256Operations<float>
 ::vector_multiply_sum(float f1[], float f2[], int64_t n) {
     if (n == 4) {
         return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
@@ -96,7 +96,7 @@ float fasttree::AVX256Operations<float>
 }
 
 template<>
-double fasttree::AVX256Operations<double>::
+inline double fasttree::AVX256Operations<double>::
 vector_multiply3_sum(double f1[], double f2[], double f3[], int64_t n) {
     __m256d sum = _mm256_setzero_pd();
     for (int64_t i = 0; i < n; i += 4) {
@@ -110,7 +110,7 @@ vector_multiply3_sum(double f1[], double f2[], double f3[], int64_t n) {
 }
 
 template<>
-float fasttree::AVX256Operations<float>::
+inline float fasttree::AVX256Operations<float>::
 vector_multiply3_sum(float f1[], float f2[], float f3[], int64_t n) {
     __m256 sum = _mm256_setzero_ps();
     int64_t m = n - (n % 8);
@@ -133,7 +133,7 @@ vector_multiply3_sum(float f1[], float f2[], float f3[], int64_t n) {
 }
 
 template<>
-double fasttree::AVX256Operations<double>::
+inline double fasttree::AVX256Operations<double>::
 vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
     __m256d sum1 = _mm256_setzero_pd();
     __m256d sum2 = _mm256_setzero_pd();
@@ -149,7 +149,7 @@ vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
 }
 
 template<>
-float fasttree::AVX256Operations<float>::
+inline float fasttree::AVX256Operations<float>::
 vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
     __m256 sum1 = _mm256_setzero_ps();
     __m256 sum2 = _mm256_setzero_ps();
@@ -176,7 +176,7 @@ vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
 }
 
 template<>
-double fasttree::AVX256Operations<double>::
+inline double fasttree::AVX256Operations<double>::
 vector_sum(double f1[], int64_t n) {
     if (n == 4) {
         return f1[0] + f1[1] + f1[2] + f1[3];
@@ -191,7 +191,7 @@ vector_sum(double f1[], int64_t n) {
 }
 
 template<>
-float fasttree::AVX256Operations<float>::
+inline float fasttree::AVX256Operations<float>::
 vector_sum(float f1[], int64_t n) {
     if (n == 4) {
         return f1[0] + f1[1] + f1[2] + f1[3];
@@ -211,7 +211,7 @@ vector_sum(float f1[], int64_t n) {
 }
 
 template<>
-void fasttree::AVX256Operations<double>::
+inline void fasttree::AVX256Operations<double>::
 vector_multiply_by(double f[], double fBy, int64_t n, numeric_t fTot[]) {
     __m256d c = _mm256_set1_pd(fBy);
     for (int64_t i = 0; i < n; i += 4) {
@@ -223,7 +223,7 @@ vector_multiply_by(double f[], double fBy, int64_t n, numeric_t fTot[]) {
 }
 
 template<>
-void fasttree::AVX256Operations<float>::
+inline void fasttree::AVX256Operations<float>::
 vector_multiply_by(float f[], float fBy, int64_t n, numeric_t fTot[]) {
     __m256 c = _mm256_set1_ps(fBy);
     int64_t m = n - (n % 8);
@@ -242,7 +242,7 @@ vector_multiply_by(float f[], float fBy, int64_t n, numeric_t fTot[]) {
 }
 
 template<>
-void fasttree::AVX256Operations<double>::
+inline void fasttree::AVX256Operations<double>::
 vector_add_mult(double fTot[], double fAdd[], double weight, int64_t n) {
     __m256d w = _mm256_set1_pd(weight);
     for (int64_t i = 0; i < n; i += 4) {
@@ -254,7 +254,7 @@ vector_add_mult(double fTot[], double fAdd[], double weight, int64_t n) {
 }
 
 template<>
-void fasttree::AVX256Operations<float>::
+inline void fasttree::AVX256Operations<float>::
 vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
     __m256 w = _mm256_set1_ps(weight);
     int64_t m = n - (n % 8);
@@ -273,7 +273,7 @@ vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
 }
 
 template<>
-void fasttree::AVX256Operations<double>::
+inline void fasttree::AVX256Operations<double>::
 matrixt_by_vector4(double mat[4][4], double vec[4], double out[4]) {
     __m256d o = _mm256_setzero_pd();
     /* result is a sum of vectors: sum(k) v[k] * mat[k][] */
@@ -286,7 +286,7 @@ matrixt_by_vector4(double mat[4][4], double vec[4], double out[4]) {
 }
 
 template<>
-void fasttree::AVX256Operations<float>::
+inline void fasttree::AVX256Operations<float>::
 matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
     __m256 vj1 = _mm256_set_ps(vec[0], vec[0], vec[0], vec[0], vec[1], vec[1], vec[1], vec[1]);
     __m256 vj2 = _mm256_set_ps(vec[2], vec[2], vec[2], vec[2], vec[3], vec[3], vec[3], vec[3]);
@@ -300,7 +300,7 @@ matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
 }
 
 template<>
-void fasttree::AVX256Operations<float>::fastexp(float fTot[], int64_t n, int lvl) {
+inline void fasttree::AVX256Operations<float>::fastexp(float fTot[], int64_t n, int lvl) {
     if (lvl == 0) {
         for (int64_t k = 0; k < n; k++) {
             fTot[k] = (float) std::exp((double) fTot[k]);
@@ -336,7 +336,7 @@ void fasttree::AVX256Operations<float>::fastexp(float fTot[], int64_t n, int lvl
 }
 
 template<>
-void fasttree::AVX256Operations<double>::fastexp(double fTot[], int64_t n, int lvl) {
+inline void fasttree::AVX256Operations<double>::fastexp(double fTot[], int64_t n, int lvl) {
     if (lvl == 0) {
         for (int64_t k = 0; k < n; k++) {
             fTot[k] = std::exp(fTot[k]);
@@ -381,7 +381,7 @@ void fasttree::AVX256Operations<double>::fastexp(double fTot[], int64_t n, int l
 }
 
 template<typename Precision>
-__m256 fasttree::AVX256Operations<Precision>::fastexpImpl(__m256 x) {
+inline __m256 fasttree::AVX256Operations<Precision>::fastexpImpl(__m256 x) {
     __m256i m, u;
     __m256 xx, px, qx;
 
@@ -433,7 +433,7 @@ __m256 fasttree::AVX256Operations<Precision>::fastexpImpl(__m256 x) {
 }
 
 template<typename Precision>
-__m256d fasttree::AVX256Operations<Precision>::fastexpImpl(__m256d x) {
+inline __m256d fasttree::AVX256Operations<Precision>::fastexpImpl(__m256d x) {
     __m256i u;
     __m256d xx, px, qx;
 
@@ -500,7 +500,7 @@ __m256d fasttree::AVX256Operations<Precision>::fastexpImpl(__m256d x) {
 
 /* Copy from SSE128Operations.tcc */
 template<typename Precision>
-__m128 fasttree::AVX256Operations<Precision>::fastexpImpl(__m128 x) {
+inline __m128 fasttree::AVX256Operations<Precision>::fastexpImpl(__m128 x) {
     __m128i m, u;
     __m128 xx, px, qx;
 
