@@ -4281,14 +4281,14 @@ MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool b
     int64_t nRounds = options.mlAccuracy < 2 ? 2 : options.mlAccuracy;
     double penalty[3];
     quartetConstraintPenalties(profiles4, penalty);
-    if (penalty[ABvsCD] > penalty[ACvsBD] || penalty[ABvsCD] > penalty[ADvsBC] || options.threads > 1) {
+    if (penalty[ABvsCD] > penalty[ACvsBD] || penalty[ABvsCD] > penalty[ADvsBC]) {
         bFast = false; /* turn off star topology test */
     }
 
     int64_t iRound;
     for (iRound = 0; iRound < nRounds; iRound++) {
-        bool bStarTest = false;
-        if (bFast) {
+        if (options.threads == 1) {
+            bool bStarTest = false;
             criteria[ABvsCD] = MLQuartetOptimize(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3],
                                                  lenABvsCD, &bStarTest,  /*site_likelihoods*/nullptr)
                                - penalty[ABvsCD];    /* subtract penalty b/c we are trying to maximize log lk */
