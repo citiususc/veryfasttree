@@ -22,6 +22,15 @@ inline float fasttree::AVX256Operations<float>::mm_sum(register __m256 sum) {
 }
 
 template<>
+template<>
+inline float fasttree::AVX256Operations<float>::mm_sum(register __m128 sum) {
+    /* stupider but faster */
+    alignas(ALIGNMENT) float f[4];
+    _mm_store_ps(f, sum);
+    return (f[0] + f[1] + f[2] + f[3]);
+}
+
+template<>
 inline void fasttree::AVX256Operations<double>::
 vector_multiply(double f1[], double f2[], int64_t n, double fOut[]) {
     for (int64_t i = 0; i < n; i += 4) {
@@ -56,9 +65,6 @@ vector_multiply(float f1[], float f2[], int64_t n, float fOut[]) {
 template<>
 inline double fasttree::AVX256Operations<double>
 ::vector_multiply_sum(double f1[], double f2[], int64_t n) {
-    if (n == 4) {
-        return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
-    }
     __m256d sum = _mm256_setzero_pd();
     for (int64_t i = 0; i < n; i += 4) {
         __m256d a, b, c;
@@ -73,9 +79,6 @@ inline double fasttree::AVX256Operations<double>
 template<>
 inline float fasttree::AVX256Operations<float>
 ::vector_multiply_sum(float f1[], float f2[], int64_t n) {
-    if (n == 4) {
-        return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
-    }
     __m256 sum = _mm256_setzero_ps();
     int64_t m = n - (n % 8);
     for (int64_t i = 0; i < m; i += 8) {
@@ -90,7 +93,10 @@ inline float fasttree::AVX256Operations<float>
         a = _mm_load_ps(f1 + m);
         b = _mm_load_ps(f2 + m);
         c = _mm_mul_ps(a, b);
-        sum = _mm256_add_ps(_mm256_castps128_ps256(c), sum);
+        if (n == 4) {
+            return mm_sum(c);
+        }
+        return mm_sum(sum) + mm_sum(c);
     }
     return mm_sum(sum);
 }
@@ -127,7 +133,10 @@ vector_multiply3_sum(float f1[], float f2[], float f3[], int64_t n) {
         a2 = _mm_load_ps(f2 + m);
         a3 = _mm_load_ps(f3 + m);
         r = _mm_mul_ps(_mm_mul_ps(a1, a2), a3);
-        sum = _mm256_add_ps(_mm256_castps128_ps256(r), sum);
+        if (n == 4) {
+            return mm_sum(r);
+        }
+        return mm_sum(sum) + mm_sum(r);
     }
     return mm_sum(sum);
 }
@@ -169,8 +178,10 @@ vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
         aBy = _mm_load_ps(fBy + m);
         r1 = _mm_mul_ps(a1, aBy);
         r2 = _mm_mul_ps(a2, aBy);
-        sum1 = _mm256_add_ps(_mm256_castps128_ps256(r1), sum1);
-        sum2 = _mm256_add_ps(_mm256_castps128_ps256(r2), sum2);
+        if (n == 4) {
+            return mm_sum(r1) * mm_sum(r2);
+        }
+        return (mm_sum(sum1) + mm_sum(r1)) * (mm_sum(sum2) + mm_sum(r2));
     }
     return mm_sum(sum1) * mm_sum(sum2);
 }
@@ -178,9 +189,6 @@ vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
 template<>
 inline double fasttree::AVX256Operations<double>::
 vector_sum(double f1[], int64_t n) {
-    if (n == 4) {
-        return f1[0] + f1[1] + f1[2] + f1[3];
-    }
     __m256d sum = _mm256_setzero_pd();
     for (int64_t i = 0; i < n; i += 4) {
         __m256d a;
@@ -204,8 +212,7 @@ vector_sum(float f1[], int64_t n) {
         sum = _mm256_add_ps(a, sum);
     }
     if (n != m) {
-        __m128 a = _mm_load_ps(f1 + m);
-        sum = _mm256_add_ps(_mm256_castps128_ps256(a), sum);
+        return mm_sum(sum) + f1[m] + f1[m + 1] + f1[m + 2] + f1[m + 3];
     }
     return mm_sum(sum);
 }
@@ -296,7 +303,7 @@ matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
     __m256 o2 = _mm256_mul_ps(vj2, m2);
     __m256 s1 = _mm256_add_ps(o1, o2);
     __m128 s2 = _mm_add_ps(_mm256_extractf128_ps(s1, 0), _mm256_extractf128_ps(s1, 1));
-    _mm_store1_ps(out, s2);
+    _mm_store_ps(out, s2);
 }
 
 template<>
@@ -355,8 +362,9 @@ inline void fasttree::AVX256Operations<double>::fastexp(double fTot[], int64_t n
         int64_t m = n - (n % 8);
         alignas(ALIGNMENT) float arr[8];
         for (int64_t k = 0; k < n; k += 8) {
-            __m256 nums = _mm256_set_ps((float)fTot[k + 7], (float)fTot[k + 6], (float)fTot[k + 5], (float)fTot[k + 4],
-                                        (float)fTot[k + 3], (float)fTot[k + 2], (float)fTot[k + 1], (float)fTot[k]);
+            __m256 nums = _mm256_set_ps((float) fTot[k + 7], (float) fTot[k + 6], (float) fTot[k + 5],
+                                        (float) fTot[k + 4],
+                                        (float) fTot[k + 3], (float) fTot[k + 2], (float) fTot[k + 1], (float) fTot[k]);
             __m256 res = fastexpImpl(nums);
             _mm256_store_ps(arr, res);
             fTot[k] = (float) arr[0];

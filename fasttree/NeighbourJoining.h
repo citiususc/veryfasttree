@@ -226,7 +226,7 @@ namespace fasttree {
 
 
             /* 1 lock to read or write any top hits list, no thread grabs more than one */
-            std::vector<std::mutex> locks;
+            //std::vector<std::mutex> locks;
 
             TopHits(const Options &options, int64_t maxnodes, int64_t m);
 
@@ -571,7 +571,7 @@ namespace fasttree {
            (presumably due to an NNI), then it will return the node another time,
            with *pUp = true.
         */
-        int64_t traversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp);
+        int64_t traversePostorder(int64_t lastnode, std::vector<bool> &traversal, bool *pUp, int64_t branchRoot);
 
         Profile *getUpProfile(std::unique_ptr<Profile> upProfiles[], int64_t outnode, bool useML);
 
@@ -725,6 +725,20 @@ namespace fasttree {
         */
         void MLSiteLikelihoodsByRate(std::vector<numeric_t, typename op_t::Allocator> &rates,
                                      std::vector<double> &site_loglk);
+
+        int64_t treeChuncks(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
+                            std::vector<std::vector<int64_t>> &chunks);
+
+        int64_t treePartitionQuality(std::vector<int64_t> &weights, std::vector<int64_t> &partition);
+
+        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal);
+
+        void printVisualTree(int node, bool isFirst = false, const std::string &prefix = "");
+
+
+        inline int64_t transversalNNI(int64_t iRound, int64_t nRounds, bool useML,
+                                      std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
+                                      std::unique_ptr<Profile> upProfiles[], std::vector<bool> &traversal);
 
         /* One-dimensional minimization using brent's function, with
         a fractional and an absolute tolerance */

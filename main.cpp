@@ -419,6 +419,12 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-threads", options.threads, "to use a parallel version with multiple threads")->
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
+    app.add_flag("-threads-balanced", options.threadsBalanced, "create more subtrees than threads to a balanced"
+                                                                 " number of nodes per subprocess, greatly improve "
+                                                                 "performance with very unbalanced trees, "
+                                                                 "but can affect the final precision.")->
+            group(optimizations);
+
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
             group(optimizations);
 
@@ -560,7 +566,7 @@ int main(int argc, char *argv[]) {
     if (options.logFileName.empty()) {
         log.setstate(std::ios_base::badbit);
     } else {
-        log.open(options.logFileName, std::ios::out | std::ios::app);
+        log.open(options.logFileName, std::ios::out | std::ios::trunc);
         if (log.fail()) {
             std::cerr << "Couldn't open the log file! " << options.logFileName << std::endl;
             return EXIT_FAILURE;

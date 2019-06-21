@@ -88,9 +88,10 @@ namespace fasttree {
 
 
     template<typename Iter, typename Compare>
-    inline void psort(Iter first, Iter last, uint32_t threads, const Compare &comp) {
-        if (omp_in_parallel()) {
-            threads = 1;
+    inline void psort(Iter first, Iter last, const Compare &comp) {
+        uint32_t threads = 1;
+        if (!omp_in_parallel()) {
+            threads = omp_get_num_threads();
         }
         #ifndef NDEBUG
         static thread_local const Compare *_pcomp = nullptr;

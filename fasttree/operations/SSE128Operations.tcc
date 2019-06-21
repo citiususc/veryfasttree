@@ -49,9 +49,6 @@ vector_multiply(double f1[], double f2[], int64_t n, double fOut[]) {
 template<>
 inline float fasttree::SSE128Operations<float>
 ::vector_multiply_sum(float f1[], float f2[], int64_t n) {
-    if (n == 4) {
-        return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
-    }
     __m128 sum = _mm_setzero_ps();
     for (int64_t i = 0; i < n; i += 4) {
         __m128 a, b, c;
@@ -66,9 +63,6 @@ inline float fasttree::SSE128Operations<float>
 template<>
 inline double fasttree::SSE128Operations<double>
 ::vector_multiply_sum(double f1[], double f2[], int64_t n) {
-    if (n == 4) {
-        return f1[0] * f2[0] + f1[1] * f2[1] + f1[2] * f2[2] + f1[3] * f2[3];
-    }
     __m128d sum = _mm_setzero_pd();
     for (int64_t i = 0; i < n; i += 2) {
         __m128d a, b, c;
@@ -143,9 +137,6 @@ vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
 template<>
 inline float fasttree::SSE128Operations<float>::
 vector_sum(float f1[], int64_t n) {
-    if (n == 4) {
-        return f1[0] + f1[1] + f1[2] + f1[3];
-    }
     __m128 sum = _mm_setzero_ps();
     for (int64_t i = 0; i < n; i += 4) {
         __m128 a;

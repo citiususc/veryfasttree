@@ -10,53 +10,78 @@ template<typename Precision> \
 __VA_ARGS__ fasttree::BasicOperations<Precision>
 
 AbsBasicOperations(inline void)::vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]) {
-    for (int64_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i+=4) {
         fOut[i] = f1[i] * f2[i];
+        fOut[i + 1] = f1[i + 1] * f2[i + 1];
+        fOut[i + 2] = f1[i + 2] * f2[i + 2];
+        fOut[i + 3] = f1[i + 3] * f2[i + 3];
     }
 }
 
 AbsBasicOperations(inline Precision)::vector_multiply_sum(numeric_t f1[], numeric_t f2[], int64_t n) {
     numeric_t out = 0.0;
-    for (int64_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i+=4) {
         out += f1[i] * f2[i];
+        out += f1[i + 1] * f2[i + 1];
+        out += f1[i + 2] * f2[i + 2];
+        out += f1[i + 3] * f2[i + 3];
     }
     return out;
 }
 
 AbsBasicOperations(inline Precision)::vector_multiply3_sum(numeric_t f1[], numeric_t f2[], numeric_t f3[], int64_t n) {
     numeric_t sum = 0.0;
-    for (int64_t i = 0; i < n; i++)
+    for (int64_t i = 0; i < n; i+=4) {
         sum += f1[i] * f2[i] * f3[i];
+        sum += f1[i + 1] * f2[i + 1] * f3[i + 1];
+        sum += f1[i + 2] * f2[i + 2] * f3[i + 2];
+        sum += f1[i + 3] * f2[i + 3] * f3[i + 3];
+    }
     return sum;
 }
 
 AbsBasicOperations(inline Precision)::vector_dot_product_rot(numeric_t f1[], numeric_t f2[], numeric_t fBy[], int64_t n) {
     numeric_t out1 = 0.0;
     numeric_t out2 = 0.0;
-    for (int64_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i+=4) {
         out1 += f1[i] * fBy[i];
+        out1 += f1[i + 1] * fBy[i + 1];
+        out1 += f1[i + 2] * fBy[i + 2];
+        out1 += f1[i + 3] * fBy[i + 3];
         out2 += f2[i] * fBy[i];
+        out2 += f2[i + 1] * fBy[i + 1];
+        out2 += f2[i + 2] * fBy[i + 2];
+        out2 += f2[i + 3] * fBy[i + 3];
     }
     return out1 * out2;
 }
 
 AbsBasicOperations(inline Precision)::vector_sum(numeric_t f1[], int64_t n) {
     numeric_t out = 0.0;
-    for (int64_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i+=4) {
         out += f1[i];
+        out += f1[i + 1];
+        out += f1[i + 2];
+        out += f1[i + 3];
     }
     return (out);
 }
 
 AbsBasicOperations(inline void)::vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fOut[]) {
-    for (int64_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i+=4) {
         fOut[i] = f[i] * fBy;
+        fOut[i + 1] = f[i + 1] * fBy;
+        fOut[i + 2] = f[i + 2] * fBy;
+        fOut[i + 3] = f[i + 3] * fBy;
     }
 }
 
 AbsBasicOperations(inline void)::vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n) {
-    for (int64_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i+=4) {
         fTot[i] += fAdd[i] * weight;
+        fTot[i + 1] += fAdd[i + 1] * weight;
+        fTot[i + 2] += fAdd[i + 2] * weight;
+        fTot[i + 3] += fAdd[i + 3] * weight;
     }
 }
 

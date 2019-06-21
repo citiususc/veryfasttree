@@ -49,7 +49,7 @@ AbsNeighbourJoining()::TopHits::TopHits() {}
 
 AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) :
         m(_m), q((int64_t) (0.5 + options.tophits2Mult * std::sqrt(m))),
-        maxnodes(_maxnodes), topvisibleAge(0), locks(maxnodes) {
+        maxnodes(_maxnodes), topvisibleAge(0) {
     assert(m > 0);
     if (!options.useTopHits2nd || q >= m) {
         q = 0;
@@ -64,19 +64,19 @@ AbsNeighbourJoining()::
 NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressReport,
                  std::vector<std::string> &seqs, int64_t nPos,
                  std::vector<std::string> &constraintSeqs,
-                 DistanceMatrix <Precision, op_t::ALIGNMENT> &distanceMatrix,
-                 TransitionMatrix <Precision, op_t::ALIGNMENT> &transmat) : log(log),
-                                                                            options(options),
-                                                                            progressReport(progressReport),
-                                                                            nCodeSize(alignsz(options.nCodes,
-                                                                                              op_t::ALIGNMENT /
-                                                                                              sizeof(numeric_t))),
-                                                                            seqs(seqs),
-                                                                            distanceMatrix(distanceMatrix),
-                                                                            transmat(transmat),
-                                                                            constraintSeqs(constraintSeqs),
-                                                                            outprofile(nPos, constraintSeqs.size()),
-                                                                            rates(1, nPos) {
+                 DistanceMatrix<Precision, op_t::ALIGNMENT> &distanceMatrix,
+                 TransitionMatrix<Precision, op_t::ALIGNMENT> &transmat) : log(log),
+                                                                           options(options),
+                                                                           progressReport(progressReport),
+                                                                           nCodeSize(alignsz(options.nCodes,
+                                                                                             op_t::ALIGNMENT /
+                                                                                             sizeof(numeric_t))),
+                                                                           seqs(seqs),
+                                                                           distanceMatrix(distanceMatrix),
+                                                                           transmat(transmat),
+                                                                           constraintSeqs(constraintSeqs),
+                                                                           outprofile(nPos, constraintSeqs.size()),
+                                                                           rates(1, nPos) {
     this->root = -1;
     this->maxnode = seqs.size();
     this->nPos = nPos;
@@ -581,7 +581,7 @@ AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t co
 }
 
 AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[],
-                                     DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
+                                     DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat) {
     assert(fOut != nullptr);
     if (fIn != nullptr) {
         operations.vector_add_mult(fOut, fIn, weight, options.nCodes);
@@ -602,7 +602,7 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[]) {
     normalizeFreq(freq, distanceMatrix);
 }
 
-AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
+AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat) {
     double total_freq = 0;
     if (dmat) {
         /* The total frequency is dot_product(true_frequencies, 1)
@@ -1765,7 +1765,7 @@ expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &e
         }
         #ifndef NDEBUG
         for (int64_t j = 0; j < options.nCodes; j++) {
-            expeigenRates[iRate * options.nCodes + j] = std::exp((double) relLen * transmat.eigenval[j]);
+            expeigenRates[iRate * nCodeSize + j] = std::exp((double) relLen * transmat.eigenval[j]);
         }
         #else
         operations.vector_multiply_by(transmat.eigenval, relLen, options.nCodes, &expeigenRates[iRate * nCodeSize]);
@@ -1802,7 +1802,7 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
 }
 
 AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profile &profile2, double bionjWeight,
-                                          DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
+                                          DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat) {
     if (bionjWeight < 0) {
         bionjWeight = 0.5;
     }
@@ -2410,7 +2410,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     */
     std::vector<bool> traversal(maxnode, false);
     node = root;
-    while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
+    while ((node = traversePostorder(node, traversal, nullptr, root)) >= 0) {
         if (node >= (int64_t) seqs.size() && node != root) {
             setProfile(node, -1.0);
         }
@@ -2883,7 +2883,7 @@ AbsNeighbourJoining(void)::reliabilityNJ() {
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
     int64_t iNodesDone = 0;
-    while ((node = traversePostorder(node,/*IN/OUT*/traversal, /*pUp*/NULL)) >= 0) {
+    while ((node = traversePostorder(node,/*IN/OUT*/traversal, /*pUp*/nullptr, root)) >= 0) {
         if (node < (int64_t) seqs.size() || node == root)
             continue; /* nothing to do for leaves or root */
 
@@ -3003,7 +3003,8 @@ AbsNeighbourJoining(bool)::readTreeToken(std::istream &fpInTree, std::string &bu
     return !buf.empty();
 }
 
-AbsNeighbourJoining(int64_t)::traversePostorder(int64_t node, std::vector<bool> &traversal, bool *pUp) {
+AbsNeighbourJoining(int64_t)::
+traversePostorder(int64_t node, std::vector<bool> &traversal, bool *pUp, int64_t branchRoot) {
     if (pUp != nullptr) {
         *pUp = false;
     }
@@ -3029,7 +3030,7 @@ AbsNeighbourJoining(int64_t)::traversePostorder(int64_t node, std::vector<bool> 
             return (node);
         }
         /* If we've already done this node, need to move up */
-        if (node == root) {
+        if (node == branchRoot) {
             return -1; /* nowhere to go -- done traversing */
         }
         node = parent[node];
@@ -3133,10 +3134,10 @@ AbsNeighbourJoining(void)::recomputeProfile(std::unique_ptr<Profile> upProfiles[
     }
 }
 
-AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision, op_t::ALIGNMENT> &dmat) {
+AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat) {
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
-    while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
+    while ((node = traversePostorder(node, traversal, nullptr, root)) >= 0) {
         if (child[node].nChild == 2) {
             int64_t *children = child[node].child;
             averageProfile(profiles[node], profiles[children[0]], profiles[children[1]],  /*unweighted*/-1.0, dmat);
@@ -3147,7 +3148,7 @@ AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision, op_t::AL
 AbsNeighbourJoining(void)::recomputeMLProfiles() {
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
-    while ((node = traversePostorder(node, traversal, nullptr)) >= 0) {
+    while ((node = traversePostorder(node, traversal, nullptr, root)) >= 0) {
         if (child[node].nChild == 2) {
             int64_t *children = child[node].child;
             posteriorProfile(profiles[node], profiles[children[0]], profiles[children[1]],
@@ -3198,7 +3199,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
     Besthit tmp;
 
     /* Note -- if we are already in a parallel region, this will be ignored */
-    #pragma omp parallel for schedule(dynamic)
+    //pragma omp parallel for schedule(dynamic)
     for (int64_t j = 0; j < maxnode; j++) {
         Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
         sv.i = node;
@@ -3215,7 +3216,7 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
         */
         setDistCriterion(nActive, sv);
         if (sv.criterion < bestjoin.criterion && node != j) {
-            bestjoin = sv; //TODO
+            bestjoin = sv;
         }
     }
     if (options.verbose > 5) {
@@ -3335,14 +3336,14 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
         seeds[iNode] = iNode;
     }
 
-    psort(seeds.begin(), seeds.end(), options.threads, CompareSeeds(outDistances, nGaps));
+    psort(seeds.begin(), seeds.end(), CompareSeeds(outDistances, nGaps));
 
     /* For each seed, save its top 2*m hits and then look for close neighbors */
     assert(2 * tophits.m <= (int64_t) seqs.size());
 
     int64_t nHasTopHits = 0;
 
-    #pragma omp parallel for schedule(dynamic)
+    //pragma omp parallel for schedule(dynamic)
     for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
         int64_t seed = seeds[iSeed];
         if (iSeed > 0 && (iSeed % 100) == 0 && options.threads == 1) {
@@ -3351,10 +3352,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
         }
         if (tophits.topHitsLists[seed].hits.size() > 0) {
             if (options.verbose > 2) {
-                #pragma omp critical
-                {
-                    log << strformat("Skipping seed %ld", seed) << std::endl;
-                }
+                log << strformat("Skipping seed %ld", seed) << std::endl;
             }
             continue;
         }
@@ -3364,10 +3362,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
         Besthit bestjoin;
 
         if (options.verbose > 2) {
-            #pragma omp critical
-            {
-                log << strformat("Trying seed %ld", seed) << std::endl;
-            }
+            log << strformat("Trying seed %ld", seed) << std::endl;
         }
         setBestHit(seed, seqs.size(), bestjoin, besthitsSeed.data());
 
@@ -3392,11 +3387,8 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
         double nearcover = 1.0 - neardist / 2.0;
 
         if (options.verbose > 2) {
-            #pragma omp critical
-            {
-                log << strformat("Distance limit for close neighbors %f weight %f ungapped %ld",
-                                 neardist, nearweight, nPos - nGaps[seed]) << std::endl;
-            }
+            log << strformat("Distance limit for close neighbors %f weight %f ungapped %ld",
+                             neardist, nearweight, nPos - nGaps[seed]) << std::endl;
         }
         for (int64_t iClose = 0; iClose < tophits.m; iClose++) {
             Besthit &closehit = besthitsSeed[iClose];
@@ -3423,13 +3415,10 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
                 nHasTopHits++;
                 options.debug.nCloseUsed++;
                 if (options.verbose > 2) {
-                    #pragma omp critical
-                    {
-                        log << strformat("Near neighbor %ld (rank %ld weight %f ungapped %ld %ld)",
-                                         closeNode, iClose, besthitsSeed[iClose].weight,
-                                         nPos - nGaps[seed],
-                                         nPos - nGaps[closeNode]) << std::endl;
-                    }
+                    log << strformat("Near neighbor %ld (rank %ld weight %f ungapped %ld %ld)",
+                                     closeNode, iClose, besthitsSeed[iClose].weight,
+                                     nPos - nGaps[seed],
+                                     nPos - nGaps[closeNode]) << std::endl;
                 }
 
                 /* compute top 2*m hits */
@@ -3870,13 +3859,13 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
         assert(2 * tophits.m <= maxnode);
         Besthit bh;
         setBestHit(newnode, nActive, bh, allhits.data());
-        psort(allhits.begin(), allhits.end(), options.threads, CompareHitsByCriterion());
+        psort(allhits.begin(), allhits.end(), CompareHitsByCriterion());
         sortSaveBestHits(newnode, allhits, maxnode, tophits.m, tophits);
 
         /* Do not need to call UpdateVisible because we set visible below */
 
         /* And use the top 2*m entries to expand other best-hit lists, but only for top m */
-        #pragma omp parallel for schedule(dynamic, 50)
+        //pragma omp parallel for schedule(dynamic, 50)
         for (int64_t iHit = 0; iHit < tophits.m; iHit++) {
             if (allhits[iHit].i < 0) {
                 continue;
@@ -3939,7 +3928,7 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
     assert(nIn > 0);
     assert(nOut > 0);
 
-    psort(besthits.begin(), besthits.end(), options.threads, CompareHitsByCriterion());
+    psort(besthits.begin(), besthits.end(), CompareHitsByCriterion());
 
     /* First count how many we will save
        Not sure if removing duplicates is actually necessary.
@@ -3959,7 +3948,7 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
     }
 
     assert(nSave > 0);
-    std::lock_guard<std::mutex> lock(tophits.locks[iNode]);
+    //std::lock_guard<std::mutex> lock(tophits.locks[iNode]);
     TopHitsList &l = tophits.topHitsLists[iNode];
     l.hits.resize(nSave);
 
@@ -4141,7 +4130,7 @@ AbsNeighbourJoining(void)::resetTopVisible(int64_t nActive, TopHits &tophits) {
     }
     assert(nVisible > 0);
 
-    psort(visibleSorted.begin(), visibleSorted.end(), options.threads, CompareHitsByCriterion());
+    psort(visibleSorted.begin(), visibleSorted.end(), CompareHitsByCriterion());
 
     /* Only keep the top m items, and try to avoid duplicating i->j with j->i
        Note that visible(i) -> j does not necessarily imply visible(j) -> i,
@@ -4188,7 +4177,7 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
         Besthit &hit = combined[iHit];
         updateBestHit(nActive, hit, false);
     }
-    psort(combined.begin(), combined.end(), options.threads, CompareHitsByIJ());
+    psort(combined.begin(), combined.end(), CompareHitsByIJ());
 
     out.reserve(combined.size());
     int64_t iSavedLast = -1;
@@ -4287,60 +4276,30 @@ MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool b
 
     int64_t iRound;
     for (iRound = 0; iRound < nRounds; iRound++) {
-        if (options.threads == 1) {
-            bool bStarTest = false;
-            criteria[ABvsCD] = MLQuartetOptimize(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3],
-                                                 lenABvsCD, &bStarTest,  /*site_likelihoods*/nullptr)
-                               - penalty[ABvsCD];    /* subtract penalty b/c we are trying to maximize log lk */
-            if (bStarTest) {
-                options.debug.nStarTests++;
-                criteria[ACvsBD] = -1e20;
-                criteria[ADvsBC] = -1e20;
-                len[LEN_I] = lenABvsCD[LEN_I];
-                return ABvsCD;
-            }
+        bool bStarTest = false;
+        criteria[ABvsCD] = MLQuartetOptimize(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3],
+                                             lenABvsCD, &bStarTest,  /*site_likelihoods*/nullptr)
+                           - penalty[ABvsCD];    /* subtract penalty b/c we are trying to maximize log lk */
+        if (bStarTest) {
+            options.debug.nStarTests++;
+            criteria[ACvsBD] = -1e20;
+            criteria[ADvsBC] = -1e20;
+            len[LEN_I] = lenABvsCD[LEN_I];
+            return ABvsCD;
+        }
 
-            if (bConsiderAC) {
-                criteria[ACvsBD] = MLQuartetOptimize(*profiles4[0], *profiles4[2], *profiles4[1], *profiles4[3],
-                                                     lenACvsBD, nullptr, /*site_likelihoods*/nullptr)
-                                   - penalty[ACvsBD];
-            }
+        if (bConsiderAC) {
+            criteria[ACvsBD] = MLQuartetOptimize(*profiles4[0], *profiles4[2], *profiles4[1], *profiles4[3],
+                                                 lenACvsBD, nullptr, /*site_likelihoods*/nullptr)
+                               - penalty[ACvsBD];
+        }
 
-            if (bConsiderAD) {
-                criteria[ADvsBC] = MLQuartetOptimize(*profiles4[0], *profiles4[3], *profiles4[2], *profiles4[1],
-                                                     lenADvsBC, nullptr, /*site_likelihoods*/nullptr)
-                                   - penalty[ADvsBC];
-            }
-        } else {
-            #pragma omp parallel
-            #pragma omp sections
-            {
-                #pragma omp section
-                {
-                    criteria[ABvsCD] = MLQuartetOptimize(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3],
-                                                         lenABvsCD, nullptr,  /*site_likelihoods*/nullptr)
-                                       - penalty[ABvsCD];    /* subtract penalty b/c we are trying to maximize log lk */
-                }
+        if (bConsiderAD) {
+            criteria[ADvsBC] = MLQuartetOptimize(*profiles4[0], *profiles4[3], *profiles4[2], *profiles4[1],
+                                                 lenADvsBC, nullptr, /*site_likelihoods*/nullptr)
+                               - penalty[ADvsBC];
+        }
 
-                #pragma omp section
-                {
-                    if (bConsiderAC) {
-                        criteria[ACvsBD] = MLQuartetOptimize(*profiles4[0], *profiles4[2], *profiles4[1], *profiles4[3],
-                                                             lenACvsBD, nullptr, /*site_likelihoods*/nullptr)
-                                           - penalty[ACvsBD];
-                    }
-                }
-
-                #pragma omp section
-                {
-                    if (bConsiderAD) {
-                        criteria[ADvsBC] = MLQuartetOptimize(*profiles4[0], *profiles4[3], *profiles4[2], *profiles4[1],
-                                                             lenADvsBC, nullptr, /*site_likelihoods*/nullptr)
-                                           - penalty[ADvsBC];
-                    }
-                }
-            }
-        } /* end parallel sections */
         if (options.mlAccuracy < 2) {
             /* If clearly worse then ABvsCD, or have short internal branch length and worse, then
                give up */
@@ -4410,7 +4369,7 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
 
     int64_t node = root;
     int64_t iDone = 0;
-    while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr)) >= 0) {
+    while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr, root)) >= 0) {
         int64_t nChild = child[node].nChild;
         if (nChild > 0) {
             if ((iDone % 100) == 0)
@@ -4474,7 +4433,7 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
 
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
-    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr)) >= 0) {
+    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr, root)) >= 0) {
         int64_t nChild = child[node].nChild;
         if (nChild == 0) {
             continue;
@@ -4830,89 +4789,178 @@ AbsNeighbourJoining(void)::logTree(const std::string &format, int64_t i, std::ve
     }
 }
 
-AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats,
-                                    double &dMaxDelta) {
-/* For each non-root node N, with children A,B, sibling C, and uncle D,
-     we compare the current topology AB|CD to the alternate topologies
-     AC|BD and AD|BC, by using the 4 relevant profiles.
 
-     If useML is true, it uses quartet maximum likelihood, and it
-     updates branch lengths as it goes.
+AbsNeighbourJoining(void)::printVisualTree(int node, bool isFirst, const std::string &prefix) {
+    log << prefix << (isFirst ? "├──" : "└──") << node << std::endl;
 
-     If useML is false, it uses the minimum-evolution criterion with
-     log-corrected distances on profiles.  (If logdist is false, then
-     the log correction is not done.) If useML is false, then NNI()
-     does NOT modify the branch lengths.
-
-     Regardless of whether it changes the topology, it recomputes the
-     profile for the node, using the pairwise distances and BIONJ-like
-     weightings (if bionj is set). The parent's profile has changed,
-     but recomputing it is not necessary because we will visit it
-     before we need it (we use postorder, so we may visit the sibling
-     and its children before we visit the parent, but we never
-     consider an ancestor's profile, so that is OK). When we change
-     the parent's profile, this alters the uncle's up-profile, so we
-     remove that.  Finally, if the topology has changed, we remove the
-     up-profiles of the nodes.
-
-     If we do an NNI during post-order traversal, the result is a bit
-     tricky. E.g. if we are at node N, and have visited its children A
-     and B but not its uncle C, and we do an NNI that swaps B & C,
-     then the post-order traversal will visit C, and its children, but
-     then on the way back up, it will skip N, as it has already
-     visited it.  So, the profile of N will not be recomputed: any
-     changes beneath C will not be reflected in the profile of N, and
-     the profile of N will be slightly stale. This will be corrected
-     on the next round of NNIs.
-  */
-    double supportThreshold = useML ? Constants::treeLogLkDelta : options.MEMinDelta;
-    dMaxDelta = 0.0;
-    int64_t nNNIThisRound = 0;
-
-    if (seqs.size() <= 3) {
-        return 0;            /* nothing to do */
-    }
-    if (options.verbose > 2) {
-        log << strformat("Beginning round %ld of NNIs with ml? %d", iRound, useML ? 1 : 0) << std::endl;
-        printNJInternal(log, /*useLen*/useML && iRound > 0 ? true : false);
-    }
-    /* For each node the upProfile or NULL */
-    std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
-    std::vector<bool> traversal(maxnodes, false);
-
-    /* Identify nodes we can skip traversing into */
-    if (options.fastNNI) {
-        for (int64_t node = 0; node < maxnode; node++) {
-            if (node != root
-                && node >= (int64_t) seqs.size()
-                && stats[node].age >= 2
-                && stats[node].subtreeAge >= 2
-                && stats[node].support > supportThreshold) {
-                int64_t nodeABCD[4];
-                setupABCD(node, nullptr, nullptr, nodeABCD, useML);
-                int i;
-                for (i = 0; i < 4; i++) {
-                    if (stats[nodeABCD[i]].age == 0 && stats[nodeABCD[i]].support > supportThreshold) {
-                        break;
-                    }
-                }
-                if (i == 4) {
-                    traversal[node] = true;
-                    if (options.verbose > 2) {
-                        log << strformat(
-                                "Skipping subtree at %ld: child %ld %ld parent %ld age %ld subtreeAge %ld support %.3f",
-                                node, nodeABCD[0], nodeABCD[1], parent[node],
-                                stats[node].age, stats[node].subtreeAge, stats[node].support) << std::endl;
-                    }
-                }
+    if (child[node].nChild > 0) {
+        printHtree(child[node].child[0], child[node].nChild > 1, prefix + (isFirst ? "│  " : "   "));
+        if (child[node].nChild > 1) {
+            printHtree(child[node].child[1], child[node].nChild > 2, prefix + (isFirst ? "│  " : "   "));
+            if (child[node].nChild > 2) {
+                printHtree(child[node].child[2], false, prefix + (isFirst ? "│  " : "   "));
             }
         }
     }
 
+}
+
+AbsNeighbourJoining(int64_t)::
+treeChuncks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std::vector<std::vector<int64_t>> &chunks) {
+    std::sort(partition.begin(), partition.end(),
+              [&weights](int64_t x, int64_t y) { return weights[x] > weights[y]; });
+    chunks.resize(options.threads);
+    std::vector<int64_t> boxWeights(options.threads, 0);
+    int64_t used = 0;
+    for (int i = 0; i < (int) partition.size(); i++) {
+        chunks[0].push_back(partition[i]);
+        boxWeights[0] = weights[partition[i]];
+        used += weights[partition[i]];
+        for (int j = 1; j < options.threads; j++) {
+            if (boxWeights[j - 1] > boxWeights[j]) {
+                std::swap(chunks[j - 1], chunks[j]);
+                std::swap(boxWeights[j - 1], boxWeights[j]);
+            } else {
+                break;
+            }
+        }
+    }
+    return boxWeights.back();
+}
+
+/*
+ * The quality of a partition are the inverse of the thread with the most number of nodes
+ * and nodes excluded from all partitions, that will be processed sequentially.
+ * */
+AbsNeighbourJoining(int64_t)::treePartitionQuality(std::vector<int64_t> &weights, std::vector<int64_t> &partition) {
+    int64_t max = 0;
+    int64_t used = 0;
+    if ((int) partition.size() <= options.threads) {
+        for (int i = 0; i < (int) partition.size(); i++) {
+            if (weights[partition[i]] > max) {
+                max = weights[partition[i]];
+            }
+            used += weights[partition[i]];
+        }
+        max += weights[root] - used;
+    } else {
+        std::vector<std::vector<int64_t>> chunks;
+        max = treeChuncks(partition, weights, chunks);
+
+        partition.clear();
+        for (int i = 0; i < options.threads; i++) {
+            for (int j = 0; j < (int) chunks[i].size(); j++) {
+                partition.push_back(chunks[i][j]);
+                used += weights[chunks[i][j]];
+            }
+        }
+
+        max += (weights[root] - used) + partition.size() * 3;
+    }
+    return -max;
+}
+
+AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal) {
+    std::vector<int64_t> weights(child.size(), 0);
+    std::vector<std::pair<int64_t, bool>> stack;
+    stack.push_back({root, false});
+
+    /* Calculate number of nodes that will be procesed in each subtree */
+    while (!stack.empty()) {
+        int64_t node = stack.back().first;
+        bool visited = stack.back().second;
+
+        if (visited) {
+            for (int i = 0; i < child[node].nChild; i++) {
+                weights[node] += weights[child[node].child[i]];
+            }
+            weights[node] += 1;
+            stack.erase(stack.end());
+            continue;
+        }
+        stack.back().second = true;
+
+        if ((int64_t) seqs.size() >= node || traversal[node]) {
+            stack.erase(stack.end());
+            continue;
+        }
+
+        for (int i = 0; i < child[node].nChild; i++) {
+            stack.push_back({child[node].child[i], false});
+        }
+
+    }
+
+    int maxPartitions = options.threads > 2 ? options.threads : options.threads * 2;
+    std::vector<std::vector<int64_t>> uncheckedPartitions;
+    std::vector<int64_t> bestPartition = {root};
+    uncheckedPartitions.push_back({child[root].child[0], child[root].child[1], child[root].child[2]});
+    /*
+     * Quick search of nodes that create subtrees with a similar number of nodes
+     * to balance the process time in threads.
+     * */
+    do {
+        std::vector<int64_t> partition = std::move(uncheckedPartitions.back());
+        uncheckedPartitions.resize(uncheckedPartitions.size() - 1);
+
+        int64_t actualQuality = treePartitionQuality(weights, bestPartition);
+        int64_t newQuality = treePartitionQuality(weights, partition);
+
+        /*std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
+        for (int i = 1; i < (int) partition.size(); i++) {
+            std::cerr << ", " << partition[i] << "(" << weights[partition[i]] << ")";
+        }
+        std::cerr << ") quality: " << treePartitionQuality(weights, partition) << std::endl;*/
+
+        if (newQuality >= actualQuality) {
+            bestPartition = partition;
+        } else {
+            continue;
+        }
+
+        if (options.threadsBalanced || (int) partition.size() < maxPartitions) {
+            for (int i = 0; i < (int) partition.size(); i++) {
+                if (child[partition[i]].nChild == 2) {
+                    uncheckedPartitions.push_back(partition);
+                    uncheckedPartitions.back()[i] = child[partition[i]].child[0];
+                    uncheckedPartitions.back().push_back(child[partition[i]].child[1]);
+                }
+            }
+        }
+
+        if ((int) partition.size() >= maxPartitions) {
+            int64_t min = weights[partition[0]];
+            for (int i = 1; i < (int) partition.size(); i++) {
+                if (weights[partition[i]] < min) {
+                    min = i;
+                }
+            }
+            for (int i = 0; i < (int) partition.size(); i++) {
+                if (child[partition[i]].nChild == 2 &&
+                    weights[child[partition[i]].child[0]] > weights[min] &&
+                    weights[child[partition[i]].child[1]] > weights[min] && i != min) {
+                    uncheckedPartitions.push_back(partition);
+                    uncheckedPartitions.back()[i] = child[partition[i]].child[0];
+                    uncheckedPartitions.back()[min] = child[partition[i]].child[1];
+                }
+            }
+        }
+    } while (!uncheckedPartitions.empty());
+
+    treeChuncks(bestPartition, weights, chunks);
+}
+
+
+AbsNeighbourJoining(inline int64_t)::transversalNNI(int64_t iRound, int64_t nRounds, bool useML,
+                                                    std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
+                                                    std::unique_ptr<Profile> upProfiles[],
+                                                    std::vector<bool> &traversal) {
+    double supportThreshold = useML ? Constants::treeLogLkDelta : options.MEMinDelta;
     int64_t iDone = 0;
+    int64_t nNNIThisRound = 0;
+    int64_t branchRoot = node;
     bool bUp;
-    int64_t node = root;
-    while ((node = traversePostorder(node, traversal, &bUp)) >= 0) {
+    while ((node = traversePostorder(node, traversal, &bUp, branchRoot)) >= 0) {
         if (node < (int64_t) seqs.size() || node == root) {
             continue; /* nothing to do for leaves or root */
         }
@@ -4925,10 +4973,10 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
                 upProfiles[child[node].child[i]].reset();
             }
             upProfiles[node].reset();
-            recomputeProfile(upProfiles.data(), node, useML);
+            recomputeProfile(upProfiles, node, useML);
             continue;
         }
-        if ((iDone % 100) == 0) {
+        if ((iDone % 100) == 0 && options.threads == 1) {
             std::string buf;
             buf.reserve(100);
             buf += useML ? "ML" : "ME";
@@ -4947,7 +4995,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
         int64_t nodeABCD[4];
         /* Note -- during the first round of ML NNIs, we use the min-evo-based branch lengths,
            which may be suboptimal */
-        setupABCD(node, profiles4, upProfiles.data(), nodeABCD, useML);
+        setupABCD(node, profiles4, upProfiles, nodeABCD, useML);
 
         /* Given our 4 profiles, consider doing a swap */
         int64_t nodeA = nodeABCD[0];
@@ -5092,19 +5140,162 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
             upProfiles[nodeA].reset();
             upProfiles[nodeB].reset();
             upProfiles[nodeC].reset();
-            recomputeProfile(upProfiles.data(), node, useML);
+            recomputeProfile(upProfiles, node, useML);
             if (options.slow && useML) {
-                updateForNNI(node, upProfiles.data(), useML);
+                updateForNNI(node, upProfiles, useML);
             }
         } else {
-            updateForNNI(node, upProfiles.data(), useML);
+            updateForNNI(node, upProfiles, useML);
         }
         if (options.verbose > 2 && options.slow && useML) {
             /* Note we recomputed profiles back up to root already if slow */
             printNJInternal(log, /*useLen*/true);
             log << strformat("New tree lk -- %.4f\n", treeLogLk(/*site_likelihoods*/nullptr));
         }
-    } /* end postorder traversal */
+    }
+    return nNNIThisRound;
+}
+
+AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML, std::vector<NNIStats> &stats,
+                                    double &dMaxDelta) {
+/* For each non-root node N, with children A,B, sibling C, and uncle D,
+     we compare the current topology AB|CD to the alternate topologies
+     AC|BD and AD|BC, by using the 4 relevant profiles.
+
+     If useML is true, it uses quartet maximum likelihood, and it
+     updates branch lengths as it goes.
+
+     If useML is false, it uses the minimum-evolution criterion with
+     log-corrected distances on profiles.  (If logdist is false, then
+     the log correction is not done.) If useML is false, then NNI()
+     does NOT modify the branch lengths.
+
+     Regardless of whether it changes the topology, it recomputes the
+     profile for the node, using the pairwise distances and BIONJ-like
+     weightings (if bionj is set). The parent's profile has changed,
+     but recomputing it is not necessary because we will visit it
+     before we need it (we use postorder, so we may visit the sibling
+     and its children before we visit the parent, but we never
+     consider an ancestor's profile, so that is OK). When we change
+     the parent's profile, this alters the uncle's up-profile, so we
+     remove that.  Finally, if the topology has changed, we remove the
+     up-profiles of the nodes.
+
+     If we do an NNI during post-order traversal, the result is a bit
+     tricky. E.g. if we are at node N, and have visited its children A
+     and B but not its uncle C, and we do an NNI that swaps B & C,
+     then the post-order traversal will visit C, and its children, but
+     then on the way back up, it will skip N, as it has already
+     visited it.  So, the profile of N will not be recomputed: any
+     changes beneath C will not be reflected in the profile of N, and
+     the profile of N will be slightly stale. This will be corrected
+     on the next round of NNIs.
+  */
+    double supportThreshold = useML ? Constants::treeLogLkDelta : options.MEMinDelta;
+    int64_t nNNIThisRound = 0;
+    dMaxDelta = 0.0;
+
+    if (seqs.size() <= 3) {
+        return 0;            /* nothing to do */
+    }
+    if (options.verbose > 2) {
+        log << strformat("Beginning round %ld of NNIs with ml? %d", iRound, useML ? 1 : 0) << std::endl;
+        printNJInternal(log, /*useLen*/useML && iRound > 0 ? true : false);
+    }
+
+    /* For each node the upProfile or NULL */
+    std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
+    std::vector<bool> traversal(maxnodes, false);
+
+
+    /* Identify nodes we can skip traversing into */
+    if (options.fastNNI) {
+        for (int64_t node = 0; node < maxnode; node++) {
+            if (node != root
+                && node >= (int64_t) seqs.size()
+                && stats[node].age >= 2
+                && stats[node].subtreeAge >= 2
+                && stats[node].support > supportThreshold) {
+                int64_t nodeABCD[4];
+                setupABCD(node, nullptr, nullptr, nodeABCD, useML);
+                int i;
+                for (i = 0; i < 4; i++) {
+                    if (stats[nodeABCD[i]].age == 0 && stats[nodeABCD[i]].support > supportThreshold) {
+                        break;
+                    }
+                }
+                if (i == 4) {
+                    traversal[node] = true;
+                    if (options.verbose > 2) {
+                        log << strformat(
+                                "Skipping subtree at %ld: child %ld %ld parent %ld age %ld subtreeAge %ld support %.3f",
+                                node, nodeABCD[0], nodeABCD[1], parent[node],
+                                stats[node].age, stats[node].subtreeAge, stats[node].support) << std::endl;
+                    }
+                }
+            }
+        }
+    }
+
+    if (useML && options.threads > 1) {
+        std::vector<std::vector<int64_t>> chunks;
+        treePartition(chunks, traversal);
+
+        if (options.verbose > 0) {
+            int roots = 0;
+            for (int i = 0; i < (int) chunks.size(); i++) {
+                roots += chunks[i].size();
+            }
+
+            log << "Tree splited into " << roots << " subtrees with grouped root nodes: ";
+            for (int i = 0; i < (int) chunks.size(); i++) {
+                log << "[";
+                for (int j = 0; j < (int) chunks[i].size(); j++) {
+                    log << chunks[i][j];
+                    if (j + 1 < (int) chunks[i].size()) {
+                        log << ", ";
+                    }
+                }
+                log << "]";
+            }
+            log << std::endl;
+        }
+
+        #pragma omp parallel
+        {
+            std::vector<std::unique_ptr<Profile>> upProfilesThread(maxnodes);
+            double dMaxDelta2 = 0.0;
+            int64_t nNNIThisRound2 = 0;
+
+            #pragma omp for schedule(static, 1)
+            for (int i = 0; i < (int) chunks.size(); i++) {
+                for (int64_t subtreeRoot : chunks[i]) {
+                    /*
+                     * the neighborhood of a node includes the parent, so in order not to modify the subtreeRoot node,
+                     * we do not process their direct children.
+                     */
+                    for (int j = 0; j < child[subtreeRoot].nChild; j++) {
+                        int64_t directChildren = child[subtreeRoot].child[j];
+                        for (int k = 0; k < child[directChildren].nChild; k++) {
+                            int64_t children = child[directChildren].child[k];
+                            nNNIThisRound2 += transversalNNI(iRound, nRounds, useML, stats, dMaxDelta2, children,
+                                                             upProfilesThread.data(), traversal);
+                        }
+                    }
+                }
+            }
+
+            #pragma omp critical
+            {
+                if (dMaxDelta2 > dMaxDelta) {
+                    dMaxDelta = dMaxDelta2;
+                }
+                nNNIThisRound += nNNIThisRound2;
+            }
+        }
+    }
+
+    nNNIThisRound += transversalNNI(iRound, nRounds, useML, stats, dMaxDelta, root, upProfiles.data(), traversal);
 
     if (options.verbose >= 2) {
         int nUp = 0;
@@ -5145,7 +5336,7 @@ AbsNeighbourJoining(void)::SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRo
     int64_t nodeListLen = 0;
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
-    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr)) >= 0) {
+    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr, root)) >= 0) {
         nodeList[nodeListLen++] = node;
     }
     assert(nodeListLen == maxnode);
@@ -5369,7 +5560,7 @@ AbsNeighbourJoining(void)::updateBranchLengths() {
     std::vector<bool> traversal(maxnodes, false);
 
     int64_t node = root;
-    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr)) >= 0) {
+    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr, root)) >= 0) {
         /* reset branch length of node (distance to its parent) */
         if (node == root) {
             continue; /* no branch length to set */
@@ -5414,7 +5605,7 @@ AbsNeighbourJoining(double)::treeLength(bool recomputeProfiles) {
     if (recomputeProfiles) {
         std::vector<bool> traversal2(maxnodes, false);
         int64_t j = root;
-        while ((j = traversePostorder(j, traversal2, /*pUp*/nullptr)) >= 0) {
+        while ((j = traversePostorder(j, traversal2, /*pUp*/nullptr, root)) >= 0) {
             /* nothing to do for leaves or root */
             if (j >= (int64_t) seqs.size() && j != root)
                 setProfile(j, /*noweight*/-1.0);
@@ -5440,7 +5631,7 @@ AbsNeighbourJoining(void)::testSplitsMinEvo(SplitCount &splitcount) {
     std::vector<bool> traversal(maxnodes, false);
     int64_t node = root;
 
-    while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr)) >= 0) {
+    while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr, root)) >= 0) {
         if (node < (int64_t) seqs.size() || node == root) {
             continue; /* nothing to do for leaves or root */
         }
@@ -5567,7 +5758,7 @@ AbsNeighbourJoining(void)::testSplitsML(SplitCount &splitcount) {
     std::vector<double> site_likelihoods(3 * nPos);
 
     int64_t iNodesDone = 0;
-    while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr)) >= 0) {
+    while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr, root)) >= 0) {
         if (node < (int64_t) seqs.size() || node == root) {
             continue; /* nothing to do for leaves or root */
         }
