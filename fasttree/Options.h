@@ -94,6 +94,7 @@ namespace fasttree {
 
         /*Optimizations*/
         int threads = 1;
+        int threadsLevel = 1;
         bool threadsBalanced = false;
         bool doublePrecision = false;
         int fastexp = 0;

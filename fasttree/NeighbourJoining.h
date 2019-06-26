@@ -93,7 +93,7 @@ namespace fasttree {
         void recomputeProfiles(DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
 
         /* One round of subtree-prune-regraft moves (minimum evolution) */
-        void SPR(int64_t maxSPRLength, int64_t iRound, int64_t nRounds);
+        void SPR(int64_t iRound, int64_t nRounds);
 
         /* Given a topology and branch lengths, optimize GTR rates and quickly reoptimize branch lengths
            If gtrfreq is NULL, then empirical frequencies are used
@@ -371,7 +371,7 @@ namespace fasttree {
            Modifies the tree by this chain of NNIs
         */
         int64_t findSPRSteps(int64_t node, int64_t parent, /* sibling or parent of node to NNI to start the chain */
-                             std::unique_ptr<Profile> upProfiles[], SprStep steps[], int64_t maxSteps, bool bFirstAC);
+                             std::unique_ptr<Profile> upProfiles[], SprStep steps[], bool bFirstAC);
 
         /* Undo a single NNI */
         void unwindSPRStep(SprStep &step, std::unique_ptr<Profile> upProfiles[]);
@@ -736,9 +736,12 @@ namespace fasttree {
         void printVisualTree(int node, bool isFirst = false, const std::string &prefix = "");
 
 
-        inline int64_t transversalNNI(int64_t iRound, int64_t nRounds, bool useML,
+        inline int64_t traverseNNI(int64_t iRound, int64_t nRounds, bool useML,
                                       std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
                                       std::unique_ptr<Profile> upProfiles[], std::vector<bool> &traversal);
+
+        inline void traverseSPR(int64_t iRound, int64_t nRounds, int64_t nodeList[], std::unique_ptr<Profile> upProfiles[],
+                double last_tot_len);
 
         /* One-dimensional minimization using brent's function, with
         a fractional and an absolute tolerance */

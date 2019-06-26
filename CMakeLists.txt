@@ -3,7 +3,7 @@ project(FastTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
-option(USE_NATIVE "enable/disable system's processor architecture optimization (linux)" OFF)
+option(USE_NATIVE "enable/disable system's processor architecture optimization (linux)" ON)
 option(USE_SEE2 "enable/disable SEE2 in windows (linux default)" ON)
 option(USE_SEE4 "enable/disable SEE4.1" OFF)
 option(USE_AVX "enable/disable AVX" OFF)

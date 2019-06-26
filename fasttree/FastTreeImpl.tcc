@@ -177,7 +177,7 @@ AbsFastTreeImpl(void)::run() {
                     if (sprRemaining > 0 &&
                         (nniToDo / (options.spr + 1) > 0 &&
                          ((i + 1) % (nniToDo / (options.spr + 1))) == 0)) {
-                        nj.SPR(options.maxSPRLength, options.spr - sprRemaining, options.spr);
+                        nj.SPR(options.spr - sprRemaining, options.spr);
                         nj.logTree("ME_SPR%ld", options.spr - sprRemaining + 1, aln.names, unique);
                         sprRemaining--;
                         /* Restart the NNIs -- set all ages to 0, etc. */
@@ -187,7 +187,7 @@ AbsFastTreeImpl(void)::run() {
                 }
             }
             while (sprRemaining > 0) {    /* do any remaining SPR rounds */
-                nj.SPR(options.maxSPRLength, options.spr - sprRemaining, options.spr);
+                nj.SPR(options.spr - sprRemaining, options.spr);
                 nj.logTree("ME_SPR%ld", options.spr - sprRemaining + 1, aln.names, unique);
                 sprRemaining--;
             }

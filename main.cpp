@@ -419,11 +419,14 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-threads", options.threads, "to use a parallel version with multiple threads")->
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
-    app.add_flag("-threads-balanced", options.threadsBalanced, "create more subtrees than threads to a balanced"
-                                                                 " number of nodes per subprocess, greatly improve "
-                                                                 "performance with very unbalanced trees, "
-                                                                 "but can affect the final precision.")->
+    app.add_flag("-threads-balanced", options.threadsBalanced,
+                 "create more subtrees than threads to a balanced  number of nodes per subprocess, greatly improve "
+                 "performance with very unbalanced trees, but can affect the final precision.")->
             group(optimizations);
+    app.add_option("-threads-level", options.threadsLevel,
+                   "Restrict the number of sections that will be parallelized. Options: "
+                   "0 legacy(tree is not divided), 1 (tree is divided for NNI, 70% of final time, default)")->
+            type_name("lvl")->check(CLI::Range(0, 1))->group(optimizations);
 
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
             group(optimizations);
@@ -432,10 +435,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                             "compute multiple processing elements with one operation. Available: none, SSE3, AVX, AVX2 or AVX512")
             ->type_name("name")->default_val("NONE")->group(optimizations);
 
-    app.add_option("-fastexp", options.fastexp, "to use a fast implementation of exp(x) for distance matrix, in some"
-                                                " cases can reduce the final precision especially when"
-                                                " -double-precision is used. Options: "
-                                                "0 precise (default), 2 balanced, 3 fast, 1 less precise (fast than precise, use when balanced has bad results)")->
+    app.add_option("-fastexp", options.fastexp,
+                   "to use a fast implementation of exp(x) for distance matrix, in some  cases can reduce the final "
+                   "precision especially when -double-precision is used. Options: "
+                   "0 precise (default), 2 balanced, 3 fast, 1 less precise (fast than precise, use when balanced has bad results)")->
             type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
 
     for (auto &c:options.extension) { c = (char) std::toupper(c); }
