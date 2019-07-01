@@ -4883,8 +4883,7 @@ AbsNeighbourJoining(int64_t)::treePartitionQuality(std::vector<int64_t> &weights
             }
         }
     }
-    max += weights[root] - used;
-    return -max;
+    return used - max;
 }
 
 AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal) {
@@ -4919,14 +4918,16 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
     }
 
     int maxPartitions = options.threads > 2 ? options.threads : options.threads * 2;
+    int64_t minPartition = weights[root] / (2 * maxPartitions);
     std::vector<std::vector<int64_t>> uncheckedPartitions;
-    std::vector<int64_t> bestPartition = {root};
+    std::vector<int64_t> bestPartition;
     uncheckedPartitions.push_back({});
     for (int i = 0; i < 3; i++) {
         if (weights[child[root].child[i]] > 20) {
             uncheckedPartitions[0].push_back(child[root].child[i]);
         }
     }
+    bestPartition = uncheckedPartitions.back();
 
     /*
      * Quick search of nodes that create subtrees with a similar number of nodes
@@ -4939,11 +4940,11 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         int64_t actualQuality = treePartitionQuality(weights, bestPartition);
         int64_t newQuality = treePartitionQuality(weights, partition);
 
-        std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
+        /*std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
         for (int i = 1; i < (int) partition.size(); i++) {
             std::cerr << ", " << partition[i] << "(" << weights[partition[i]] << ")";
         }
-        std::cerr << ") quality: " << treePartitionQuality(weights, partition) << std::endl;
+        std::cerr << ") quality: " << treePartitionQuality(weights, partition) << std::endl;*/
 
         if (newQuality >= actualQuality) {
             bestPartition = partition;
@@ -4954,15 +4955,18 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         /* Add a new root node */
         if (options.threadsBalanced || (int) partition.size() < maxPartitions) {
             for (int i = 0; i < (int) partition.size(); i++) {
-                if (child[partition[i]].nChild == 2 && weights[partition[i]] > 40) {
+                if (child[partition[i]].nChild == 2 &&
+                    (weights[partition[i]] > minPartition || options.threadsBalanced)) {
                     uncheckedPartitions.push_back(partition);
                     if (weights[child[partition[i]].child[0]] > 20) {
                         uncheckedPartitions.back()[i] = child[partition[i]].child[0];
+                        if (weights[child[partition[i]].child[1]] > 20) {
+                            uncheckedPartitions.back().push_back(child[partition[i]].child[1]);
+                        }
                     } else {
                         uncheckedPartitions.back()[i] = child[partition[i]].child[1];
                         continue;
                     }
-                    uncheckedPartitions.back().push_back(child[partition[i]].child[1]);
                 }
             }
         }
