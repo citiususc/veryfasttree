@@ -33,7 +33,7 @@ namespace fasttree {
 
     private:
         template<typename Tp>
-        inline numeric_t mm_sum(register Tp sum);
+        inline numeric_t mm_sum(Tp sum);
 
         inline __m128 fastexpImpl(__m128 vx);
 

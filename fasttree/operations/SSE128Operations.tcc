@@ -6,20 +6,22 @@
 
 template<>
 template<>
-inline float fasttree::SSE128Operations<float>::mm_sum(register __m128 sum) {
+inline float fasttree::SSE128Operations<float>::mm_sum(__m128 sum) {
+    #ifdef  __SSE3__
+    sum = _mm_hadd_ps(sum, sum);
+    return sum[0] + sum[1];
+    #else
     /* stupider but faster */
     alignas(ALIGNMENT) float f[4];
     _mm_store_ps(f, sum);
     return (f[0] + f[1] + f[2] + f[3]);
+    #endif
 }
 
 template<>
 template<>
-inline double fasttree::SSE128Operations<double>::mm_sum(register __m128d sum) {
-    /* stupider but faster */
-    alignas(ALIGNMENT) double f[2];;
-    _mm_store_pd(f, sum);
-    return (f[0] + f[1]);
+inline double fasttree::SSE128Operations<double>::mm_sum(__m128d sum) {
+    return sum[0] + sum[1];
 }
 
 template<>

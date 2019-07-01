@@ -32,8 +32,12 @@ namespace fasttree {
         inline void fastexp(numeric_t fTot[], int64_t n, int lvl);
 
     private:
-        template <typename Tp>
-        inline numeric_t mm_sum(register Tp sum);
+
+        inline numeric_t mm_sum(__m128 sum);
+
+        inline numeric_t mm_sum(__m256d sum);
+
+        inline numeric_t mm_sum(__m256 sum1, __m128 sum2);
 
         inline __m128 fastexpImpl(__m128 vx);
 
