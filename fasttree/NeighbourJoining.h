@@ -726,8 +726,8 @@ namespace fasttree {
         void MLSiteLikelihoodsByRate(std::vector<numeric_t, typename op_t::Allocator> &rates,
                                      std::vector<double> &site_loglk);
 
-        int64_t treeChuncks(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
-                            std::vector<std::vector<int64_t>> &chunks);
+        int64_t treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
+                           std::vector<std::vector<int64_t>> &chunks);
 
         int64_t treePartitionQuality(std::vector<int64_t> &weights, std::vector<int64_t> &partition);
 

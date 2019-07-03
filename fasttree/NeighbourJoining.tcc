@@ -4837,7 +4837,7 @@ AbsNeighbourJoining(void)::printVisualTree(int node, bool isFirst, const std::st
 }
 
 AbsNeighbourJoining(int64_t)::
-treeChuncks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std::vector<std::vector<int64_t>> &chunks) {
+treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std::vector<std::vector<int64_t>> &chunks) {
     chunks.resize(options.threads);
     std::vector<int64_t> boxWeights(options.threads, 0);
     int64_t used = 0;
@@ -4875,7 +4875,7 @@ AbsNeighbourJoining(int64_t)::treePartitionQuality(std::vector<int64_t> &weights
         return used - max;
     } else {
         std::vector<std::vector<int64_t>> chunks;
-        return treeChuncks(partition, weights, chunks);
+        return treeChunks(partition, weights, chunks);
     }
 }
 
@@ -4957,7 +4957,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
 
     }
 
-    treeChuncks(bestPartition, weights, chunks);
+    treeChunks(bestPartition, weights, chunks);
     if (options.verbose > 0) {
         if (false) {
             printVisualTree(root);
