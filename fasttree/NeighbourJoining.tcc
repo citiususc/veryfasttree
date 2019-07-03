@@ -4838,12 +4838,12 @@ AbsNeighbourJoining(void)::printVisualTree(int node, bool isFirst, const std::st
 
 AbsNeighbourJoining(int64_t)::
 treeChuncks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std::vector<std::vector<int64_t>> &chunks) {
-    std::sort(partition.begin(), partition.end(),
-              [&weights](int64_t x, int64_t y) { return weights[x] > weights[y]; });
     chunks.resize(options.threads);
     std::vector<int64_t> boxWeights(options.threads, 0);
+    int64_t used = 0;
     for (int i = 0; i < (int) partition.size(); i++) {
         chunks[0].push_back(partition[i]);
+        used += weights[partition[i]];
         boxWeights[0] += weights[partition[i]];
         for (int j = 1; j < options.threads; j++) {
             if (boxWeights[j - 1] > boxWeights[j]) {
@@ -4854,7 +4854,7 @@ treeChuncks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std:
             }
         }
     }
-    return boxWeights.back();
+    return used - boxWeights.back();
 }
 
 /*
@@ -4862,28 +4862,21 @@ treeChuncks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std:
  * and nodes excluded from all partitions, that will be processed sequentially.
  * */
 AbsNeighbourJoining(int64_t)::treePartitionQuality(std::vector<int64_t> &weights, std::vector<int64_t> &partition) {
-    int64_t max = 0;
-    int64_t used = 0;
+    std::sort(partition.begin(), partition.end(), [&weights](int64_t x, int64_t y) { return weights[x] > weights[y]; });
     if ((int) partition.size() <= options.threads) {
+        int64_t max = 0;
+        int64_t used = 0;
         for (int i = 0; i < (int) partition.size(); i++) {
             if (weights[partition[i]] > max) {
                 max = weights[partition[i]];
             }
             used += weights[partition[i]];
         }
+        return used - max;
     } else {
         std::vector<std::vector<int64_t>> chunks;
-        max = treeChuncks(partition, weights, chunks);
-
-        partition.clear();
-        for (int i = 0; i < options.threads; i++) {
-            for (int j = 0; j < (int) chunks[i].size(); j++) {
-                partition.push_back(chunks[i][j]);
-                used += weights[chunks[i][j]];
-            }
-        }
+        return treeChuncks(partition, weights, chunks);
     }
-    return used - max;
 }
 
 AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal) {
@@ -4917,76 +4910,54 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
 
     }
 
-    int maxPartitions = options.threads > 2 ? options.threads : options.threads * 2;
-    int64_t minPartition = weights[root] / (2 * maxPartitions);
-    std::vector<std::vector<int64_t>> uncheckedPartitions;
-    std::vector<int64_t> bestPartition;
-    uncheckedPartitions.push_back({});
-    for (int i = 0; i < 3; i++) {
-        if (weights[child[root].child[i]] > 20) {
-            uncheckedPartitions[0].push_back(child[root].child[i]);
-        }
-    }
-    bestPartition = uncheckedPartitions.back();
+    int maxPartitions = options.threads * 2;
+    int64_t minPartition = (weights[root] / maxPartitions) - 1;
+    std::vector<int64_t> bestPartition = {child[root].child[0], child[root].child[1], child[root].child[2]};
+    int64_t bestQuality = treePartitionQuality(weights, bestPartition);
+    std::vector<int64_t> partition = bestPartition;
+    int64_t quality = bestQuality;
 
     /*
      * Quick search of nodes that create subtrees with a similar number of nodes
      * to balance the process time in threads.
-     * */
-    do {
-        std::vector<int64_t> partition = std::move(uncheckedPartitions.back());
-        uncheckedPartitions.resize(uncheckedPartitions.size() - 1);
+     */
+    while (weights[partition.front()] > minPartition) {
 
-        int64_t actualQuality = treePartitionQuality(weights, bestPartition);
-        int64_t newQuality = treePartitionQuality(weights, partition);
-
-        /*std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
+        std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
         for (int i = 1; i < (int) partition.size(); i++) {
             std::cerr << ", " << partition[i] << "(" << weights[partition[i]] << ")";
         }
-        std::cerr << ") quality: " << treePartitionQuality(weights, partition) << std::endl;*/
+        std::cerr << ") quality: " << quality << std::endl;
 
-        if (newQuality >= actualQuality) {
+        if ((quality - 3 * partition.size()) > (bestQuality - 3 * bestPartition.size())) {
             bestPartition = partition;
-        } else {
-            continue;
+            bestQuality = quality;
         }
 
-        /* Add a new root node */
-        if (options.threadsBalanced || (int) partition.size() < maxPartitions) {
-            for (int i = 0; i < (int) partition.size(); i++) {
-                if (child[partition[i]].nChild == 2 &&
-                    (weights[partition[i]] > minPartition || options.threadsBalanced)) {
-                    uncheckedPartitions.push_back(partition);
-                    if (weights[child[partition[i]].child[0]] > 20) {
-                        uncheckedPartitions.back()[i] = child[partition[i]].child[0];
-                        if (weights[child[partition[i]].child[1]] > 20) {
-                            uncheckedPartitions.back().push_back(child[partition[i]].child[1]);
-                        }
-                    } else {
-                        uncheckedPartitions.back()[i] = child[partition[i]].child[1];
-                        continue;
-                    }
-                }
-            }
+        if (child[partition.front()].nChild == 2) {
+            int64_t node = partition.front();
+            partition.front() = child[node].child[0];
+            partition.push_back(child[node].child[1]);
         }
 
-        /* Remove the smallest root node */
-        if ((int) partition.size() >= maxPartitions) {
-            int64_t min = 0;
-            for (int i = 1; i < (int) partition.size(); i++) {
-                if (weights[partition[i]] < weights[partition[min]]) {
-                    min = i;
-                }
-            }
-            partition.erase(partition.begin() + min);
-            uncheckedPartitions.push_back(partition);
+        quality = treePartitionQuality(weights, partition);
+        if (!options.threadsBalanced && maxPartitions > (int) bestPartition.size()) {
+            partition.resize(maxPartitions);
         }
 
+        bool changed = false;
+        while (weights[partition.back()] < 3 * (int64_t) partition.size()) {
+            partition.resize(partition.size() - 1);
+            changed = true;
+        }
 
-    } while (!uncheckedPartitions.empty());
+        if (changed) {
+            quality = treePartitionQuality(weights, partition);
+        }
+
+    }
+
     treeChuncks(bestPartition, weights, chunks);
-
     if (options.verbose > 0) {
         if (false) {
             printVisualTree(root);
@@ -5012,14 +4983,14 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
                     log << ", ";
                 }
             }
-            log << "] , nodes " << nodes << std::endl;
+            log << "], nodes " << nodes << std::endl;
         }
         int64_t skipped = weights[root] - used;
         maxNodes += skipped;
-        log << strformat("  skipped   (%3.2f%%): nodes %d", skipped * 100.0 / weights[root], weights[root] - used);
+        log << strformat("    skipped (%3.2f%%): nodes %d", skipped * 100.0 / weights[root], weights[root] - used);
         log << std::endl;
-        log << strformat(" total (%3.2f%%), nodes %d, speedup %.2f of %d", maxNodes * 100.0 / weights[root], maxNodes,
-                         weights[root] / (float) maxNodes, options.threads);
+        log << strformat(" total (%3.2f%%), nodes %d, speedup %.2f of %d Time %.2f", maxNodes * 100.0 / weights[root],
+                         maxNodes, weights[root] / (float) maxNodes, options.threads, progressReport.clockDiff());
         log << std::endl;
     }
 
