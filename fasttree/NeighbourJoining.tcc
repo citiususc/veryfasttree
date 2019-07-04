@@ -4923,13 +4923,13 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
      */
     while (weights[partition.front()] > minPartition) {
 
-        std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
+        /*std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
         for (int i = 1; i < (int) partition.size(); i++) {
             std::cerr << ", " << partition[i] << "(" << weights[partition[i]] << ")";
         }
-        std::cerr << ") quality: " << quality << std::endl;
+        std::cerr << ") quality: " << quality << std::endl;*/
 
-        if ((quality - 3 * partition.size()) > (bestQuality - 3 * bestPartition.size())) {
+        if ((quality - 3 * (int64_t)partition.size()) > (bestQuality - 3 * (int64_t)bestPartition.size())) {
             bestPartition = partition;
             bestQuality = quality;
         }
