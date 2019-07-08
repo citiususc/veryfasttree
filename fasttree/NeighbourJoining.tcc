@@ -4276,7 +4276,7 @@ MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool b
 
     int64_t iRound;
     for (iRound = 0; iRound < nRounds; iRound++) {
-        if (omp_in_parallel()) {
+        if (omp_in_parallel() || options.threads == 1) {
             bool bStarTest = false;
             criteria[ABvsCD] = MLQuartetOptimize(*profiles4[0], *profiles4[1], *profiles4[2], *profiles4[3],
                                                  lenABvsCD, &bStarTest,  /*site_likelihoods*/nullptr)
