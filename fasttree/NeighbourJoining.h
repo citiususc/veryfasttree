@@ -226,7 +226,7 @@ namespace fasttree {
 
 
             /* 1 lock to read or write any top hits list, no thread grabs more than one */
-            //std::vector<std::mutex> locks;
+            std::vector<std::mutex> locks;
 
             TopHits(const Options &options, int64_t maxnodes, int64_t m);
 
@@ -737,11 +737,14 @@ namespace fasttree {
 
 
         inline int64_t traverseNNI(int64_t iRound, int64_t nRounds, bool useML,
-                                      std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
-                                      std::unique_ptr<Profile> upProfiles[], std::vector<bool> &traversal);
+                                   std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
+                                   std::unique_ptr<Profile> upProfiles[], std::vector<bool> &traversal);
 
-        inline void traverseSPR(int64_t iRound, int64_t nRounds, int64_t nodeList[], std::unique_ptr<Profile> upProfiles[],
-                double last_tot_len);
+        inline void
+        traverseSPR(int64_t iRound, int64_t nRounds, int64_t nodeList[], std::unique_ptr<Profile> upProfiles[],
+                    double last_tot_len);
+
+        inline void traverseRecomputeMLProfiles(std::vector<bool> &traversal, int64_t node);
 
         /* One-dimensional minimization using brent's function, with
         a fractional and an absolute tolerance */

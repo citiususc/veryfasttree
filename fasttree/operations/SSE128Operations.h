@@ -41,6 +41,13 @@ namespace fasttree {
     };
 }
 
+/*
+ * A template specialization must be declared inside namespace in gcc 5 and 6.
+ */
+namespace fasttree {
+
 #include "SSE128Operations.tcc"
+
+}
 
 #endif

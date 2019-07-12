@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 3.6)
-project(FastTree)
+cmake_minimum_required(VERSION 3.5)
+project(VeryFastTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
 option(USE_NATIVE "enable/disable system's processor architecture optimization (linux)" ON)
-option(USE_SEE2 "enable/disable SEE2 in windows (linux default)" ON)
-option(USE_SEE4 "enable/disable SEE4.1" OFF)
+option(USE_SEE2 "enable/disable SSE2 in windows (linux default)" ON)
+option(USE_SEE4 "enable/disable SSE4.1" OFF)
 option(USE_AVX "enable/disable AVX" OFF)
 option(USE_AVX2 "enable/disable AVX2" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)

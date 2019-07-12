@@ -49,7 +49,7 @@ AbsNeighbourJoining()::TopHits::TopHits() {}
 
 AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) :
         m(_m), q((int64_t) (0.5 + options.tophits2Mult * std::sqrt(m))),
-        maxnodes(_maxnodes), topvisibleAge(0) {
+        maxnodes(_maxnodes), topvisibleAge(0), locks(options.threads > 1 ? maxnodes : 0) {
     assert(m > 0);
     if (!options.useTopHits2nd || q >= m) {
         q = 0;
@@ -3145,16 +3145,40 @@ AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision, op_t::AL
     }
 }
 
-AbsNeighbourJoining(void)::recomputeMLProfiles() {
-    std::vector<bool> traversal(maxnodes, false);
-    int64_t node = root;
-    while ((node = traversePostorder(node, traversal, nullptr, root)) >= 0) {
+
+AbsNeighbourJoining(inline void)::traverseRecomputeMLProfiles(std::vector<bool> &traversal, int64_t node) {
+    int64_t branchRoot = node;
+    while ((node = traversePostorder(node, traversal, nullptr, branchRoot)) >= 0) {
         if (child[node].nChild == 2) {
             int64_t *children = child[node].child;
             posteriorProfile(profiles[node], profiles[children[0]], profiles[children[1]],
                              branchlength[children[0]], branchlength[children[1]]);
         }
     }
+
+
+}
+
+AbsNeighbourJoining(void)::recomputeMLProfiles() {
+    std::vector<bool> traversal(maxnodes, false);
+
+    if (options.threads > 1 && options.threadsLevel > 0) {
+        std::vector<std::vector<int64_t>> chunks;
+        treePartition(chunks, traversal);
+
+        #pragma omp parallel
+        {
+            #pragma omp for schedule(static, 1)
+            for (int i = 0; i < (int) chunks.size(); i++) {
+                for (int64_t subtreeRoot : chunks[i]) {
+                    traverseRecomputeMLProfiles(traversal, subtreeRoot);
+                }
+            }
+        }
+    }
+
+    traverseRecomputeMLProfiles(traversal, root);
+
 }
 
 /* The BIONJ-like formula for the weight of A when building a profile for AB is
@@ -3199,26 +3223,41 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
     Besthit tmp;
 
     /* Note -- if we are already in a parallel region, this will be ignored */
-    //pragma omp parallel for schedule(dynamic)
-    for (int64_t j = 0; j < maxnode; j++) {
-        Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
-        sv.i = node;
-        sv.j = j;
-        if (parent[j] >= 0) {
-            sv.i = -1;        /* illegal/empty join */
-            sv.weight = 0.0;
-            sv.criterion = sv.dist = (numeric_t) 1e20;
-            continue;
+    #pragma omp parallel
+    {
+        Besthit bestjoin2 = bestjoin;
+        #pragma omp for schedule(dynamic)
+        for (int64_t j = 0; j < maxnode; j++) {
+            Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
+            sv.i = node;
+            sv.j = j;
+            if (parent[j] >= 0) {
+                sv.i = -1;        /* illegal/empty join */
+                sv.weight = 0.0;
+                sv.criterion = sv.dist = (numeric_t) 1e20;
+                continue;
+            }
+            /* Note that we compute self-distances (allow j==node) because the top-hit heuristic
+               expects self to be within its top hits, but we exclude those from the bestjoin
+               that we return...
+            */
+            setDistCriterion(nActive, sv);
+            /*
+             * Local comparisons in each thread to remove non deterministic results
+             */
+            if (sv.criterion < bestjoin2.criterion && node != j) {
+                bestjoin2 = sv;
+            }
         }
-        /* Note that we compute self-distances (allow j==node) because the top-hit heuristic
-           expects self to be within its top hits, but we exclude those from the bestjoin
-           that we return...
-        */
-        setDistCriterion(nActive, sv);
-        if (sv.criterion < bestjoin.criterion && node != j) {
-            bestjoin = sv;
+
+        #pragma omp critical
+        {
+            if (bestjoin2.criterion < bestjoin.criterion) {
+                bestjoin = bestjoin2;
+            }
         }
     }
+
     if (options.verbose > 5) {
         log << strformat("SetBestHit %ld %ld %f %f", bestjoin.i, bestjoin.j, bestjoin.dist, bestjoin.criterion)
             << std::endl;
@@ -3343,7 +3382,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
 
     int64_t nHasTopHits = 0;
 
-    //pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
         int64_t seed = seeds[iSeed];
         if (iSeed > 0 && (iSeed % 100) == 0 && options.threads == 1) {
@@ -3865,7 +3904,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
         /* Do not need to call UpdateVisible because we set visible below */
 
         /* And use the top 2*m entries to expand other best-hit lists, but only for top m */
-        //pragma omp parallel for schedule(dynamic, 50)
+        #pragma omp parallel for schedule(dynamic, 50)
         for (int64_t iHit = 0; iHit < tophits.m; iHit++) {
             if (allhits[iHit].i < 0) {
                 continue;
@@ -3948,7 +3987,9 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
     }
 
     assert(nSave > 0);
-    //std::lock_guard<std::mutex> lock(tophits.locks[iNode]);
+    if (options.threads > 1) {
+        tophits.locks[iNode].lock();
+    }
     TopHitsList &l = tophits.topHitsLists[iNode];
     l.hits.resize(nSave);
 
@@ -3964,6 +4005,9 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
         }
     }
     assert(iSave == nSave);
+    if (options.threads > 1) {
+        tophits.locks[iNode].unlock();
+    }
 }
 
 AbsNeighbourJoining(void)::transferBestHits(int64_t nActive, int64_t iNode, std::vector<Besthit> &oldhits,
@@ -4389,7 +4433,7 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
         assert(child[parent].nChild == 2);
         int64_t nodes[2] = {child[parent].child[0], child[parent].child[1]};
         double length = 1.0;
-        (void) MLPairOptimize(profiles[nodes[0]], profiles[nodes[1]], /*IN/OUT*/&length);
+        MLPairOptimize(profiles[nodes[0]], profiles[nodes[1]], /*IN/OUT*/&length);
         branchlength[nodes[0]] = length / 2.0;
         branchlength[nodes[1]] = length / 2.0;
         return;
@@ -4929,7 +4973,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         }
         std::cerr << ") quality: " << quality << std::endl;*/
 
-        if ((quality - 3 * (int64_t)partition.size()) > (bestQuality - 3 * (int64_t)bestPartition.size())) {
+        if ((quality - 3 * (int64_t) partition.size()) > (bestQuality - 3 * (int64_t) bestPartition.size())) {
             bestPartition = partition;
             bestQuality = quality;
         }
@@ -4989,7 +5033,8 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         maxNodes += skipped;
         log << strformat("    skipped (%3.2f%%): nodes %d", skipped * 100.0 / weights[root], weights[root] - used);
         log << std::endl;
-        log << strformat(" total (%3.2f%%), nodes %d, speedup %.2f of %d Time %.2f", maxNodes * 100.0 / weights[root],
+        log << strformat(" total (%3.2f%%), nodes %d, theoretical speedup %.2f of %d Time %.2f",
+                         maxNodes * 100.0 / weights[root],
                          maxNodes, weights[root] / (float) maxNodes, options.threads, progressReport.clockDiff());
         log << std::endl;
     }
@@ -5284,6 +5329,9 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
     }
 
     if (useML && options.threads > 1 && options.threadsLevel > 0) {
+        std::string buf = useML ? "ML" : "ME";
+        buf += " NNI round %ld of %ld, %ld splits";
+        progressReport.print(buf, iRound + 1, nRounds, (int64_t) (maxnode - seqs.size()));
         std::vector<std::vector<int64_t>> chunks;
         treePartition(chunks, traversal);
 

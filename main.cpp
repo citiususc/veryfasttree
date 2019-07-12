@@ -425,7 +425,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             group(optimizations);
     app.add_option("-threads-level", options.threadsLevel,
                    "Restrict the number of sections that will be parallelized. Options: "
-                   "0 legacy(tree is not divided), 1 (tree is divided for NNI, 70% of final time, default)")->
+                   "0 legacy(tree is not divided), 1 (tree is divided for NNI, default)")->
             type_name("lvl")->check(CLI::Range(0, 1))->group(optimizations);
 
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
@@ -516,7 +516,7 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
 
 int main(int argc, char *argv[]) {
     fasttree::Options options;
-    std::string name = "FastTree";
+    std::string name = "VeryFastTree";
     std::string version = fasttree::Constants::version;
     std::string flags = fasttree::Constants::compileFlags;
     std::vector<std::string> args(argv + 1, argv + argc);

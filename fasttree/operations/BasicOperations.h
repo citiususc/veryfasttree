@@ -8,7 +8,11 @@ namespace fasttree {
     template<typename Precision>
     class BasicOperations {
     public:
-        static constexpr int ALIGNMENT = 0;
+        /*
+         * No alignment required, values less than sizeof(Precision) are ignored,
+         * value 0 is not supported by gcc 5 and 6.
+         */
+        static constexpr int ALIGNMENT = 2;
         using Allocator = std::allocator<Precision>;
         typedef Precision numeric_t;
 

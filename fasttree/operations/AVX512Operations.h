@@ -34,6 +34,12 @@ namespace fasttree {
     };
 }
 
+/*
+ * A template specialization must be declared inside namespace in gcc 5 and 6.
+ */
+namespace fasttree {
+
 #include "AVX512Operations.tcc"
 
+}
 #endif
