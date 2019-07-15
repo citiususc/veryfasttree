@@ -59,5 +59,55 @@ Linux:
 
 ## Running VeryFastTree ##
 
-VeryFastTree preserves all legacy options from FastTree, new options perform optimizations 
-that greatly increase performance.
+VeryFastTree implements through the CLI library the same command interface that FastTree used. The arguments have the same behavior as in FastTree and these can be consulted with *-h* option . VeryFastTree adds new arguments grouped in optimizations section, the arguments allow to improve the performance and to change between the different versions that in FastTree were different binaries.
+
+  - **-threads**: allows to specify the number of threads, if the option
+    is not set, value will be obtained from the environment variable
+    *OMP\_NUM\_THREADS* as FastTree. If the number of threads is 1, the
+    tool behavior is the same as FastTree compiled without -DOPENMP.
+
+  - **-threads-balanced**: Removes the maximum number of subtrees
+    restriction assigned to each thread, improves the performance of the
+    parallel version but reduces the interaction between nodes when
+    creating more isolated zones, it can reduce the accuracy with some
+    datasets.
+
+  - **-threads-level**: allows to change the type of parallelization, 0 is
+    the parallelization used by FastTree and 1 (by default) the new
+    parallelization system where tree processing is divided in threads.
+
+  - **-double-precision**: Use double precision numbers for operations.
+    The same behavior as compiling FastTree with *-DUSE\_DOUBLE*.
+
+  - **-fastexp**: allows selecting an alternative implementation of the
+    exp function, which has a significant impact on performance:
+    
+      - 0: (default) use math exp with double precision.
+    
+      - 1: use math exp with simple precision. (not recommended with
+        -double-precision option)
+    
+      - 2: Approximate vectorized exp from Cephes Math Library with
+        double precision..
+    
+      - 3: Approximate vectorized exp from Cephes Math Library with
+        simple precision.. (not recommended with -double-precision
+        option)
+
+  - **-ext**: Enable vector extensions:
+    
+      - none: (default) Operations are performed with language
+        operators, loops are unrolled which allows the compiler to apply
+        some optimization, including some type of vectorization.
+    
+      - SSE, AVX128: Use the set of 128-bit vector instructions, 4
+        floats of 32 bits or 2 doubles of 64 bits, it requires data
+        aligning which a small memory overhead.
+    
+      - AVX256: Use the set of 256-bit vector instructions, 8 floats of
+        32 bits or 4 doubles of 64 bits, doubles require data aligning
+        which a small memory overhead and floats add a padding to
+        preserve aligning when use 8 that is not divisor of protein set
+        which requires more memory.
+
+
