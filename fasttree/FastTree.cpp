@@ -24,8 +24,9 @@ FastTree::FastTree(const Options &options) : options(options) {}
 void FastTree::settings(std::ostream &log) {
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
-    if (options.nCodes == 4 && options.matrixPrefix.empty())
+    if (options.nCodes == 4 && options.matrixPrefix.empty()) {
         options.useMatrix = false;        /* no default nucleotide matrix */
+    }
 
     if (options.slow && options.tophitsMult > 0) {
         options.tophitsMult = 0.0;
@@ -58,10 +59,11 @@ void FastTree::settings(std::ostream &log) {
 
         std::string supportString = "none";
         if (options.nBootstrap > 0) {
-            if (options.MLnni != 0 || options.MLlen)
+            if (options.MLnni != 0 || options.MLlen) {
                 supportString = strformat("SH-like %d", options.nBootstrap);
-            else
+            } else {
                 supportString = strformat("Local boot %d", options.nBootstrap);
+            }
         }
         std::string nniString = "(no NNI)";
         if (options.nni > 0) {

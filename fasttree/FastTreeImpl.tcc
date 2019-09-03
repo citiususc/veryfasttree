@@ -319,9 +319,10 @@ AbsFastTreeImpl(void)::run() {
                                          loglk, changes, maxDelta, progressReport.clockDiff(),
                                          bConverged ? " (final)" : "") << std::endl;
                     }
-                    if (!options.logFileName.empty())
+                    if (!options.logFileName.empty()) {
                         log << strformat("TreeLogLk\tML_NNI%ld\t%.4lf\tMaxChange\t%.4lf",
                                          iMLnni + 1, loglk, maxDelta) << std::endl;
+                    }
                     if (bConverged) {
                         break;        /* we did our extra round */
                     }
@@ -357,11 +358,12 @@ AbsFastTreeImpl(void)::run() {
                     nj.logTree("ML_Lengths%ld", 2, aln.names, unique);
                     if (options.verbose || !options.logFileName.empty()) {
                         double loglk = nj.treeLogLk(/*site_likelihoods*/nullptr);
-                        if (options.verbose)
+                        if (options.verbose) {
                             log << strformat("Optimize all lengths: LogLk %s= %.3f Time %.2f",
                                              options.exactML || options.nCodes != 20 ? "" : "~",
                                              loglk,
                                              progressReport.clockDiff()) << std::endl;
+                        }
                         if (!options.logFileName.empty()) {
                             log << strformat("TreeLogLk\tML_Lengths%d\t%.4f", 2, loglk) << std::endl;
                         }
@@ -369,8 +371,9 @@ AbsFastTreeImpl(void)::run() {
                 }
 
                 /* Count bad splits and compute SH-like supports if desired */
-                if ((MLnniToDo > 0 && !options.fastest) || options.nBootstrap > 0)
+                if ((MLnniToDo > 0 && !options.fastest) || options.nBootstrap > 0) {
                     nj.testSplitsML(splitcount);
+                }
 
                 /* Compute gamma-based likelihood? */
                 if (options.gammaLogLk && options.nRateCats > 1) {
@@ -502,8 +505,9 @@ AbsFastTreeImpl(void)::transMatToDistanceMat(DistanceMatrix <Precision, op_t::AL
     */
     for (int64_t i = 0; i < options.nCodes; i++) {
         dmat.eigentot[i] = 0.0;
-        for (int64_t j = 0; j < options.nCodes; j++)
+        for (int64_t j = 0; j < options.nCodes; j++) {
             dmat.eigentot[i] += transmat.eigeninv[i][j];
+        }
     }
     dmat.setted = true;
 }

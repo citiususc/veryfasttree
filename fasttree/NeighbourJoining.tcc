@@ -610,8 +610,9 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Preci
         */
         total_freq = operations.vector_multiply_sum(freq, dmat.eigentot, options.nCodes);
     } else {
-        for (int k = 0; k < options.nCodes; k++)
+        for (int k = 0; k < options.nCodes; k++) {
             total_freq += freq[k];
+        }
     }
     if (total_freq > options.fPostTotalTolerance) {
         numeric_t inverse_weight = 1.0 / total_freq;
@@ -620,11 +621,13 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Preci
         /* This can happen if we are in a very low-weight region, e.g. if a mostly-gap position gets weighted down
            repeatedly; just set them all to arbitrary but legal values */
         if (!dmat) {
-            for (int k = 0; k < options.nCodes; k++)
+            for (int k = 0; k < options.nCodes; k++) {
                 freq[k] = 1.0 / options.nCodes;
+            }
         } else {
-            for (int k = 0; k < options.nCodes; k++)
+            for (int k = 0; k < options.nCodes; k++) {
                 freq[k] = dmat.codeFreq[0][k];
+            }
         }
     }
 }
@@ -637,8 +640,9 @@ AbsNeighbourJoining(void)::setCodeDist(Profile &profile) {
     for (int64_t i = 0; i < nPos; i++) {
         numeric_t *f = getFreq(profile, i, iFreq);
 
-        for (int k = 0; k < options.nCodes; k++)
+        for (int k = 0; k < options.nCodes; k++) {
             profile.codeDist[i * options.nCodes + k] = profileDistPiece(profile.codes[i], k, f, nullptr, nullptr);
+        }
     }
     assert(iFreq == profile.nVectors);
 }
@@ -2190,8 +2194,6 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
        (matching sequences show up once in the NJ but could be in multiple places in the tree)
        Will use iUnique as the index of nodes, as in the NJ structure
     */
-    assert(maxnodes == (int64_t) unique.alnToUniq.size() * 2);
-    assert(maxnode == (int64_t) unique.alnToUniq.size());
     std::vector<int64_t> parents(maxnodes, -1);
     std::vector<Children> children(maxnodes);
 
@@ -2205,7 +2207,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     std::string token;
     token.reserve(5000l);
 
-    if (readTreeToken(fpInTree, token) || token[0] != '(') {
+    if (!readTreeToken(fpInTree, token) || token[0] != '(') {
         readTreeError("No '(' at start", token);
     }
     /* nDown is still 0 because we have created the root */
@@ -2918,8 +2920,9 @@ AbsNeighbourJoining(void)::readTreeMaybeAddLeaf(int64_t iparent, std::string &na
                                                 Uniquify &unique,
                                                 std::vector<int64_t> &parents, std::vector<Children> &children) {
     auto hi = hashnames.find(name);
-    if (hi == nullptr)
+    if (hi == nullptr) {
         readTreeError("not recognized as a sequence name", name);
+    }
 
     int64_t iSeqNonunique = *hi;
     assert(iSeqNonunique >= 0 && iSeqNonunique < (int64_t) unique.alnToUniq.size());
@@ -2983,7 +2986,7 @@ AbsNeighbourJoining(bool)::readTreeToken(std::istream &fpInTree, std::string &bu
     while ((c = fpInTree.get()) != EOF) {
         if (c == '(' || c == ')' || c == ':' || c == ';' || c == ',') {
             /* standalone token */
-            if (buf.empty() == 0) {
+            if (buf.empty()) {
                 buf += (char) c;
                 break;
             } else {

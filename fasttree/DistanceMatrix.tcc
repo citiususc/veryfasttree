@@ -115,9 +115,10 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
                         distances[j][i]));
             }
             double total = 0.0;
-            for (int k = 0; k < options.nCodes; k++)
+            for (int k = 0; k < options.nCodes; k++) {
                 total += eigenval[k] * eigeninv[k][i] *
                          eigeninv[k][j];
+            }
             if (fabs(total - distances[i][j]) > 1e-6) {
                 throw std::invalid_argument(strformat(
                         "Distance matrix entry %d,%d should be %f but eigen-representation gives %f",
@@ -129,8 +130,9 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
     /* And compute eigentot */
     for (int k = 0; k < options.nCodes; k++) {
         eigentot[k] = 0.;
-        for (int j = 0; j < options.nCodes; j++)
+        for (int j = 0; j < options.nCodes; j++) {
             eigentot[k] += eigeninv[k][j];
+        }
     }
 
     /* And compute codeFreq */
