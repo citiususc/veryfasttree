@@ -69,7 +69,7 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
     for (int i = 0; i < options.nCodes; i++) {
         stat[i] = _stat[i];
         statinv[i] = 1.0 / _stat[i];
-        sqrtstat[i] = sqrt(_stat[i]);
+        sqrtstat[i] = std::sqrt(_stat[i]);
     }
 
     double sym[20 * 20];        /* symmetrized matrix M' */

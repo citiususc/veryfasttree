@@ -2071,7 +2071,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
             }
 
             /* and finally, divide by stat again & rotate to give the new frequencies */
-            operations.matrixt_by_vector4((numeric_t(*)[4]) transmat.eigeninvT, fPost, /*OUT*/fOut);
+            operations.matrixt_by_vector4(transmat.eigeninvT, fPost, fOut);
         }  /* end loop over position i */
     } else if (options.nCodes == 20) {    /* matrix model on amino acids */
         numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
@@ -2196,6 +2196,8 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     */
     std::vector<int64_t> parents(maxnodes, -1);
     std::vector<Children> children(maxnodes);
+    int64_t maxnode = this->maxnode;
+    int64_t root = maxnode++;
 
     /* The stack is the current path to the root, with the root at the first (top) position */
     int64_t stack_size = 1;
@@ -2368,7 +2370,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
         int64_t node = stack[--stack_size];
         if (node >= (int64_t) unique.uniqueSeq.size()) { /* internal node */
             assert(node == root || children[node].nChild > 1);
-            map[node] = maxnode++;
+            map[node] = this->maxnode++;
             for (int64_t i = 0; i < children[node].nChild; i++) {
                 assert(stack_size < maxnodes);
                 stack[stack_size++] = children[node].child[i];
@@ -2382,7 +2384,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
         }
 
     /* Set parents, children, root */
-    root = map[root];
+    this->root = map[root];
     int64_t node;
     for (node = 0; node < maxnodes; node++) {
         int64_t njnode = map[node];
@@ -2399,10 +2401,10 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     }
 
     /* Make sure that parents/child relationships match */
-    for (int64_t i = 0; i < maxnode; i++) {
+    for (int64_t i = 0; i < this->maxnode; i++) {
         Children &c = child[i];
         for (int64_t j = 0; j < c.nChild; j++) {
-            assert(c.child[j] >= 0 && c.child[j] < maxnode && this->parent[c.child[j]] == i);
+            assert(c.child[j] >= 0 && c.child[j] < this->maxnode && this->parent[c.child[j]] == i);
         }
     }
     assert(this->parent[root] < 0);
@@ -2410,7 +2412,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     /* Compute profiles as balanced -- the NNI stage will recompute these
        profiles anyway
     */
-    std::vector<bool> traversal(maxnode, false);
+    std::vector<bool> traversal(this->maxnode, false);
     node = root;
     while ((node = traversePostorder(node, traversal, nullptr, root)) >= 0) {
         if (node >= (int64_t) seqs.size() && node != root) {
@@ -3807,8 +3809,9 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
 
     if (!bUseUnique && bSecondLevel && lNew.age <= tophitAgeLimit) {
         int64_t source = activeAncestor(lChild[0]->hitSource);
-        if (source == newnode)
+        if (source == newnode) {
             source = activeAncestor(lChild[1]->hitSource);
+        }
         /* In parallel mode, it is possible that we would select a node as the
            hit-source and then over-write that top hit with a short list.
            So we need this sanity check.
@@ -3820,7 +3823,9 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
             TopHitsList &lSource = tophits.topHitsLists[source];
             assert(lSource.hitSource < 0);
             assert(!lSource.hits.empty());
+            int64_t nMerge = (int64_t) lSource.hits.size() + nUnique + 1;
             std::vector<Besthit> mergeList(uniqueList); /* Copy */
+            mergeList.resize(nMerge);
 
             int64_t iMerge = nUnique;
             mergeList[iMerge].i = newnode;
@@ -3832,7 +3837,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
                 setDistCriterion(nActive, mergeList[iMerge]);
                 iMerge++;
             }
-            assert(iMerge == (int64_t) lSource.hits.size() + nUnique + 1);
+            assert(iMerge == nMerge);
 
             uniqueList.clear();
 

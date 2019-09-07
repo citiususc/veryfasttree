@@ -256,8 +256,9 @@ vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
 }
 
 template<>
+template<int row>
 inline void fasttree::AVX256Operations<double>::
-matrixt_by_vector4(double mat[4][4], double vec[4], double out[4]) {
+matrixt_by_vector4(double mat[][row], double vec[], double out[]) {
     __m256d o = _mm256_setzero_pd();
     for (int64_t j = 0; j < 4; j++) {
         __m256d m = _mm256_load_pd(&mat[j][0]);
@@ -268,17 +269,17 @@ matrixt_by_vector4(double mat[4][4], double vec[4], double out[4]) {
 }
 
 template<>
+template<int row>
 inline void fasttree::AVX256Operations<float>::
-matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
-    __m256 vj1 = _mm256_set_ps(vec[1], vec[1], vec[1], vec[1], vec[0], vec[0], vec[0], vec[0]);
-    __m256 vj2 = _mm256_set_ps(vec[3], vec[3], vec[3], vec[3], vec[2], vec[2], vec[2], vec[2]);
-    __m256 m1 = _mm256_load_ps(&mat[0][0]);
-    __m256 m2 = _mm256_load_ps(&mat[2][0]);
-    __m256 o1 = _mm256_mul_ps(vj1, m1);
-    __m256 o2 = _mm256_mul_ps(vj2, m2);
-    __m256 s1 = _mm256_add_ps(o1, o2);
-    __m128 s2 = _mm_add_ps(*(__m128 *) &s1, *(__m128 *) &s1[4]);
-    _mm_store_ps(out, s2);
+matrixt_by_vector4(float mat[][row], float vec[], float out[]) {
+    __m128 o = _mm_setzero_ps();
+    /* result is a sum of vectors: sum(k) v[k] * mat[k][] */
+    for (int64_t j = 0; j < 4; j++) {
+        __m128 m = _mm_load_ps(&mat[j][0]);
+        __m128 vj = _mm_load1_ps(&vec[j]);    /* is it faster to shuffle v? */
+        o = _mm_add_ps(o, _mm_mul_ps(vj, m));
+    }
+    _mm_store_ps(out, o);
 }
 
 template<>

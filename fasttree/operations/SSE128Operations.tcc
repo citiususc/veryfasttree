@@ -212,8 +212,9 @@ vector_add_mult(double fTot[], double fAdd[], double weight, int64_t n) {
 }
 
 template<>
+template<int row>
 inline void fasttree::SSE128Operations<float>::
-matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
+matrixt_by_vector4(float mat[][row], float vec[], float out[]) {
     __m128 o = _mm_setzero_ps();
     /* result is a sum of vectors: sum(k) v[k] * mat[k][] */
     for (int64_t j = 0; j < 4; j++) {
@@ -225,8 +226,9 @@ matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
 }
 
 template<>
+template<int row>
 inline void fasttree::SSE128Operations<double>::
-matrixt_by_vector4(double mat[4][4], double vec[4], double out[4]) {
+matrixt_by_vector4(double mat[][row], double vec[], double out[]) {
     __m128d o1 = _mm_setzero_pd();
     __m128d o2 = _mm_setzero_pd();
     /* result is a sum of vectors: sum(k) v[k] * mat[k][] */

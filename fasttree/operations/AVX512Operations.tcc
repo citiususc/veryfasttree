@@ -80,12 +80,14 @@ fasttree::AVX512Operations<double>::vector_add_mult(double fTot[], double fAdd[]
 }
 
 template<>
-inline void fasttree::AVX512Operations<float>::matrixt_by_vector4(float mat[4][4], float vec[4], float out[4]) {
+template<int row>
+inline void fasttree::AVX512Operations<float>::matrixt_by_vector4(float mat[][row], float vec[], float out[]) {
 
 }
 
 template<>
-inline void fasttree::AVX512Operations<double>::matrixt_by_vector4(double mat[4][4], double vec[4], double out[4]) {
+template<int row>
+inline void fasttree::AVX512Operations<double>::matrixt_by_vector4(double mat[][row], double vec[], double out[]) {
 
 }
 
