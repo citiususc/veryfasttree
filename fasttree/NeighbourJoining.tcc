@@ -4951,7 +4951,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         }
         stack.back().second = true;
 
-        if ((int64_t) seqs.size() >= node || traversal[node]) {
+        if ((int64_t) seqs.size() > node || traversal[node]) {
             stack.erase(stack.end());
             continue;
         }
@@ -4973,7 +4973,8 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
      * Quick search of nodes that create subtrees with a similar number of nodes
      * to balance the process time in threads.
      */
-    while (weights[partition.front()] > minPartition) {
+    bool updated = true;
+    while (weights[partition.front()] > minPartition || updated) {
 
         /*std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
         for (int i = 1; i < (int) partition.size(); i++) {
@@ -4981,6 +4982,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         }
         std::cerr << ") quality: " << quality << std::endl;*/
 
+        updated = false;
         if ((quality - 3 * (int64_t) partition.size()) > (bestQuality - 3 * (int64_t) bestPartition.size())) {
             bestPartition = partition;
             bestQuality = quality;
@@ -4990,23 +4992,21 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
             int64_t node = partition.front();
             partition.front() = child[node].child[0];
             partition.push_back(child[node].child[1]);
+            updated = true;
+        }
+
+        if (!options.threadsBalanced && maxPartitions > (int) bestPartition.size()) {
+            partition.resize(maxPartitions);
+            updated = true;
+        }
+
+
+        while (weights[partition.back()] < 3 * (int64_t) partition.size()) {
+            partition.resize(partition.size() - 1);
+            updated = true;
         }
 
         quality = treePartitionQuality(weights, partition);
-        if (!options.threadsBalanced && maxPartitions > (int) bestPartition.size()) {
-            partition.resize(maxPartitions);
-        }
-
-        bool changed = false;
-        while (weights[partition.back()] < 3 * (int64_t) partition.size()) {
-            partition.resize(partition.size() - 1);
-            changed = true;
-        }
-
-        if (changed) {
-            quality = treePartitionQuality(weights, partition);
-        }
-
     }
 
     treeChunks(bestPartition, weights, chunks);
