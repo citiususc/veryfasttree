@@ -2194,10 +2194,11 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
        (matching sequences show up once in the NJ but could be in multiple places in the tree)
        Will use iUnique as the index of nodes, as in the NJ structure
     */
-    std::vector<int64_t> parents(maxnodes, -1);
-    std::vector<Children> children(maxnodes);
-    int64_t maxnode = this->maxnode;
+    int64_t maxnode = unique.alnToUniq.size();
+    int64_t maxnodes = maxnode * 2;
     int64_t root = maxnode++;
+    std::vector<int64_t> parent(maxnodes, -1);
+    std::vector<Children> children(maxnodes);
 
     /* The stack is the current path to the root, with the root at the first (top) position */
     int64_t stack_size = 1;
@@ -2225,7 +2226,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
                 while (nDown-- > 0) {
                     int64_t newnode = maxnode++;
                     assert(newnode < maxnodes);
-                    readTreeAddChild(stack[stack_size - 1], newnode, parents, children);
+                    readTreeAddChild(stack[stack_size - 1], newnode, parent, children);
                     if (options.verbose > 5) {
                         log << strformat("Added internal child %ld of %ld, stack size increase to %ld",
                                          newnode, stack[stack_size - 1], stack_size + 1) << std::endl;
@@ -2233,7 +2234,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
                     stack[stack_size++] = newnode;
                     assert(stack_size < maxnodes);
                 }
-                readTreeMaybeAddLeaf(stack[stack_size - 1], token, hashnames, unique, parents, children);
+                readTreeMaybeAddLeaf(stack[stack_size - 1], token, hashnames, unique, parent, children);
             }
         } else if (nUp > 0) {
             if (token[0] == ';') {    /* end the tree? */
@@ -2282,13 +2283,13 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
         } else if (token[0] == ';') {
             readTreeError("unexpected token", token);
         } else {
-            readTreeMaybeAddLeaf(stack[stack_size - 1], token, hashnames, unique, parents, children);
+            readTreeMaybeAddLeaf(stack[stack_size - 1], token, hashnames, unique, parent, children);
         }
     }
 
     /* Verify that all sequences were seen */
     for (int64_t i = 0; i < (int64_t) unique.uniqueSeq.size(); i++) {
-        if (parents[i] < 0) {
+        if (parent[i] < 0) {
             throw std::invalid_argument(
                     strformat("Alignment sequence %ld (unique %ld) absent from input tree\n"
                               "The starting tree (the argument to -intree) must include all sequences in the alignment!",
@@ -2311,11 +2312,11 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
             if (node >= (int64_t) unique.uniqueSeq.size()) { /* internal node */
                 if (children[node].nChild <= 1) {
                     if (node != root) {
-                        readTreeRemove(parents, children, node);
+                        readTreeRemove(parent, children, node);
                         nRemoved++;
                     } else if (node == root && children[node].nChild == 1) {
                         int64_t newroot = children[node].child[0];
-                        parents[newroot] = -1;
+                        parent[newroot] = -1;
                         children[root].nChild = 0;
                         nRemoved++;
                         if (options.verbose > 5) {
@@ -2344,7 +2345,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
             int64_t ichild = children[root].child[i];
             assert(ichild >= 0 && ichild < maxnodes);
             if (children[ichild].nChild == 2) {
-                readTreeRemove(parents, children, ichild); /* replace root -> child -> A,B with root->A,B */
+                readTreeRemove(parent, children, ichild); /* replace root -> child -> A,B with root->A,B */
                 break;
             }
         }
@@ -2352,7 +2353,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
 
     for (int64_t i = 0; i < maxnodes; i++)
         if (options.verbose > 5) {
-            log << strformat("Simplfied node %ld has parent %ld nchild %d", i, parents[i], children[i].nChild)
+            log << strformat("Simplfied node %ld has parent %ld nchild %d", i, parent[i], children[i].nChild)
                 << std::endl;
         }
 
@@ -2379,7 +2380,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
     }
     for (int64_t i = 0; i < maxnodes; i++)
         if (options.verbose > 5) {
-            log << strformat("Map %ld to %ld (parent %ld nchild %d)", i, map[i], parents[i], children[i].nChild)
+            log << strformat("Map %ld to %ld (parent %ld nchild %d)", i, map[i], parent[i], children[i].nChild)
                 << std::endl;
         }
 
@@ -2394,8 +2395,8 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
                 assert(children[node].child[i] >= 0 && children[node].child[i] < maxnodes);
                 child[njnode].child[i] = map[children[node].child[i]];
             }
-            if (parents[node] >= 0) {
-                this->parent[njnode] = map[parents[node]];
+            if (parent[node] >= 0) {
+                this->parent[njnode] = map[parent[node]];
             }
         }
     }
@@ -2407,7 +2408,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
             assert(c.child[j] >= 0 && c.child[j] < this->maxnode && this->parent[c.child[j]] == i);
         }
     }
-    assert(this->parent[root] < 0);
+    assert(this->parent[this->root] < 0);
 
     /* Compute profiles as balanced -- the NNI stage will recompute these
        profiles anyway
