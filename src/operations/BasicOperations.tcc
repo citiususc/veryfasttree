@@ -7,7 +7,7 @@
 
 #define AbsBasicOperations(...) \
 template<typename Precision> \
-__VA_ARGS__ fasttree::BasicOperations<Precision>
+__VA_ARGS__ veryfasttree::BasicOperations<Precision>
 
 AbsBasicOperations(inline void)::vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]) {
     for (int64_t i = 0; i < n; i+=4) {

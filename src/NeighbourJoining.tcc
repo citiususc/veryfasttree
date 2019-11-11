@@ -6,7 +6,7 @@
 
 #define AbsNeighbourJoining(...) \
 template<typename Precision, template<class> class Operations> \
-__VA_ARGS__ fasttree::NeighbourJoining<Precision, Operations>
+__VA_ARGS__ veryfasttree::NeighbourJoining<Precision, Operations>
 
 
 AbsNeighbourJoining()::Profile::Profile() {}
@@ -1107,7 +1107,7 @@ AbsNeighbourJoining(double)::pairLogLk(Profile &p1, Profile &p2, double length, 
             if (!(lkAB > 0)) {
                 /* If this happens, it indicates a numerical problem that needs to be addressed elsewhere,
                    so report all the details */
-                log << "# FastTree.c::PairLogLk -- numerical problem!" << std::endl;
+                log << "# VeryFastTree.c::PairLogLk -- numerical problem!" << std::endl;
                 log << "# This block is intended for loading into R" << std::endl;
 
                 log << strformat("lkAB = %.8g", lkAB) << std::endl;
@@ -3049,7 +3049,7 @@ traversePostorder(int64_t node, std::vector<bool> &traversal, bool *pUp, int64_t
     }
 }
 
-AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::Profile *)::getUpProfile(
+AbsNeighbourJoining(typename veryfasttree::NeighbourJoining<Precision, Operations>::Profile *)::getUpProfile(
         std::unique_ptr<Profile> upProfiles[], int64_t outnode, bool useML) {
     assert(outnode != root && outnode >= (int64_t) seqs.size()); /* not for root or leaves */
     if (upProfiles[outnode]) {
@@ -3170,7 +3170,7 @@ AbsNeighbourJoining(void)::recomputeMLProfiles() {
 
     if (options.threads > 1 && options.threadsLevel > 0) {
         std::vector<std::vector<int64_t>> chunks;
-        treePartition(chunks, traversal);
+        treePartition(chunks, traversal, 0);
 
         #pragma omp parallel
         {
@@ -4267,8 +4267,9 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
 }
 
 
-AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::NNI)::chooseNNI(Profile *profiles4[4],
-                                                                                                double criteria[3]) {
+AbsNeighbourJoining(typename veryfasttree::NeighbourJoining<Precision, Operations>::NNI)::chooseNNI(
+        Profile *profiles4[4],
+        double criteria[3]) {
     double d[6];
     correctedPairDistances(profiles4, 4, d);
     double penalty[3];        /* indexed as nni_t */
@@ -4312,7 +4313,7 @@ AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::
     return (choice);
 }
 
-AbsNeighbourJoining(typename fasttree::NeighbourJoining<Precision, Operations>::NNI)::
+AbsNeighbourJoining(typename veryfasttree::NeighbourJoining<Precision, Operations>::NNI)::
 MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool bFast) {
     double lenABvsCD[5] = {len[LEN_A], len[LEN_B], len[LEN_C], len[LEN_D], len[LEN_I]};
     double lenACvsBD[5] = {len[LEN_A], len[LEN_C], len[LEN_B], len[LEN_D], len[LEN_I]};   /* Swap B & C */
@@ -4932,7 +4933,8 @@ AbsNeighbourJoining(int64_t)::treePartitionQuality(std::vector<int64_t> &weights
     }
 }
 
-AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal) {
+AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal,
+                                         int p) {
     std::vector<int64_t> weights(child.size(), 0);
     std::vector<std::pair<int64_t, bool>> stack;
     stack.push_back({root, false});
@@ -4963,8 +4965,8 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
 
     }
 
-    int maxPartitions = options.threads * 2;
-    int64_t minPartition = (weights[root] / maxPartitions) - 1;
+    int64_t maxPartitions = (int64_t) options.threadSubtrees * (int64_t) options.threads;
+    int64_t minPartition = (weights[root] / options.threads * 2) - 1;
     std::vector<int64_t> bestPartition = {child[root].child[0], child[root].child[1], child[root].child[2]};
     int64_t bestQuality = treePartitionQuality(weights, bestPartition);
     std::vector<int64_t> partition = bestPartition;
@@ -4984,7 +4986,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         std::cerr << ") quality: " << quality << std::endl;*/
 
         updated = false;
-        if ((quality - 3 * (int64_t) partition.size()) > (bestQuality - 3 * (int64_t) bestPartition.size())) {
+        if ((quality - p * (int64_t) partition.size()) > (bestQuality - p * (int64_t) bestPartition.size())) {
             bestPartition = partition;
             bestQuality = quality;
         }
@@ -4996,11 +4998,10 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
             updated = true;
         }
 
-        if (!options.threadsBalanced && maxPartitions > (int) bestPartition.size()) {
+        if (maxPartitions < (int64_t) partition.size()) {
             partition.resize(maxPartitions);
             updated = true;
         }
-
 
         while (weights[partition.back()] < 3 * (int64_t) partition.size()) {
             partition.resize(partition.size() - 1);
@@ -5557,7 +5558,7 @@ AbsNeighbourJoining(void)::setMLGtr(double freq_in[]) {
         for (int i = 0; i < 4; i++)
             gtr.freq[i] = freq_in[i];
     } else {
-        /* n[] and sum were int in FastTree 2.1.9 and earlier -- this
+        /* n[] and sum were int in VeryFastTree 2.1.9 and earlier -- this
            caused gtr analyses to fail on analyses with >2e9 positions */
         int64_t n[4] = {1, 1, 1, 1};    /* pseudocounts */
         for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {

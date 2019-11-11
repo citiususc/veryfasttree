@@ -6,7 +6,7 @@
 
 #define AbsTransitionMatrix(...) \
 template<typename Precision, int Aligment> \
-__VA_ARGS__ fasttree::TransitionMatrix<Precision, Aligment>
+__VA_ARGS__ veryfasttree::TransitionMatrix<Precision, Aligment>
 
 AbsTransitionMatrix()::TransitionMatrix() : setted(false) {}
 

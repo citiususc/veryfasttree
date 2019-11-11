@@ -1,6 +1,6 @@
 
-#ifndef FASTTREE_FASTTREEIMPL_H
-#define FASTTREE_FASTTREEIMPL_H
+#ifndef VERYFASTTREE_VERYFASTTREEIMPL_H
+#define VERYFASTTREE_VERYFASTTREEIMPL_H
 
 
 #include <memory>
@@ -14,11 +14,11 @@
 #include "DistanceMatrix.h"
 #include "NeighbourJoining.h"
 
-namespace fasttree {
+namespace veryfasttree {
     template<typename Precision, template<class> class Operations>
-    class FastTreeImpl {
+    class VeyFastTreeImpl {
     public:
-        FastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log);
+        VeyFastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log);
 
         void run();
 
@@ -48,6 +48,6 @@ namespace fasttree {
     };
 }
 
-#include "FastTreeImpl.tcc"
+#include "VeryFastTreeImpl.tcc"
 
 #endif

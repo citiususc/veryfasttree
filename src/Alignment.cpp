@@ -5,7 +5,7 @@
 #include <sstream>
 #include "HashTable.h"
 
-using namespace fasttree;
+using namespace veryfasttree;
 
 Alignment::Alignment(const Options &options, std::istream &fp, std::ostream &log) : options(options),
                                                                                     fp(fp),

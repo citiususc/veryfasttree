@@ -8,7 +8,7 @@
 #include <io.h>
 #include <ciso646>
 
-namespace fasttree {
+namespace veryfasttree {
     inline bool isWindows(){return true;}
 
     inline bool isattyIn(){return ::_isatty( _fileno( stdin ) );}
@@ -21,7 +21,7 @@ namespace fasttree {
 
 #include <unistd.h>
 
-namespace fasttree {
+namespace veryfasttree {
     inline bool isWindows() { return false; }
 
     inline bool isattyIn() { return ::isatty(STDIN_FILENO); }
@@ -39,7 +39,7 @@ namespace fasttree {
 #include <boost/sort/sample_sort/sample_sort.hpp>
 #include <cmath>
 
-namespace fasttree {
+namespace veryfasttree {
     class TeeStream : public std::streambuf {
     public:
         TeeStream(std::ostream &os1, std::ostream &os2) : os1(os1), os2(os2) {}

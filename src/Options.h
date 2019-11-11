@@ -1,13 +1,13 @@
 
-#ifndef FASTTREE_OPTIONS_H
-#define FASTTREE_OPTIONS_H
+#ifndef VERYFASTTREE_OPTIONS_H
+#define VERYFASTTREE_OPTIONS_H
 
 #include "Constants.h"
 #include "Debug.h"
 #include <string>
 #include <ctime>
 
-namespace fasttree {
+namespace veryfasttree {
     struct Options {
         int verbose = 1;
         bool showProgress = true;
@@ -95,7 +95,7 @@ namespace fasttree {
         /*Optimizations*/
         int threads = 1;
         int threadsLevel = 1;
-        bool threadsBalanced = false;
+        int threadSubtrees = (unsigned int)~0 >> 1;
         bool doublePrecision = false;
         int fastexp = 0;
         std::string extension;

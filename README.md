@@ -66,11 +66,10 @@ VeryFastTree implements through the CLI library the same command interface that 
     *OMP\_NUM\_THREADS* as FastTree. If the number of threads is 1, the
     tool behavior is the same as FastTree compiled without -DOPENMP.
 
-  - **-threads-balanced**: Removes the maximum number of subtrees
-    restriction assigned to each thread, improves the performance of the
-    parallel version but reduces the interaction between nodes when
-    creating more isolated zones, it can reduce the accuracy with some
-    datasets.
+  - **-thread-subtrees**: Set the maximum number of subtrees restriction 
+  assigned to each thread, it reduce the thread  balancing of parallel 
+  version but increase the interaction between nodes, it can increase the 
+  accuracy with dataset with few sequences but with large compute work.
 
   - **-threads-level**: allows to change the type of parallelization, 0 is
     the parallelization used by FastTree and 1 (by default) the new

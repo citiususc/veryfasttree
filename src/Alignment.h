@@ -1,12 +1,12 @@
 
-#ifndef FASTTREE_ALIGNMENT_H
-#define FASTTREE_ALIGNMENT_H
+#ifndef VERYFASTTREE_ALIGNMENT_H
+#define VERYFASTTREE_ALIGNMENT_H
 
 #include <vector>
 #include <string>
 #include "Options.h"
 
-namespace fasttree {
+namespace veryfasttree {
     class Alignment {
     private:
         const Options &options;

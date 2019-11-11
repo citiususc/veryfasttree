@@ -1,6 +1,6 @@
 
-#ifndef FASTTREE_TRANSITIONMATRIX_H
-#define FASTTREE_TRANSITIONMATRIX_H
+#ifndef VERYFASTTREE_TRANSITIONMATRIX_H
+#define VERYFASTTREE_TRANSITIONMATRIX_H
 
 #include "DistanceMatrix.h"
 
@@ -56,7 +56,7 @@
    rotated_posterior = rotation(w * (i==A)/stat + (1-w) * nearP/stat)
    = codeFreq(A) * w/stat(A) + nearFreq(A) * (1-w)
  */
-namespace fasttree {
+namespace veryfasttree {
 
     template<typename Precision, int Aligment>
     struct TransitionMatrix {

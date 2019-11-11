@@ -1,11 +1,11 @@
 
-#ifndef FASTTREE_DISTANCEMATRIX_H
-#define FASTTREE_DISTANCEMATRIX_H
+#ifndef VERYFASTTREE_DISTANCEMATRIX_H
+#define VERYFASTTREE_DISTANCEMATRIX_H
 
 #include "Options.h"
 
 #define MAXCODES 20
-namespace fasttree {
+namespace veryfasttree {
     template<typename Precision, int Aligment>
     class DistanceMatrix {
     public:

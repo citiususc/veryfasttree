@@ -106,7 +106,7 @@ long ran_arr_cycle()
 
 /* end of code from Knuth */
 
-double fasttree::knuth_rand() {
+double veryfasttree::knuth_rand() {
     return(9.31322574615479e-10 * ran_arr_next()); /* multiply by 2**-30 */
 }
 

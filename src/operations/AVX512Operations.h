@@ -1,15 +1,15 @@
 
-#ifndef FASTTREE_SSE128OPERATIONS_H
-#define FASTTREE_SSE128OPERATIONS_H
+#ifndef VERYFASTTREE_AVX512OPERATIONS_H
+#define VERYFASTTREE_AVX512OPERATIONS_H
 
 #include <boost/align/aligned_allocator.hpp>
 #include <immintrin.h>
 
-namespace fasttree {
+namespace veryfasttree {
     template<typename Precision>
-    class SSE128Operations {
+    class AVX512Operations {
     public:
-        static constexpr int ALIGNMENT = 16;
+        static constexpr int ALIGNMENT = 64;
         using Allocator = boost::alignment::aligned_allocator<Precision, ALIGNMENT>;
         typedef Precision numeric_t;
 
@@ -32,23 +32,15 @@ namespace fasttree {
 
         inline void fastexp(numeric_t fTot[], int64_t n, int lvl);
 
-    private:
-        template<typename Tp>
-        inline numeric_t mm_sum(Tp sum);
-
-        inline __m128 fastexpImpl(__m128 vx);
-
-        inline __m128d fastexpImpl(__m128d vx);
     };
 }
 
 /*
  * A template specialization must be declared inside namespace in gcc 5 and 6.
  */
-namespace fasttree {
+namespace veryfasttree {
 
-#include "SSE128Operations.tcc"
+#include "AVX512Operations.tcc"
 
 }
-
 #endif

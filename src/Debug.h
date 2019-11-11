@@ -1,10 +1,10 @@
 
-#ifndef FASTTREE_DEBUG_H
-#define FASTTREE_DEBUG_H
+#ifndef VERYFASTTREE_DEBUG_H
+#define VERYFASTTREE_DEBUG_H
 
 #include <memory>
 
-namespace fasttree {
+namespace veryfasttree {
 
     struct Debug {
 

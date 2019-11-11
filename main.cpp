@@ -1,8 +1,8 @@
 
 #include <CLI11.hpp>
-#include "fasttree/Options.h"
-#include "fasttree/FastTree.h"
-#include "fasttree/Utils.h"
+#include "src/Options.h"
+#include "src/VeryFastTree.h"
+#include "src/Utils.h"
 #include <cmath>
 
 std::string isNotEmpty(const std::string &input) {
@@ -38,7 +38,7 @@ void setDeprecated(CLI::Option *op) {
     });
 }
 
-void cli(CLI::App &app, std::string &name, std::string &version, std::string &flags, fasttree::Options &options,
+void cli(CLI::App &app, std::string &name, std::string &version, std::string &flags, veryfasttree::Options &options,
          std::vector<std::string> &args) {
     std::stringstream description;
     std::string padd = std::string(name.size() + 1, ' ');
@@ -61,9 +61,9 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     description << name << " [-nt] [-matrix Matrix | -nomatrix] [-rawdist] -makematrix [alignment]" << std::endl;
     description << padd << "[-n 100] > phylip_distance_matrix" << std::endl;
     description << std::endl;
-    description << "  FastTree supports fasta or phylip interleaved alignments" << std::endl;
-    description << "  By default FastTree expects protein alignments,  use -nt for nucleotides" << std::endl;
-    description << "  FastTree reads standard input if no alignment file is given" << std::endl;
+    description << "  VeryFastTree supports fasta or phylip interleaved alignments" << std::endl;
+    description << "  By default VeryFastTree expects protein alignments,  use -nt for nucleotides" << std::endl;
+    description << "  VeryFastTree reads standard input if no alignment file is given" << std::endl;
 
     app.name(name);
     app.description(description.str());
@@ -80,7 +80,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     app.add_option("-n", options.nAlign,
                    "read in multiple alignments in. This only works with phylip interleaved format. For example,"
-                   " you can use it with the output from phylip's seqboot. If you use -n, FastTree will write 1"
+                   " you can use it with the output from phylip's seqboot. If you use -n, VeryFastTree will write 1"
                    " tree per line to standard output.")->type_name("<number>")->check(Min(1))->group(io);
 
     app.add_flag_function("-nt", [&options](size_t) {
@@ -162,7 +162,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     std::stringstream topo_description;
     topo_description << "Topology refinement:" << std::endl;
-    topo_description << "  By default, FastTree tries to improve the tree with up to 4*log2(N)" << std::endl;
+    topo_description << "  By default, VeryFastTree tries to improve the tree with up to 4*log2(N)" << std::endl;
     topo_description << "  rounds of minimum-evolution nearest-neighbor interchanges (NNI)," << std::endl;
     topo_description << "  where N is the number of unique sequences, 2 rounds of" << std::endl;
     topo_description << "  subtree-prune-regraft (SPR) moves (also min. evo.), and" << std::endl;
@@ -273,15 +273,16 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                               options.gammaLogLk = true;
                           },
                           "after the final round of optimizing branch lengths with the CAT model, report the likelihood"
-                          " under the discrete gamma model with the same number of categories. FastTree uses the same"
+                          " under the discrete gamma model with the same number of categories. VeryFastTree uses the same"
                           " branch lengths but optimizes the gamma shape parameter and the scale of the lengths. "
                           "The final tree will have rescaled lengths. Used with -log, this also generates per-site"
-                          " likelihoods for use with CONSEL, see GammaLogToPaup.pl and documentation on the FastTree"
+                          " likelihoods for use with CONSEL, see GammaLogToPaup.pl and documentation on the VeryFastTree"
                           " web site.")->group(model);
 
     std::stringstream support_description;
     support_description << "Support value options:" << std::endl;
-    support_description << "  By default, FastTree computes local support values by resampling the site" << std::endl;
+    support_description << "  By default, VeryFastTree computes local support values by resampling the site"
+                        << std::endl;
     support_description << "  likelihoods 1,000 times and the Shimodaira Hasegawa test. If you specify -nome,"
                         << std::endl;
     support_description << "  it will compute minimum-evolution bootstrap supports instead" << std::endl;
@@ -310,7 +311,8 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     std::stringstream search_description;
     search_description << "Searching for the best join:" << std::endl;
-    search_description << "  By default, FastTree combines the 'visible set' of fast neighbor-joining " << std::endl;
+    search_description << "  By default, VeryFastTree combines the 'visible set' of fast neighbor-joining "
+                       << std::endl;
     search_description << "  with local hill-climbing as in relaxed neighbor-joining" << std::endl;
 
     auto search = search_description.str();
@@ -334,7 +336,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     std::stringstream heuristics_description;
     heuristics_description << "Top-hit heuristics:" << std::endl;
-    heuristics_description << "  By default, FastTree uses a top-hit list to speed up search" << std::endl;
+    heuristics_description << "  By default, VeryFastTree uses a top-hit list to speed up search" << std::endl;
 
     auto heuristics = heuristics_description.str();
 
@@ -351,10 +353,11 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                           "(or -slow) to turn this feature off and compare all leaves to each other, and all new "
                           "joined nodes to each other")->group(heuristics);
 
-    app.add_option("-topm", options.tophitsMult, "set the top-hit list size to parameter*sqrt(N) FastTree estimates the"
-                                                 " top m hits of a leaf from the top 2*m hits of a 'close' neighbor,"
-                                                 " where close is defined as d(seed,close) < 0.75 * d(seed, hit of rank"
-                                                 " 2*m), and updates the top-hits as joins proceed")->type_name("1.0")->
+    app.add_option("-topm", options.tophitsMult,
+                   "set the top-hit list size to parameter*sqrt(N) VeryFastTree estimates the"
+                   " top m hits of a leaf from the top 2*m hits of a 'close' neighbor,"
+                   " where close is defined as d(seed,close) < 0.75 * d(seed, hit of rank"
+                   " 2*m), and updates the top-hits as joins proceed")->type_name("1.0")->
             group(heuristics);
 
     app.add_option("-close", options.tophitsMult, "modify the close heuristic, lower is more conservative")->
@@ -398,7 +401,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             group(join);
 
     app.add_flag_function("-bionj", [&options](size_t) { options.bionj = true; },
-                          "weighted joins as in BIONJ FastTree will also weight joins during NNIs")->
+                          "weighted joins as in BIONJ VeryFastTree will also weight joins during NNIs")->
             group(join);
 
 
@@ -419,10 +422,11 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-threads", options.threads, "to use a parallel version with multiple threads")->
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
-    app.add_flag("-threads-balanced", options.threadsBalanced,
-                 "create more subtrees than threads to a balanced  number of nodes per subprocess, greatly improve "
-                 "performance with very unbalanced trees, but can affect the final precision.")->
-            group(optimizations);
+    app.add_option("-thread-subtrees", options.threadSubtrees,
+                   "Set the maximum number of subtrees restriction assigned to each thread, it reduce the thread"
+                   "  balancing of parallel version but increase the interaction between nodes, it can increase the accuracy"
+                   " with dataset with few sequences but with large compute work.")->type_name("n")->
+            check(Min(1))->group(optimizations);
     app.add_option("-threads-level", options.threadsLevel,
                    "Restrict the number of sections that will be parallelized. Options: "
                    "0 legacy(tree is not divided), 1 (tree is divided for NNI, default)")->
@@ -487,7 +491,7 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     app.get_option("-log")->description("save intermediate trees, settings, and model details")->group(common);
     app.get_option("-quote")->description(
             "allow spaces and other restricted characters (but not ' ) in sequence names and quote names in the output "
-            "tree (fasta input only; FastTree will not be able to read these trees back in)")->group(common);
+            "tree (fasta input only; VeryFastTree will not be able to read these trees back in)")->group(common);
     app.get_option("-pseudo")->description("to use pseudocounts (recommended for highly gapped sequences)")->
             group(common);
     app.get_option("-fastest")->description(
@@ -515,17 +519,17 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
 
 
 int main(int argc, char *argv[]) {
-    fasttree::Options options;
-    std::string name = "VeryFastTree";
-    std::string version = fasttree::Constants::version;
-    std::string flags = fasttree::Constants::compileFlags;
+    veryfasttree::Options options;
+    std::string name = veryfasttree::Constants::name;
+    std::string version = veryfasttree::Constants::version;
+    std::string flags = veryfasttree::Constants::compileFlags;
     std::vector<std::string> args(argv + 1, argv + argc);
     CLI::App app;
 
     cli(app, name, version, flags, options, args);
-    if (fasttree::isattyIn() && argc == 1) {
+    if (veryfasttree::isattyIn() && argc == 1) {
         std::cout << app.help() << std::endl;
-        if (fasttree::isWindows()) {
+        if (veryfasttree::isWindows()) {
             std::cerr << "Windows users: Please remember to run this inside a command shell" << std::endl;
             std::cerr << "Hit return to continue" << std::endl;
             std::cin.ignore(1);
@@ -543,7 +547,7 @@ int main(int argc, char *argv[]) {
     std::ifstream input;
     std::ofstream output;
     std::ofstream log;
-    fasttree::TeeStream tee(log, std::cerr);
+    veryfasttree::TeeStream tee(log, std::cerr);
     std::ostream teelog(&tee);
 
     if (options.inFileName.empty()) {
@@ -576,7 +580,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    fasttree::FastTree fastTree(options);
+    veryfasttree::VeryFastTree fastTree(options);
     std::ostream &applog = log ? teelog : std::cerr;
     applog << "Command: ";
     std::copy(argv, argv + argc - 1, std::ostream_iterator<char *>(applog, " "));

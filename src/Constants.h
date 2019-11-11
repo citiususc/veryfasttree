@@ -1,10 +1,10 @@
 
-#ifndef FASTTREE_CONSTANTS_H
-#define FASTTREE_CONSTANTS_H
+#ifndef VERYFASTTREE_CONSTANTS_H
+#define VERYFASTTREE_CONSTANTS_H
 
 #include <string>
 
-namespace fasttree {
+namespace veryfasttree {
 
     namespace Constants {
 
@@ -53,6 +53,7 @@ namespace fasttree {
         const std::string codesStringAA = "ARNDCQEGHILKMFPSTWYV";
         const std::string codesStringNT = "ACGT";
 
+        const std::string name = "VeryFastTree";
         const std::string version = "3.0";
         const std::string compileFlags =
                 "(OpenMP"

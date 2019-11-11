@@ -2,17 +2,17 @@
 #ifndef FASTTREE_FASTTREEIMPL_TCC
 #define FASTTREE_FASTTREEIMPL_TCC
 
-#include "FastTreeImpl.h"
+#include "VeyFastTreeImpl.h"
 #include <sstream>
 #include "NeighbourJoining.h"
 #include "Utils.h"
 
 #define AbsFastTreeImpl(...) \
 template<typename Precision, template<class> class Operations> \
-__VA_ARGS__ fasttree::FastTreeImpl<Precision, Operations>
+__VA_ARGS__ veryfasttree::VeyFastTreeImpl<Precision, Operations>
 
 
-AbsFastTreeImpl()::FastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log) :
+AbsFastTreeImpl()::VeyFastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log) :
         options(options), input(input), output(output), log(log), progressReport(options) {
     if (!options.matrixPrefix.empty()) {
         if (!options.useMatrix) {
@@ -220,20 +220,20 @@ AbsFastTreeImpl(void)::run() {
                     log << "WARNING! This alignment consists of closely-related and very-long sequences." << std::endl;
                 }
                 if (warn_len) {
-                    log << "This version of FastTree may not report reasonable branch lengths!" << std::endl;
+                    log << "This version of VeryFastTree may not report reasonable branch lengths!" << std::endl;
                     if (options.doublePrecision) {
                         log << "Consider changing MLMinBranchLengthTolerance." << std::endl;
                     } else {
-                        log << "Consider use FastTree with -double-precision." << std::endl;
+                        log << "Consider use VeryFastTree with -double-precision." << std::endl;
                     }
                     log << "For more information, visit" << std::endl;
                     log << "http://www.microbesonline.org/fasttree/#BranchLen" << std::endl;
 
                 }
                 if (warn) {
-                    log << "WARNING! FastTree (or other standard maximum-likelihood tools)" << std::endl;
+                    log << "WARNING! VeryFastTree (or other standard maximum-likelihood tools)" << std::endl;
                     log << "may not be appropriate for aligments of very closely-related sequences" << std::endl;
-                    log << "like this one, as FastTree does not account for recombination or gene conversion"
+                    log << "like this one, as VeryFastTree does not account for recombination or gene conversion"
                         << std::endl << std::endl;
 
                 }

@@ -2,7 +2,7 @@
 #ifndef FASTTREE_KNUTH_H
 #define FASTTREE_KNUTH_H
 
-namespace fasttree {
+namespace veryfasttree {
 
     double knuth_rand();
 

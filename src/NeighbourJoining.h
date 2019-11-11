@@ -1,6 +1,6 @@
 
-#ifndef FASTTREE_NEIGHBOURJOINING_H
-#define FASTTREE_NEIGHBOURJOINING_H
+#ifndef VERYFASTTREE_NEIGHBOURJOINING_H
+#define VERYFASTTREE_NEIGHBOURJOINING_H
 
 #include "DistanceMatrix.h"
 #include "TransitionMatrix.h"
@@ -12,7 +12,7 @@
 #include "Knuth.h"
 
 
-namespace fasttree {
+namespace veryfasttree {
 
     template<typename Precision, template<class> class Operations>
     class NeighbourJoining {
@@ -501,7 +501,7 @@ namespace fasttree {
            To ensure good behavior while evaluating a subtree-prune-regraft move as a series
            of nearest-neighbor interchanges, this uses a distance-ish model of constraints,
            as given by PairConstraintDistance(), rather than
-           counting the number of violated splits (which is what FastTree does
+           counting the number of violated splits (which is what VeryFastTree does
            during neighbor-joining).
            Thus, penalty values may well be >0 even if no constraints are violated, but the
            relative scores for the three NNIs will be correct.
@@ -701,7 +701,7 @@ namespace fasttree {
 
         double gammaLogLk(Siteratelk &s, double gamma_loglk_sites[]);
 
-        /* Input site_loglk must be for each rate. Note that FastTree does not reoptimize
+        /* Input site_loglk must be for each rate. Note that VeryFastTree does not reoptimize
            the branch lengths under the Gamma model -- it optimizes the overall scale.
            Reports the gamma log likelihhod (and logs site likelihoods if fpLog is set),
            and reports the rescaling value.
@@ -731,7 +731,7 @@ namespace fasttree {
 
         int64_t treePartitionQuality(std::vector<int64_t> &weights, std::vector<int64_t> &partition);
 
-        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal);
+        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal, int pen = 3);
 
         void printVisualTree(int node, bool isFirst = false, const std::string &prefix = "");
 

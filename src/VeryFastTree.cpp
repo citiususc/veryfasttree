@@ -1,5 +1,5 @@
 
-#include "FastTree.h"
+#include "VeryFastTree.h"
 #include "Utils.h"
 #include "Debug.h"
 #include <omp.h>
@@ -17,11 +17,11 @@
 #include "operations/AVX512Operations.h"
 #endif
 
-using namespace fasttree;
+using namespace veryfasttree;
 
-FastTree::FastTree(const Options &options) : options(options) {}
+VeryFastTree::VeryFastTree(const Options &options) : options(options) {}
 
-void FastTree::settings(std::ostream &log) {
+void VeryFastTree::settings(std::ostream &log) {
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
     if (options.nCodes == 4 && options.matrixPrefix.empty()) {
@@ -91,7 +91,7 @@ void FastTree::settings(std::ostream &log) {
             mlnniString += strformat(" opt-each=%d", options.mlAccuracy);
         }
 
-        log << "FastTree Version " << Constants::version << " " << Constants::compileFlags << std::endl;
+        log << "VeryFastTree Version " << Constants::version << " " << Constants::compileFlags << std::endl;
         log << "Alignment: " << (options.inFileName.empty() ? "standard input" : options.inFileName);
 
         if (options.nAlign > 1) {
@@ -160,36 +160,36 @@ void FastTree::settings(std::ostream &log) {
     }
 }
 
-void FastTree::configOpenMP() {
+void VeryFastTree::configOpenMP() {
     omp_set_num_threads(options.threads);
 }
 
-void FastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
+void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
     settings(log);
     configOpenMP();
 
     if (options.extension == "NONE") {
         if (options.doublePrecision) {
-            FastTreeImpl<double, BasicOperations>(options, in, out, log).run();
+            VeyFastTreeImpl<double, BasicOperations>(options, in, out, log).run();
         } else {
-            FastTreeImpl<float, BasicOperations>(options, in, out, log).run();
+            VeyFastTreeImpl<float, BasicOperations>(options, in, out, log).run();
         }
     }
     #if (defined __SSE2__) || (defined __AVX__)
     else if(options.extension == "SSE" || options.extension == "AVX128"){
         if(options.doublePrecision){
-            FastTreeImpl<double, SSE128Operations>(options, in, out, log).run();
+            VeyFastTreeImpl<double, SSE128Operations>(options, in, out, log).run();
         }else{
-            FastTreeImpl<float, SSE128Operations>(options, in, out, log).run();
+            VeyFastTreeImpl<float, SSE128Operations>(options, in, out, log).run();
         }
     }
     #endif
     #ifdef __AVX__
     else if(options.extension == "AVX256"){
         if(options.doublePrecision){
-            FastTreeImpl<double, AVX256Operations>(options, in, out, log).run();
+            VeyFastTreeImpl<double, AVX256Operations>(options, in, out, log).run();
         }else{
-            FastTreeImpl<float, AVX256Operations>(options, in, out, log).run();
+            VeyFastTreeImpl<float, AVX256Operations>(options, in, out, log).run();
         }
     }
     #endif

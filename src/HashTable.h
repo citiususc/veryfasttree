@@ -1,12 +1,12 @@
 
-#ifndef FASTTREE_HASHTABLE_H
-#define FASTTREE_HASHTABLE_H
+#ifndef VERYFASTTREE_HASHTABLE_H
+#define VERYFASTTREE_HASHTABLE_H
 
 #include <vector>
 #include <tsl/robin_map.h>
 #include <xxh64.hpp>
 
-namespace fasttree {
+namespace veryfasttree {
 
     class HashTable {
     public:

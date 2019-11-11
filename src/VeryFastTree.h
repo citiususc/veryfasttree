@@ -1,12 +1,12 @@
 
-#ifndef FASTTREE_FASTTREE_H
-#define FASTTREE_FASTTREE_H
+#ifndef VERYFASTTREE_VERYFASTTREE_H
+#define VERYFASTTREE_VERYFASTTREE_H
 
-#include "FastTreeImpl.h"
+#include "VeyFastTreeImpl.h"
 #include "tsl/robin_map.h"
 
-namespace fasttree {
-    class FastTree {
+namespace veryfasttree {
+    class VeryFastTree {
     private:
         Options options;
 
@@ -14,7 +14,7 @@ namespace fasttree {
         void configOpenMP();
 
     public:
-        FastTree(const Options &options);
+        VeryFastTree(const Options &options);
 
         void run(std::istream &input, std::ostream &output, std::ostream &log);
 

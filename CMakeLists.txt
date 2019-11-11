@@ -21,32 +21,32 @@ ADD_SUBDIRECTORY("libs/boost-sort")
 ADD_SUBDIRECTORY("libs/boost-align")
 
 set(SOURCE_FILES
-        fasttree/operations/BasicOperations.tcc
-        fasttree/operations/BasicOperations.h
-        fasttree/operations/SSE128Operations.tcc
-        fasttree/operations/SSE128Operations.h
-        fasttree/operations/AVX256Operations.tcc
-        fasttree/operations/AVX256Operations.h
-        fasttree/operations/AVX512Operations.tcc
-        fasttree/operations/AVX512Operations.h
-        fasttree/Knuth.cpp
-        fasttree/Knuth.h
-        fasttree/Options.h
-        fasttree/Constants.h
-        fasttree/Debug.h
-        fasttree/Utils.h
-        fasttree/HashTable.h
-        fasttree/DistanceMatrix.tcc
-        fasttree/DistanceMatrix.h
-        fasttree/TransitionMatrix.tcc
-        fasttree/TransitionMatrix.h
-        fasttree/NeighbourJoining.tcc
-        fasttree/NeighbourJoining.h
-        fasttree/Alignment.cpp
-        fasttree/Alignment.h
-        fasttree/FastTreeImpl.tcc
-        fasttree/FastTree.cpp
-        fasttree/FastTree.h
+        src/operations/BasicOperations.tcc
+        src/operations/BasicOperations.h
+        src/operations/SSE128Operations.tcc
+        src/operations/SSE128Operations.h
+        src/operations/AVX256Operations.tcc
+        src/operations/AVX256Operations.h
+        src/operations/AVX512Operations.tcc
+        src/operations/AVX512Operations.h
+        src/Knuth.cpp
+        src/Knuth.h
+        src/Options.h
+        src/Constants.h
+        src/Debug.h
+        src/Utils.h
+        src/HashTable.h
+        src/DistanceMatrix.tcc
+        src/DistanceMatrix.h
+        src/TransitionMatrix.tcc
+        src/TransitionMatrix.h
+        src/NeighbourJoining.tcc
+        src/NeighbourJoining.h
+        src/Alignment.cpp
+        src/Alignment.h
+        src/VeryFastTreeImpl.tcc
+        src/VeryFastTree.cpp
+        src/VeryFastTree.h
         main.cpp
         )
 
