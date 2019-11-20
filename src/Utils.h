@@ -154,7 +154,7 @@ namespace veryfasttree {
 
         inline double clockDiff() {
             auto timeNow = Clock::now();
-            return std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeLast).count() /
+            return std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count() /
                    (double) (1000);
         }
 
