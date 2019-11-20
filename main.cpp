@@ -435,9 +435,15 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
             group(optimizations);
 
-    app.add_set_ignore_case("-ext", options.extension, {"NONE", "SSE", "AVX128", "AVX256", "AVX512"},
-                            "compute multiple processing elements with one operation. Available: none, SSE3, AVX, AVX2 or AVX512")
-            ->type_name("name")->default_val("NONE")->group(optimizations);
+    app.add_set_ignore_case("-ext", options.extension, {"NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512"},
+                            "compute multiple processing elements with one operation. "
+                            "Available: NONE, SSE3, AVX, AVX2 or AVX512. Default(SSE3)")
+            ->type_name("name")->group(optimizations)->
+            #if (defined __SSE2__) || (defined __AVX__)
+            default_val("SSE3");
+            #else
+            default_val("NONE");
+            #endif
 
     app.add_option("-fastexp", options.fastexp,
                    "to use a fast implementation of exp(x) for distance matrix, in some  cases can reduce the final "

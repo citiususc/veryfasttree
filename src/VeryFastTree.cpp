@@ -176,7 +176,7 @@ void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
         }
     }
     #if (defined __SSE2__) || (defined __AVX__)
-    else if(options.extension == "SSE" || options.extension == "AVX128"){
+    else if(options.extension == "SSE" || options.extension == "SSE3"){
         if(options.doublePrecision){
             VeyFastTreeImpl<double, SSE128Operations>(options, in, out, log).run();
         }else{
@@ -185,7 +185,7 @@ void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
     }
     #endif
     #ifdef __AVX__
-    else if(options.extension == "AVX256"){
+    else if(options.extension == "AVX" || options.extension == "AVX2"){
         if(options.doublePrecision){
             VeyFastTreeImpl<double, AVX256Operations>(options, in, out, log).run();
         }else{
