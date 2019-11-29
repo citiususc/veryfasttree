@@ -82,8 +82,8 @@ It enables the vector extensions:
 	- **AVX2**: Similar to AVX, but some arithmetic operations are performed using  additional AVX2 vector intrinsics not included in the AVX instruction set. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bit doubles).
 
 - **-fastexp [implementation]**  
-This option is used to select an alternative implementation for the exponential function (e^x), which has a significant impact on performance:
+This option is used to select an alternative implementation for the exponential function (e<sup>x</sup>), which has a significant impact on performance:
 	- **0**: (default) Use the *exp* function included in the built-in math library with double precision.
 	- **1**: Use the *exp* function included in the built-in math library with simple precision (not recommended together with *-double-precision* option).
-	- **2**: Use a very efficient and fast implementation to compute an accurate approximation of $e^x$ using double precision arithmetic.
+	- **2**: Use a very efficient and fast implementation to compute an accurate approximation of e<sup>x</sup> using double precision arithmetic.
 	- **3**: Use a very efficient and fast implementation to compute an accurate approximation of e<sup>x</sup> using simple precision arithmetic (not recommended together with *-double-precision* option).
