@@ -419,26 +419,25 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     auto optimizations = "Optimizations";
 
-    app.add_option("-threads", options.threads, "to use a parallel version with multiple threads")->
+    app.add_option("-threads", options.threads, "to specify the number of threads used in a parallel execution ")->
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
     app.add_option("-thread-subtrees", options.threadSubtrees,
-                   "Set the maximum number of subtrees restriction assigned to each thread, it reduce the thread"
-                   "  balancing of parallel version but increase the interaction between nodes, it can increase the accuracy"
-                   " with dataset with few sequences but with large compute work.")->type_name("n")->
-            check(Min(1))->group(optimizations);
+                  "set a maximum number of subtrees assigned to a thread. This option could increase "
+                  "the accuracy for small datasets containing large sequences at the expense of reducing "
+                  "the workload balance among threads")->type_name("n")->check(Min(1))->group(optimizations);
     app.add_option("-threads-level", options.threadsLevel,
-                   "Restrict the number of sections that will be parallelized. Options: "
-                   "0 legacy(tree is not divided), 1 (tree is divided for NNI, default)")->
+                   "to change the degree of parallelization. If level is 0, VeryFastTree uses the same "
+                   "parallelization strategy followed by FastTree-2. If level is 1 (by default), VeryFastTree "
+                   "accelerates the rounds of ML NNIs using its tree partitioning method")->
             type_name("lvl")->check(CLI::Range(0, 1))->group(optimizations);
 
-    app.add_flag("-double-precision", options.doublePrecision, "use double precision instead of single")->
+    app.add_flag("-double-precision", options.doublePrecision, "use double precision arithmetic")->
             group(optimizations);
 
     app.add_set_ignore_case("-ext", options.extension, {"NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512"},
-                            "compute multiple processing elements with one operation. "
-                            "Available: NONE, SSE3, AVX, AVX2 or AVX512. Default(SSE3)")
-            ->type_name("name")->group(optimizations)->
+                            "to speed up computations enabling the vector extensions. "
+                            "Available: NONE, SSE3 (default), AVX, AVX2 or AVX512")->type_name("name")->group(optimizations)->
             #if (defined __SSE2__) || (defined __AVX__)
             default_val("SSE3");
             #else
@@ -446,9 +445,12 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             #endif
 
     app.add_option("-fastexp", options.fastexp,
-                   "to use a fast implementation of exp(x) for distance matrix, in some  cases can reduce the final "
-                   "precision especially when -double-precision is used. Options: "
-                   "0 precise (default), 2 balanced, 3 fast, 1 less precise (fast than precise, use when balanced has bad results)")->
+                   "to select an alternative implementation for the exponential function exp(x), which has "
+                   "a significant impact on performance. Options: 0 - built-in math library with double precision "
+                   "(default), 1 - built-in math library with simple precision (not recommended with "
+                   "-double-precision option), 2 - fast implementation to compute an approximation of "
+                   "exp(x) using double precision, and 3 - fast implementation to compute an approximation "
+                   "of exp(x) using simple precision (not recommended with -double-precision option)")->
             type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
 
     for (auto &c:options.extension) { c = (char) std::toupper(c); }
