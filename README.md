@@ -4,8 +4,8 @@
 
 ## Requirements
 
-All libraries need to compile **VeryFastTree** are include inside of lib folder, the 
-other basic requirement are:
+All libraries needed to compile **VeryFastTree** are included inside the lib folder. The
+other basic requirements are:
 
 * CMake v3.5+
 * C++11 compiler
@@ -15,9 +15,9 @@ other basic requirement are:
 
 ## Configuring
 
-CMake will generate the necessary configuration files for the compilation. In Linux by 
-default a native compilation is done for the architecture where it is compiled, this 
-allows to detect the characteristics automatically and apply them when possible, if the 
+CMake will generate the necessary configuration files for the compilation. In Linux by
+default a native compilation is done for the architecture where it is compiled, this
+allows to detect the characteristics automatically and apply them when possible, if the
 program is going to be executed in a different machine this option must be disabled.
 
 Options can be listed with cmake:
@@ -59,54 +59,31 @@ Linux:
 
 ## Running VeryFastTree ##
 
-VeryFastTree implements through the CLI library the same command interface that FastTree used. The arguments have the same behavior as in FastTree and these can be consulted with *-h* option . VeryFastTree adds new arguments grouped in optimizations section, the arguments allow to improve the performance and to change between the different versions that in FastTree were different binaries.
+**To improve the usability and facilitate the adoption of VeryFastTree, it implements the same command interface than FastTree-2. It means that arguments have exactly the same behavior as in FastTree-2.** All these arguments can be consulted with the *-h* option. As a consequence, to take advantage of the performance benefits provided by VeryFastTree is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options.  
 
-  - **-threads**: allows to specify the number of threads, if the option
-    is not set, value will be obtained from the environment variable
-    *OMP\_NUM\_THREADS* as FastTree. If the number of threads is 1, the
-    tool behavior is the same as FastTree compiled without -DOPENMP.
+On the other hand, VeryFastTree has its own extra arguments which have been grouped in the  *Optimizations* section. These arguments are related to the parametrization of the different parallelization and vectorization strategies included in VeryFastTree. Next we list and explain the new arguments available:
+- **-threads [n]**
+It allows to specify the number of threads (*n*) used in the parallel execution. If this option is not set, the corresponding value will be obtained from the environment variable *OMP\_NUM\_THREADS*. This is the same approach followed by FastTree-2. If *n=1*, VeryFastTree behaves in the same way than FastTree-2 compiled without the *-DOPENMP* flag.
 
-  - **-thread-subtrees**: Set the maximum number of subtrees restriction 
-  assigned to each thread, it reduce the thread  balancing of parallel 
-  version but increase the interaction between nodes, it can increase the 
-  accuracy with dataset with few sequences but with large compute work.
+- **-threads-level [level]**
+It allows to change the degree of parallelization. If level is *0*, VeryFastTree uses the same parallelization strategy followed by FastTree-2. If level is *1* (by default), VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method.
 
-  - **-threads-level**: allows to change the type of parallelization, 0 is
-    the parallelization used by FastTree and 1 (by default) the new
-    parallelization system where tree processing is divided in threads.
+- **-thread-subtrees [num\_subtrees]**
+It sets a maximum number of subtrees assigned to a thread. This option could increase the accuracy for small datasets containing large sequences at the expense of reducing the workload balance among threads.
 
-  - **-double-precision**: Use double precision numbers for operations.
-    The same behavior as compiling FastTree with *-DUSE\_DOUBLE*.
+- **-double-precision**
+Use double precision arithmetic. Therefore, it is equivalent to compile FastTree-2 with *-DUSE\_DOUBLE*.
 
-  - **-fastexp**: allows selecting an alternative implementation of the
-    exp function, which has a significant impact on performance:
-    
-      - 0: (default) use math exp with double precision.
-    
-      - 1: use math exp with simple precision. (not recommended with
-        -double-precision option)
-    
-      - 2: Approximate vectorized exp from Cephes Math Library with
-        double precision..
-    
-      - 3: Approximate vectorized exp from Cephes Math Library with
-        simple precision.. (not recommended with -double-precision
-        option)
+- **-ext [type]**
+It enables the vector extensions:
+	- **none**: (default) Operations are performed with the native programming language operators. In addition, loops are unrolled with the aim of providing hints to the compiler for applying some optimization (including vectorization).
+	- **SSE3**: Arithmetic operations are performed using SSE3 vector intrinsics. Each instruction operates on 128 bit registers, which could contain four 32-bit floats or two 64-bit doubles.
+	- **AVX**: Arithmetic operations are performed using AVX vector intrinsics. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bits doubles.
+	- **AVX2**: Similar to AVX, but some arithmetic operations are performed using  additional AVX2 vector intrinsics not included in the AVX instruction set. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bit doubles).
 
-  - **-ext**: Enable vector extensions:
-    
-      - none: (default) Operations are performed with language
-        operators, loops are unrolled which allows the compiler to apply
-        some optimization, including some type of vectorization.
-    
-      - SSE, AVX128: Use the set of 128-bit vector instructions, 4
-        floats of 32 bits or 2 doubles of 64 bits, it requires data
-        aligning which a small memory overhead.
-    
-      - AVX256: Use the set of 256-bit vector instructions, 8 floats of
-        32 bits or 4 doubles of 64 bits, doubles require data aligning
-        which a small memory overhead and floats add a padding to
-        preserve aligning when use 8 that is not divisor of protein set
-        which requires more memory.
-
-
+- **-fastexp [implementation]**  
+This option is used to select an alternative implementation for the exponential function (e^x), which has a significant impact on performance:
+	- **0**: (default) Use the *exp* function included in the built-in math library with double precision.
+	- **1**: Use the *exp* function included in the built-in math library with simple precision (not recommended together with *-double-precision* option).
+	- **2**: Use a very efficient and fast implementation to compute an accurate approximation of $e^x$ using double precision arithmetic.
+	- **3**: Use a very efficient and fast implementation to compute an accurate approximation of e<sup>x</sup> using simple precision arithmetic (not recommended together with *-double-precision* option).
