@@ -48,6 +48,14 @@ vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
     return 0;
 }
 
+inline void veryfasttree::AVX512Operations<float>::vector_add(float fTot[], float fAdd[], int64_t n){
+
+}
+
+inline void veryfasttree::AVX512Operations<double>::vector_add(double fTot[], double fAdd[], int64_t n){
+
+}
+
 template<>
 inline float veryfasttree::AVX512Operations<float>::vector_sum(float f1[], int64_t n) {
     return 0;

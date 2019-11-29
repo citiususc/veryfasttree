@@ -169,6 +169,32 @@ vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
     return mm_sum(sum1, r1) * mm_sum(sum2, r2);
 }
 
+template <>
+inline void veryfasttree::AVX256Operations<double>::vector_add(double fTot[], double fAdd[], int64_t n){
+    __m256d a, b;
+    for (int64_t i = 0; i < n; i += 4) {
+        a = _mm256_load_pd(fTot + i);
+        b = _mm256_load_pd(fAdd + i);
+        _mm256_store_pd(fTot + i, _mm256_add_pd(a, b));
+    }
+}
+
+template <>
+inline void veryfasttree::AVX256Operations<float>::vector_add(float fTot[], float fAdd[], int64_t n){
+    __m256 a, b;
+    int64_t m = n - (n % 8);
+    for (int64_t i = 0; i < m; i += 8) {
+        a = _mm256_load_ps(fTot + i);
+        b = _mm256_load_ps(fAdd + i);
+        _mm256_store_ps(fTot + i, _mm256_add_ps(a, b));
+    }
+
+    __m128 aa, bb;
+    aa = _mm_load_ps(fTot + m);
+    bb = _mm_load_ps(fAdd + m);
+    _mm_store_ps(fTot + m, _mm_add_ps(aa, bb));
+}
+
 template<>
 inline double veryfasttree::AVX256Operations<double>::
 vector_sum(double f1[], int64_t n) {

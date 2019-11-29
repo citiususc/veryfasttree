@@ -137,6 +137,26 @@ vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
 }
 
 template<>
+inline void veryfasttree::SSE128Operations<float>::vector_add(float fTot[], float fAdd[], int64_t n) {
+    __m128 a, b;
+    for (int64_t i = 0; i < n; i += 4) {
+        a = _mm_load_ps(fTot + i);
+        b = _mm_load_ps(fAdd + i);
+        _mm_store_ps(fTot + i, _mm_add_ps(a, b));
+    }
+}
+
+template<>
+inline void veryfasttree::SSE128Operations<double>::vector_add(double fTot[], double fAdd[], int64_t n) {
+    __m128d a, b;
+    for (int64_t i = 0; i < n; i += 2) {
+        a = _mm_load_pd(fTot + i);
+        b = _mm_load_pd(fAdd + i);
+        _mm_store_pd(fTot + i, _mm_add_pd(a, b));
+    }
+}
+
+template<>
 inline float veryfasttree::SSE128Operations<float>::
 vector_sum(float f1[], int64_t n) {
     __m128 sum = _mm_setzero_ps();

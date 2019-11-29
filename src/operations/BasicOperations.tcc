@@ -56,6 +56,15 @@ AbsBasicOperations(inline Precision)::vector_dot_product_rot(numeric_t f1[], num
     return out1 * out2;
 }
 
+AbsBasicOperations(inline void)::vector_add(numeric_t fTot[], numeric_t fAdd[], int64_t n){
+    for (int64_t i = 0; i < n; i+=4) {
+        fTot[i] += fAdd[i];
+        fTot[i + 1] += fAdd[i + 1];
+        fTot[i + 2] += fAdd[i + 2];
+        fTot[i + 3] += fAdd[i + 3];
+    }
+}
+
 AbsBasicOperations(inline Precision)::vector_sum(numeric_t f1[], int64_t n) {
     numeric_t out = 0.0;
     for (int64_t i = 0; i < n; i+=4) {

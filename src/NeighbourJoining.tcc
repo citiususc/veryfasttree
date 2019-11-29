@@ -535,19 +535,44 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     out.vectors.resize(out.nVectors * nCodeSize, 0);
 
     /* Add up the weights, going through each sequence in turn */
-    #pragma omp parallel for schedule(static) if(nProfiles == (int64_t)seqs.size())
-    for (int64_t in = 0; in < nProfiles; in++) {
-        int64_t iFreqOut = 0;
-        int64_t iFreqIn = 0;
-        for (int64_t i = 0; i < nPos; i++) {
-            numeric_t *fIn = getFreq(asRef(_profiles[in]), i, iFreqIn);
-            numeric_t *fOut = getFreq(out, i, iFreqOut);
-            if (asRef(_profiles[in]).weights[i] > 0) {
-                addToFreq(fOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
+    if(options.threads > 1 && nProfiles == (int64_t)seqs.size()){
+        #pragma omp parallel
+        {
+            decltype(out.vectors) out_local(out.nVectors * nCodeSize, 0);
+            #pragma omp for schedule(static)
+            for (int64_t in = 0; in < nProfiles; in++) {
+                int64_t iFreqOut = 0;
+                int64_t iFreqIn = 0;
+                for (int64_t i = 0; i < nPos; i++) {
+                    numeric_t *fIn = getFreq(asRef(_profiles[in]), i, iFreqIn);
+                    getFreq(out, i, iFreqOut);
+                    if (asRef(_profiles[in]).weights[i] > 0) {
+                        numeric_t *lfOut = &out_local[nCodeSize * (iFreqOut-1)];
+                        addToFreq(lfOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
+                    }
+                }
+                assert(iFreqOut == out.nVectors);
+                assert(iFreqIn == asRef(_profiles[in]).nVectors);
+            }
+            #pragma omp critical
+            {
+                operations.vector_add(&out.vectors[0], &out_local[0], (int64_t)out.vectors.size());
             }
         }
-        assert(iFreqOut == out.nVectors);
-        assert(iFreqIn == asRef(_profiles[in]).nVectors);
+    }else{
+        for (int64_t in = 0; in < nProfiles; in++) {
+            int64_t iFreqOut = 0;
+            int64_t iFreqIn = 0;
+            for (int64_t i = 0; i < nPos; i++) {
+                numeric_t *fIn = getFreq(asRef(_profiles[in]), i, iFreqIn);
+                numeric_t *fOut = getFreq(out, i, iFreqOut);
+                if (asRef(_profiles[in]).weights[i] > 0) {
+                    addToFreq(fOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
+                }
+            }
+            assert(iFreqOut == out.nVectors);
+            assert(iFreqIn == asRef(_profiles[in]).nVectors);
+        }
     }
 
     /* And normalize the frequencies to sum to 1 */

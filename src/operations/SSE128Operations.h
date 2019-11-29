@@ -21,6 +21,8 @@ namespace veryfasttree {
 
         inline numeric_t vector_dot_product_rot(numeric_t f1[], numeric_t f2[], numeric_t fBy[], int64_t n);
 
+        inline void vector_add(numeric_t fTot[], numeric_t fAdd[], int64_t n);
+
         inline numeric_t vector_sum(numeric_t f1[], int64_t n);
 
         inline void vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fOut[]);
