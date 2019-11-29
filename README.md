@@ -1,10 +1,16 @@
 # VeryFastTree
 
+**VeryFastTree** is a highly-tuned implementation of the [FastTree-2](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490) tool that takes advantage of parallelization and vectorization strategies to speed up the inference of phylogenies for huge alignments. It is important to highlight that VeryFastTree keeps unchanged the phases, methods and heuristics used by FastTree-2 to estimate the phylogenetic tree. In this way, it produces trees with the same topological accuracy than FastTree-2. In addition, unlike the parallel version of VeryFastTree-2, VeryFastTree is deterministic.
+
+Regarding the performance, for example, VeryFastTree is able to construct a tree on a standard server (12-core Intel Xeon E5-2680v3 processor and 128 GiB of memory) using double precision arithmetic from an [ultra-large 330k alignment](http://www.microbesonline.org/fasttree/) in only 4.5 hours, which is 7.8× and 3.5× faster than the sequential and best parallel FastTree-2 times, respectively.
+
+To facilitate the adoption from the research community, VeryFastTree keeps exactly the same command line arguments than FastTree-2. In this way, it is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options to increase the overall performance.
+
 # Getting started #
 
 ## Requirements
 
-All libraries needed to compile **VeryFastTree** are included inside the lib folder. The
+All the libraries needed to compile **VeryFastTree** are included inside the lib folder. The
 other basic requirements are:
 
 * CMake v3.5+
@@ -15,10 +21,10 @@ other basic requirements are:
 
 ## Configuring
 
-CMake will generate the necessary configuration files for the compilation. In Linux by
-default a native compilation is done for the architecture where it is compiled, this
-allows to detect the characteristics automatically and apply them when possible, if the
-program is going to be executed in a different machine this option must be disabled.
+CMake will generate the necessary configuration files for the compilation. In Linux/MacOS by
+default a native compilation is done for the considered architecture. This
+allows to detect automatically the hardware features. If the
+program is going to be executed on a different machine, this option must be disabled.
 
 Options can be listed with cmake:
 
@@ -27,7 +33,7 @@ Options can be listed with cmake:
 	// enable/disable system's processor architecture optimization (linux)
 	USE_NATIVE:BOOL=ON
 
-	// enable/disable SSE2 in windows (linux default)
+	// enable/disable SSE2 in Windows (Linux default)
 	USE_SEE2:BOOL=ON
 
 	// enable/disable SSE4.1
@@ -41,16 +47,16 @@ Options can be listed with cmake:
 
 Example:
 
-	cmake -DUSE_NATIVE=OFF -DUSE_SEE4=ON . //Disable native compilation an use SSE 4.1
+	cmake -DUSE_NATIVE=OFF -DUSE_SEE4=ON . // Disable native compilation and use SSE 4.1
 
-## Build
+## Building
 
 Windows:
 
 	cmake [options] .
 	cmake --build
 
-Linux:
+Linux/MacOS:
 
 	cmake [options] .
 	make
