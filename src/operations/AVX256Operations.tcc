@@ -3,6 +3,7 @@
 #define FASTTREE_AVX256OPERATIONS_TCC
 
 #include "AVX256Operations.tcc"
+#include <cmath>
 
 template<>
 inline float veryfasttree::AVX256Operations<float>::mm_sum(__m128 sum) {
@@ -169,8 +170,8 @@ vector_dot_product_rot(float f1[], float f2[], float fBy[], int64_t n) {
     return mm_sum(sum1, r1) * mm_sum(sum2, r2);
 }
 
-template <>
-inline void veryfasttree::AVX256Operations<double>::vector_add(double fTot[], double fAdd[], int64_t n){
+template<>
+inline void veryfasttree::AVX256Operations<double>::vector_add(double fTot[], double fAdd[], int64_t n) {
     __m256d a, b;
     for (int64_t i = 0; i < n; i += 4) {
         a = _mm256_load_pd(fTot + i);
@@ -179,8 +180,8 @@ inline void veryfasttree::AVX256Operations<double>::vector_add(double fTot[], do
     }
 }
 
-template <>
-inline void veryfasttree::AVX256Operations<float>::vector_add(float fTot[], float fAdd[], int64_t n){
+template<>
+inline void veryfasttree::AVX256Operations<float>::vector_add(float fTot[], float fAdd[], int64_t n) {
     __m256 a, b;
     int64_t m = n - (n % 8);
     for (int64_t i = 0; i < m; i += 8) {
@@ -225,31 +226,31 @@ vector_sum(float f1[], int64_t n) {
 
 template<>
 inline void veryfasttree::AVX256Operations<double>::
-vector_multiply_by(double f[], double fBy, int64_t n, numeric_t fTot[]) {
+vector_multiply_by(double f[], double fBy, int64_t n, double fOut[]) {
     __m256d c = _mm256_set1_pd(fBy);
     for (int64_t i = 0; i < n; i += 4) {
         __m256d a, b;
         a = _mm256_load_pd(f + i);
         b = _mm256_mul_pd(a, c);
-        _mm256_store_pd(fTot + i, b);
+        _mm256_store_pd(fOut + i, b);
     }
 }
 
 template<>
 inline void veryfasttree::AVX256Operations<float>::
-vector_multiply_by(float f[], float fBy, int64_t n, numeric_t fTot[]) {
+vector_multiply_by(float f[], float fBy, int64_t n, float fOut[]) {
     __m256 c = _mm256_set1_ps(fBy);
     int64_t m = n - (n % 8);
     for (int64_t i = 0; i < m; i += 8) {
         __m256 a, b;
         a = _mm256_load_ps(f + i);
         b = _mm256_mul_ps(a, c);
-        _mm256_store_ps(fTot + i, b);
+        _mm256_store_ps(fOut + i, b);
     }
     __m128 a, b;
     a = _mm_load_ps(f + m);
     b = _mm_mul_ps(a, _mm256_castps256_ps128(c));
-    _mm_store_ps(fTot + m, b);
+    _mm_store_ps(fOut + m, b);
 }
 
 template<>
@@ -363,7 +364,7 @@ inline void veryfasttree::AVX256Operations<double>::fastexp(double fTot[], int64
     } else {
         int64_t m = n - (n % 8);
         alignas(ALIGNMENT) float arr[8];
-        for (int64_t k = 0; k < n; k += 8) {
+        for (int64_t k = 0; k < m; k += 8) {
             __m256 nums = _mm256_set_ps((float) fTot[k + 7], (float) fTot[k + 6], (float) fTot[k + 5],
                                         (float) fTot[k + 4],
                                         (float) fTot[k + 3], (float) fTot[k + 2], (float) fTot[k + 1], (float) fTot[k]);
@@ -378,15 +379,13 @@ inline void veryfasttree::AVX256Operations<double>::fastexp(double fTot[], int64
             fTot[k + 6] = (float) arr[6];
             fTot[k + 7] = (float) arr[7];
         }
-        if (n != m) {
-            __m128 nums = _mm_set_ps((float) fTot[m + 3], (float) fTot[m + 2], (float) fTot[m + 1], (float) fTot[m]);
-            __m128 res = fastexpImpl(nums);
-            _mm_store_ps(arr, res);
-            fTot[m] = (float) arr[0];
-            fTot[m + 1] = (float) arr[1];
-            fTot[m + 2] = (float) arr[2];
-            fTot[m + 3] = (float) arr[3];
-        }
+        __m128 nums = _mm_set_ps((float) fTot[m + 3], (float) fTot[m + 2], (float) fTot[m + 1], (float) fTot[m]);
+        __m128 res = fastexpImpl(nums);
+        _mm_store_ps(arr, res);
+        fTot[m] = (float) arr[0];
+        fTot[m + 1] = (float) arr[1];
+        fTot[m + 2] = (float) arr[2];
+        fTot[m + 3] = (float) arr[3];
     }
 }
 
@@ -426,7 +425,7 @@ inline __m256 veryfasttree::AVX256Operations<Precision>::fastexpImpl(__m256 x) {
     x = _mm256_div_ps(px, _mm256_sub_ps(qx, px));
     x = _mm256_add_ps(_mm256_set1_ps(1.0), _mm256_mul_ps(_mm256_set1_ps(2.0), x));
 
-    /* Build 2^n in double. */
+    /* Build 2^n in float. */
     #ifdef __AVX2__
     m = _mm256_add_epi32(m, _mm256_set1_epi32(127));
     u = _mm256_slli_epi32(m, 23);
@@ -554,7 +553,7 @@ inline __m128 veryfasttree::AVX256Operations<Precision>::fastexpImpl(__m128 x) {
     x = _mm_div_ps(px, _mm_sub_ps(qx, px));
     x = _mm_add_ps(_mm_set1_ps(1.0), _mm_mul_ps(_mm_set1_ps(2.0), x));
 
-    /* Build 2^n in double. */
+    /* Build 2^n in float. */
     m = _mm_add_epi32(m, _mm_set1_epi32(127));
     u = _mm_slli_epi32(m, 23);
 

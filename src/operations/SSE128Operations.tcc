@@ -3,6 +3,7 @@
 #define FASTTREE_SSE128OPERATIONS_TCC
 
 #include "SSE128Operations.h"
+#include <cmath>
 
 template<>
 template<>
@@ -366,7 +367,7 @@ inline __m128 veryfasttree::SSE128Operations<Precision>::fastexpImpl(__m128 x) {
     x = _mm_div_ps(px, _mm_sub_ps(qx, px));
     x = _mm_add_ps(_mm_set1_ps(1.0), _mm_mul_ps(_mm_set1_ps(2.0), x));
 
-    /* Build 2^n in double. */
+    /* Build 2^n in float. */
     m = _mm_add_epi32(m, _mm_set1_epi32(127));
     u = _mm_slli_epi32(m, 23);
 

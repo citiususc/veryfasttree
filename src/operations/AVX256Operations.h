@@ -25,7 +25,7 @@ namespace veryfasttree {
 
         inline numeric_t vector_sum(numeric_t f1[], int64_t n);
 
-        inline void vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fTot[]);
+        inline void vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fOut[]);
 
         inline void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n);
 

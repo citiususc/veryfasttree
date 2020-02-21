@@ -33,6 +33,19 @@ namespace veryfasttree {
         inline void matrixt_by_vector4(numeric_t mat[][row], numeric_t vec[], numeric_t out[]);
 
         inline void fastexp(numeric_t fTot[], int64_t n, int lvl);
+    private:
+
+        inline numeric_t mm_sum(__m128 sum);
+
+        inline numeric_t mm_sum(__m256d sum);
+
+        inline __m128 fastexpImpl(__m128 vx);
+
+        inline __m256d fastexpImpl(__m256d vx);
+
+        inline __m512 fastexpImpl(__m512 vx);
+
+        inline __m512d fastexpImpl(__m512d vx);
 
     };
 }

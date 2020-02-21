@@ -196,9 +196,9 @@ void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
     #ifdef __AVX512F__
     else if(options.extension == "AVX512"){
         if(options.doublePrecision){
-            FastTreeImpl<double, AVX512Operations>(options, in, out, log).run();
+            VeyFastTreeImpl<double, AVX512Operations>(options, in, out, log).run();
         }else{
-            FastTreeImpl<float, AVX512Operations>(options, in, out, log).run();
+            VeyFastTreeImpl<float, AVX512Operations>(options, in, out, log).run();
         }
     }
     #endif
