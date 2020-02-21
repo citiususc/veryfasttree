@@ -5076,7 +5076,9 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
 
 }
 
-
+#ifdef __GNUC__ //disable multiple false warning in gcc 8+
+    #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 AbsNeighbourJoining(inline int64_t)::traverseNNI(int64_t iRound, int64_t nRounds, bool useML,
                                                  std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
                                                  std::unique_ptr<Profile> upProfiles[],

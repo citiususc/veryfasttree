@@ -196,33 +196,21 @@ vector_dot_product_rot(double f1[], double f2[], double fBy[], int64_t n) {
 template<>
 inline void veryfasttree::AVX512Operations<float>::vector_add(float fTot[], float fAdd[], int64_t n) {
     __m512 a, b;
-    int64_t m = n - (n % 16);
-    for (int64_t i = 0; i < m; i += 16) {
+    for (int64_t i = 0; i < n; i += 16) {
         a = _mm512_load_ps(fTot + i);
         b = _mm512_load_ps(fAdd + i);
         _mm512_store_ps(fTot + i, _mm512_add_ps(a, b));
     }
-
-    __m128 aa, bb;
-    aa = _mm_load_ps(fTot + m);
-    bb = _mm_load_ps(fAdd + m);
-    _mm_store_ps(fTot + m, _mm_add_ps(aa, bb));
 }
 
 template<>
 inline void veryfasttree::AVX512Operations<double>::vector_add(double fTot[], double fAdd[], int64_t n) {
     __m512d a, b;
-    int64_t m = n - (n % 8);
-    for (int64_t i = 0; i < m; i += 8) {
+    for (int64_t i = 0; i < n; i += 8) {
         a = _mm512_load_pd(fTot + i);
         b = _mm512_load_pd(fAdd + i);
         _mm512_store_pd(fTot + i, _mm512_add_pd(a, b));
     }
-
-    __m256d aa, bb;
-    aa = _mm256_load_pd(fTot + m);
-    bb = _mm256_load_pd(fAdd + m);
-    _mm256_store_pd(fTot + m, _mm256_add_pd(aa, bb));
 }
 
 template<>

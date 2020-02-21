@@ -136,7 +136,7 @@ namespace veryfasttree {
     inline bool readline(std::basic_istream<_CharT, _Traits> &__is, std::basic_string<_CharT, _Traits, _Alloc> &__str) {
         if (!__is.eof()) {
             std::getline(__is, __str);
-            if (__str.back() == '\r') {
+            if (!__str.empty() && __str.back() == '\r') {
                 __str.resize(__str.size() - 1);
             }
             return true;

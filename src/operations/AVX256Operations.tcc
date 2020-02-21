@@ -183,17 +183,11 @@ inline void veryfasttree::AVX256Operations<double>::vector_add(double fTot[], do
 template<>
 inline void veryfasttree::AVX256Operations<float>::vector_add(float fTot[], float fAdd[], int64_t n) {
     __m256 a, b;
-    int64_t m = n - (n % 8);
-    for (int64_t i = 0; i < m; i += 8) {
+    for (int64_t i = 0; i < n; i += 8) {
         a = _mm256_load_ps(fTot + i);
         b = _mm256_load_ps(fAdd + i);
         _mm256_store_ps(fTot + i, _mm256_add_ps(a, b));
     }
-
-    __m128 aa, bb;
-    aa = _mm_load_ps(fTot + m);
-    bb = _mm_load_ps(fAdd + m);
-    _mm_store_ps(fTot + m, _mm_add_ps(aa, bb));
 }
 
 template<>
