@@ -2,7 +2,7 @@
 #ifndef FASTTREE_AVX256OPERATIONS_TCC
 #define FASTTREE_AVX256OPERATIONS_TCC
 
-#include "AVX256Operations.tcc"
+#include "AVX256Operations.h"
 #include <cmath>
 
 template<>
