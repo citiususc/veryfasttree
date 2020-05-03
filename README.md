@@ -86,6 +86,7 @@ It enables the vector extensions:
 	- **SSE3**: Arithmetic operations are performed using SSE3 vector intrinsics. Each instruction operates on 128 bit registers, which could contain four 32-bit floats or two 64-bit doubles.
 	- **AVX**: Arithmetic operations are performed using AVX vector intrinsics. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bits doubles.
 	- **AVX2**: Similar to AVX, but some arithmetic operations are performed using  additional AVX2 vector intrinsics not included in the AVX instruction set. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bit doubles).
+	- **AVX512**: Arithmetic operations are performed using AVX512 vector intrinsics. Each instruction operates on 512 bit registers, which could contain sixteen 32-bit floats or eight 64-bits doubles.
 
 - **-fastexp [implementation]**  
 This option is used to select an alternative implementation for the exponential function (e<sup>x</sup>), which has a significant impact on performance:
