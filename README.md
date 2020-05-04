@@ -45,6 +45,9 @@ Options can be listed with cmake:
 	// enable/disable AVX2
 	USE_AVX2:BOOL=OFF
 
+	// enable/disable AVX512
+	USE_AVX512:BOOL=OFF
+
 Example:
 
 	cmake -DUSE_NATIVE=OFF -DUSE_SEE4=ON . // Disable native compilation and use SSE 4.1
@@ -82,8 +85,8 @@ Use double precision arithmetic. Therefore, it is equivalent to compile FastTree
 
 - **-ext [type]**
 It enables the vector extensions:
-	- **none**: (default) Operations are performed with the native programming language operators. In addition, loops are unrolled with the aim of providing hints to the compiler for applying some optimization (including vectorization).
-	- **SSE3**: Arithmetic operations are performed using SSE3 vector intrinsics. Each instruction operates on 128 bit registers, which could contain four 32-bit floats or two 64-bit doubles.
+	- **none**: Operations are performed with the native programming language operators. In addition, loops are unrolled with the aim of providing hints to the compiler for applying some optimization (including vectorization).
+	- **SSE3**: (default) Arithmetic operations are performed using SSE3 vector intrinsics. Each instruction operates on 128 bit registers, which could contain four 32-bit floats or two 64-bit doubles.
 	- **AVX**: Arithmetic operations are performed using AVX vector intrinsics. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bits doubles.
 	- **AVX2**: Similar to AVX, but some arithmetic operations are performed using  additional AVX2 vector intrinsics not included in the AVX instruction set. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bit doubles).
 	- **AVX512**: Arithmetic operations are performed using AVX512 vector intrinsics. Each instruction operates on 512 bit registers, which could contain sixteen 32-bit floats or eight 64-bits doubles.
