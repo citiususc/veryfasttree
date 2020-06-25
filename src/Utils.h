@@ -116,7 +116,7 @@ namespace veryfasttree {
         buf.resize(size);
         snprintf(&buf.front(), size, format.c_str(), args ...);
         buf.resize(size - 1);
-        return std::move(buf);
+        return buf;
     }
 
     inline std::string strformat(const std::string &format) {

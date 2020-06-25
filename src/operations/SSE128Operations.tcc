@@ -1,16 +1,22 @@
 
-#ifndef FASTTREE_SSE128OPERATIONS_TCC
-#define FASTTREE_SSE128OPERATIONS_TCC
-
 #include "SSE128Operations.h"
 #include <cmath>
+
+#if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64) //Fix windows union operator[]
+#define getf(array, i) ((float*)&array)[i]
+#define getd(array, i) ((double*)&array)[i]
+#else
+#define getf(array, i) array[i]
+#define getd(array, i) array[i]
+#endif
+
 
 template<>
 template<>
 inline float veryfasttree::SSE128Operations<float>::mm_sum(__m128 sum) {
     #ifdef  __SSE3__
     sum = _mm_hadd_ps(sum, sum);
-    return sum[0] + sum[1];
+    return getf(sum, 0) + getf(sum, 1);
     #else
     /* stupider but faster */
     alignas(ALIGNMENT) float f[4];
@@ -22,7 +28,7 @@ inline float veryfasttree::SSE128Operations<float>::mm_sum(__m128 sum) {
 template<>
 template<>
 inline double veryfasttree::SSE128Operations<double>::mm_sum(__m128d sum) {
-    return sum[0] + sum[1];
+    return getd(sum, 0) + getd(sum, 1);
 }
 
 template<>
@@ -438,6 +444,5 @@ inline __m128d veryfasttree::SSE128Operations<Precision>::fastexpImpl(__m128d x)
     return _mm_mul_pd(x, _mm_castsi128_pd(u));
 }
 
-
-#endif
-
+#undef getf
+#undef getd

@@ -1,20 +1,25 @@
 
-#ifndef FASTTREE_AVX512OPERATIONS_TCC
-#define FASTTREE_AVX512OPERATIONS_TCC
-
 #include "AVX512Operations.h"
 #include <cmath>
+
+#if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64) //Fix windows union operator[]
+#define getf(array, i) ((float*)&array)[i]
+#define getd(array, i) ((double*)&array)[i]
+#else
+#define getf(array, i) array[i]
+#define getd(array, i) array[i]
+#endif
 
 template<>
 inline float veryfasttree::AVX512Operations<float>::mm_sum(__m128 sum) {
     sum = _mm_hadd_ps(sum, sum);
-    return sum[0] + sum[1];
+    return getf(sum, 0) + getf(sum, 1);
 }
 
 template<>
 inline double veryfasttree::AVX512Operations<double>::mm_sum(__m256d sum) {
     sum = _mm256_hadd_pd(sum, sum);
-    return sum[0] + sum[2];
+    return getd(sum, 0) + getd(sum, 2);
 }
 
 template<>
@@ -652,4 +657,5 @@ inline __m128 veryfasttree::AVX512Operations<Precision>::fastexpImpl(__m128 x) {
     return _mm_mul_ps(x, _mm_castsi128_ps(u));
 }
 
-#endif
+#undef getf
+#undef getd
