@@ -6,6 +6,11 @@ Regarding the performance, for example, VeryFastTree is able to construct a tree
 
 To facilitate the adoption from the research community, VeryFastTree keeps exactly the same command line arguments than FastTree-2. In this way, it is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options to increase the overall performance.
 
+If you use **VeryFastTree**, please cite:
+
+[VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies](https://doi.org/10.1093/bioinformatics/btaa582)
+César Piñeiro, José M. Abuín and Juan C. Pichel. Bioinformatics, 2020.
+
 # Getting started #
 
 ## Requirements
