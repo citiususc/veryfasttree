@@ -360,7 +360,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    " 2*m), and updates the top-hits as joins proceed")->type_name("1.0")->
             group(heuristics);
 
-    app.add_option("-close", options.tophitsMult, "modify the close heuristic, lower is more conservative")->
+    app.add_option("-close", options.tophitsClose, "modify the close heuristic, lower is more conservative")->
             type_name("0.75")->check([&options](const std::string &in) {
         if (options.tophitsMult <= 0) {
             return "Cannot use -close unless -top is set above 0";
@@ -371,7 +371,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
         return "";
     })->group(heuristics);
 
-    app.add_option("-refresh", options.tophitsMult, "compare a joined node to all other nodes if its top-hit list is "
+    app.add_option("-refresh", options.tophitsRefresh, "compare a joined node to all other nodes if its top-hit list is "
                                                     "less than 80% of the desired length, or if the age of the top-hit"
                                                     " list is log2(m) or greater")->type_name("0.8")->
             check([&options](const std::string &in) {
