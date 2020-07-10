@@ -5002,7 +5002,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
      * to balance the process time in threads.
      */
     bool updated = true;
-    while (weights[partition.front()] > minPartition || updated) {
+    while (weights[partition.front()] > minPartition && updated) {
 
         /*std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
         for (int i = 1; i < (int) partition.size(); i++) {

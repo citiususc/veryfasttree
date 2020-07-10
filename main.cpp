@@ -425,7 +425,8 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-thread-subtrees", options.threadSubtrees,
                   "set a maximum number of subtrees assigned to a thread. This option could increase "
                   "the accuracy for small datasets containing large sequences at the expense of reducing "
-                  "the workload balance among threads")->type_name("n")->check(Min(1))->group(optimizations);
+                  "the workload balance among threads")->type_name("n")
+                  ->default_val("2")->check(Min(1))->group(optimizations);
     app.add_option("-threads-level", options.threadsLevel,
                    "to change the degree of parallelization. If level is 0, VeryFastTree uses the same "
                    "parallelization strategy followed by FastTree-2. If level is 1 (by default), VeryFastTree "
