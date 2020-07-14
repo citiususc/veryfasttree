@@ -5028,7 +5028,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
             updated = true;
         }
 
-        while (weights[partition.back()] < 3 * (int64_t) partition.size()) {
+        while (!partition.empty() && weights[partition.back()] < 3 * (int64_t) partition.size()) {
             partition.resize(partition.size() - 1);
             updated = true;
         }
