@@ -67,7 +67,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     app.name(name);
     app.description(description.str());
-    app.set_help_flag("-h,-help,--help", "Print this help message and exit")->group("");
+    app.set_help_flag("-h,-help,--help")->group("");
     app.add_option("protein_alignment", options.inFileName, "input file instead of stdin")->
             type_name("")->check(isNotEmpty);
 
@@ -371,9 +371,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
         return "";
     })->group(heuristics);
 
-    app.add_option("-refresh", options.tophitsRefresh, "compare a joined node to all other nodes if its top-hit list is "
-                                                    "less than 80% of the desired length, or if the age of the top-hit"
-                                                    " list is log2(m) or greater")->type_name("0.8")->
+    app.add_option("-refresh", options.tophitsRefresh,
+                   "compare a joined node to all other nodes if its top-hit list is "
+                   "less than 80% of the desired length, or if the age of the top-hit"
+                   " list is log2(m) or greater")->type_name("0.8")->
             check([&options](const std::string &in) {
         if (options.tophitsMult <= 0) {
             return "Cannot use -refresh unless -top is set above 0";
@@ -423,10 +424,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
     app.add_option("-thread-subtrees", options.threadSubtrees,
-                  "set a maximum number of subtrees assigned to a thread. This option could increase "
-                  "the accuracy for small datasets containing large sequences at the expense of reducing "
-                  "the workload balance among threads")->type_name("n")
-                  ->default_val("2")->check(Min(1))->group(optimizations);
+                   "set a maximum number of subtrees assigned to a thread. This option could increase "
+                   "the accuracy for small datasets containing large sequences at the expense of reducing "
+                   "the workload balance among threads")->type_name("n")
+            ->check(Min(1))->group(optimizations);
     app.add_option("-threads-level", options.threadsLevel,
                    "to change the degree of parallelization. If level is 0, VeryFastTree uses the same "
                    "parallelization strategy followed by FastTree-2. If level is 1 (by default), VeryFastTree "
@@ -468,8 +469,8 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     setDeprecated(app.add_flag("-mlexact", "Exact posterior distributions, now on by default and obsolete")->
             group(deprecated));
 
-    app.footer(
-            "For more information, see http://www.microbesonline.org/fasttree/ or the comments in the source code");
+    app.footer("For more information, see http://www.microbesonline.org/fasttree/, "
+               "https://github.com/citiususc/veryfasttree or the comments in the source code");
     app.add_flag("-expert", options.expert)->group("");
 }
 
@@ -524,6 +525,7 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     app.get_option("-constraints")->description(
             "to constrain the topology search constraintAlignment should have 1s or 0s to indicates splits")->
             type_name("constraintAlignment")->group(common);
+    app.get_option("-expert")->description("see more options")->group(common);
 }
 
 
@@ -536,6 +538,7 @@ int main(int argc, char *argv[]) {
     CLI::App app;
 
     cli(app, name, version, flags, options, args);
+    basicCli(app, name, version, flags);
     if (veryfasttree::isattyIn() && argc == 1) {
         std::cout << app.help() << std::endl;
         if (veryfasttree::isWindows()) {

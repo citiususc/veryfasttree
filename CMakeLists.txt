@@ -11,7 +11,7 @@ option(USE_AVX2 "enable/disable AVX2" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
 
 
-add_definitions(-DNDEBUG)
+#add_definitions(-DNDEBUG)
 
 ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")
