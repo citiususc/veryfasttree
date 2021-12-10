@@ -3,6 +3,7 @@
 #define FASTTREE_NEIGHBOURJOINING_TCC
 
 #include "NeighbourJoining.h"
+#include <list>
 
 #define AbsNeighbourJoining(...) \
 template<typename Precision, template<class> class Operations> \
@@ -49,7 +50,7 @@ AbsNeighbourJoining()::TopHits::TopHits() {}
 
 AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) :
         m(_m), q((int64_t) (0.5 + options.tophits2Mult * std::sqrt(m))),
-        maxnodes(_maxnodes), topvisibleAge(0), locks(options.threads > 1 ? maxnodes : 0) {
+        maxnodes(_maxnodes), topvisibleAge(0), locks(options.threads > 1 && !options.deterministic ? maxnodes : 0) {
     assert(m > 0);
     if (!options.useTopHits2nd || q >= m) {
         q = 0;
@@ -106,7 +107,7 @@ NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressRe
     outDistances.resize(maxnodes);
     nOutDistActive.resize(maxnodes, seqs.size() * 10); /* unreasonably high value */
     // parent.empty()        /* so SetOutDistance ignores it */
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(dynamic)
     for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
         setOutDistance(i, seqs.size());
     }
@@ -535,10 +536,15 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     out.vectors.resize(out.nVectors * nCodeSize, 0);
 
     /* Add up the weights, going through each sequence in turn */
-    if(options.threads > 1 && nProfiles == (int64_t)seqs.size()){
+    if (options.threads > 1 && nProfiles == (int64_t) seqs.size()) {
+        std::vector<decltype(out.vectors)> out_locals;
+        for (int i = 0; i < options.threads; i++) {
+            out_locals.emplace_back(out.nVectors * nCodeSize, 0);
+        }
+
         #pragma omp parallel
         {
-            decltype(out.vectors) out_local(out.nVectors * nCodeSize, 0);
+            decltype(out.vectors) &out_local = out_locals[omp_get_thread_num()];
             #pragma omp for schedule(static)
             for (int64_t in = 0; in < nProfiles; in++) {
                 int64_t iFreqOut = 0;
@@ -547,19 +553,18 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
                     numeric_t *fIn = getFreq(asRef(_profiles[in]), i, iFreqIn);
                     getFreq(out, i, iFreqOut);
                     if (asRef(_profiles[in]).weights[i] > 0) {
-                        numeric_t *lfOut = &out_local[nCodeSize * (iFreqOut-1)];
+                        numeric_t *lfOut = &out_local[nCodeSize * (iFreqOut - 1)];
                         addToFreq(lfOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
                     }
                 }
                 assert(iFreqOut == out.nVectors);
                 assert(iFreqIn == asRef(_profiles[in]).nVectors);
             }
-            #pragma omp critical
-            {
-                operations.vector_add(&out.vectors[0], &out_local[0], (int64_t)out.vectors.size());
-            }
         }
-    }else{
+        for (int i = 0; i < options.threads; i++) {
+            operations.vector_add(&out.vectors[0], &out_locals[i][0], (int64_t) out.vectors.size());
+        }
+    } else {
         for (int64_t in = 0; in < nProfiles; in++) {
             int64_t iFreqOut = 0;
             int64_t iFreqIn = 0;
@@ -1658,6 +1663,10 @@ AbsNeighbourJoining(void)::updateForNNI(int64_t node, std::unique_ptr<Profile> u
 
         /* update profiles back to root */
         for (int64_t ancestor = node; ancestor >= 0; ancestor = parent[ancestor]) {
+            /* parallel SPR cannot modify outside its range. */
+            if (!lockedNodes.empty() && lockedNodes[ancestor]) {
+                break;
+            }
             recomputeProfile(upProfiles, ancestor, useML);
         }
 
@@ -1792,14 +1801,14 @@ expEigenRates(double length, std::vector<numeric_t, typename op_t::Allocator> &e
         if (relLen < options.MLMinRelBranchLength) {
             relLen = options.MLMinRelBranchLength;
         }
-        #ifndef NDEBUG
+#ifndef NDEBUG
         for (int64_t j = 0; j < options.nCodes; j++) {
             expeigenRates[iRate * nCodeSize + j] = std::exp((double) relLen * transmat.eigenval[j]);
         }
-        #else
+#else
         operations.vector_multiply_by(transmat.eigenval, relLen, options.nCodes, &expeigenRates[iRate * nCodeSize]);
         operations.fastexp(&expeigenRates[iRate * nCodeSize], options.nCodes, options.fastexp);
-        #endif
+#endif
     }
 }
 
@@ -3199,9 +3208,9 @@ AbsNeighbourJoining(void)::recomputeMLProfiles() {
 
         #pragma omp parallel
         {
-            #pragma omp for schedule(static, 1)
+            #pragma omp for schedule(dynamic )
             for (int i = 0; i < (int) chunks.size(); i++) {
-                for (int64_t subtreeRoot : chunks[i]) {
+                for (int64_t subtreeRoot: chunks[i]) {
                     traverseRecomputeMLProfiles(traversal, subtreeRoot);
                 }
             }
@@ -3413,7 +3422,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
 
     int64_t nHasTopHits = 0;
 
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic) if(!options.deterministic)
     for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
         int64_t seed = seeds[iSeed];
         if (iSeed > 0 && (iSeed % 100) == 0 && options.threads == 1) {
@@ -3938,7 +3947,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
         /* Do not need to call UpdateVisible because we set visible below */
 
         /* And use the top 2*m entries to expand other best-hit lists, but only for top m */
-        #pragma omp parallel for schedule(dynamic, 50)
+        #pragma omp parallel for schedule(dynamic)
         for (int64_t iHit = 0; iHit < tophits.m; iHit++) {
             if (allhits[iHit].i < 0) {
                 continue;
@@ -4021,7 +4030,7 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
     }
 
     assert(nSave > 0);
-    if (options.threads > 1) {
+    if (!tophits.locks.empty() && omp_get_num_threads() > 1) {
         tophits.locks[iNode].lock();
     }
     TopHitsList &l = tophits.topHitsLists[iNode];
@@ -4039,7 +4048,7 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
         }
     }
     assert(iSave == nSave);
-    if (options.threads > 1) {
+    if (!tophits.locks.empty() && omp_get_num_threads() > 1) {
         tophits.locks[iNode].unlock();
     }
 }
@@ -4919,10 +4928,10 @@ AbsNeighbourJoining(int64_t)::
 treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std::vector<std::vector<int64_t>> &chunks) {
     chunks.resize(options.threads);
     std::vector<int64_t> boxWeights(options.threads, 0);
-    int64_t used = 0;
+    int64_t sum = 0;
     for (int i = 0; i < (int) partition.size(); i++) {
         chunks[0].push_back(partition[i]);
-        used += weights[partition[i]];
+        sum += weights[partition[i]];
         boxWeights[0] += weights[partition[i]];
         for (int j = 1; j < options.threads; j++) {
             if (boxWeights[j - 1] > boxWeights[j]) {
@@ -4933,144 +4942,171 @@ treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std::
             }
         }
     }
-    return used - boxWeights.back();
+    return sum - boxWeights.back();
 }
 
 /*
- * The quality of a partition are the inverse of the thread with the most number of nodes
- * and nodes excluded from all partitions, that will be processed sequentially.
+ * The weight of a partition is the sum of the thread with the most nodes and the excluded nodes, that will be
+ * processed sequentially.
  * */
-AbsNeighbourJoining(int64_t)::treePartitionQuality(std::vector<int64_t> &weights, std::vector<int64_t> &partition) {
-    std::sort(partition.begin(), partition.end(), [&weights](int64_t x, int64_t y) { return weights[x] > weights[y]; });
-    if ((int) partition.size() <= options.threads) {
-        int64_t max = 0;
-        int64_t used = 0;
-        for (int i = 0; i < (int) partition.size(); i++) {
-            if (weights[partition[i]] > max) {
-                max = weights[partition[i]];
-            }
-            used += weights[partition[i]];
+AbsNeighbourJoining(int64_t)::treeWeight(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
+                                         int64_t rootWeight) {
+    std::sort(partition.begin(), partition.end(),
+              [&weights](int64_t x, int64_t y) { return weights[x] > weights[y]; });
+    if (options.threadSubtrees < (int64_t) partition.size()) {
+        partition.resize(options.threadSubtrees);
+    }
+    if (partition.empty()) {
+        return rootWeight;
+    } else if (partition.size() <= (size_t) options.threads) {
+        int64_t weight = 0;
+        for (int64_t branch: partition) {
+            weight += weights[branch];
         }
-        return used - max;
+        return rootWeight - weight + weights[partition[0]];
     } else {
         std::vector<std::vector<int64_t>> chunks;
-        return treeChunks(partition, weights, chunks);
+        return rootWeight - treeChunks(partition, weights, chunks);
     }
 }
 
-AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal,
-                                         int p) {
-    std::vector<int64_t> weights(child.size(), 0);
-    std::vector<std::pair<int64_t, bool>> stack;
-    stack.push_back({root, false});
+AbsNeighbourJoining(int64_t)::treePenWeight(int64_t branch, std::vector<int64_t> &weights, int deep) {
+    std::vector<int64_t> nodes, nodes2;
+    nodes.push_back(branch);
 
-    /* Calculate number of nodes that will be procesed in each subtree */
-    while (!stack.empty()) {
-        int64_t node = stack.back().first;
-        bool visited = stack.back().second;
-
-        if (visited) {
-            for (int i = 0; i < child[node].nChild; i++) {
-                weights[node] += weights[child[node].child[i]];
+    for (int i = 0; i < deep; i++) {
+        for (int64_t node: nodes) {
+            for (int j = 0; j < child[node].nChild; j++) {
+                nodes2.push_back(child[node].child[j]);
             }
-            weights[node] += 1;
-            stack.erase(stack.end());
-            continue;
         }
-        stack.back().second = true;
-
-        if ((int64_t) seqs.size() > node || traversal[node]) {
-            stack.erase(stack.end());
-            continue;
+        nodes.clear();
+        std::swap(nodes, nodes2);
+        if (nodes.empty()) {
+            return 0;
         }
+    }
+    int64_t weight = 0;
+    for (int64_t node: nodes) {
+        weight += weights[node];
+    }
+    return weight;
+}
 
-        for (int i = 0; i < child[node].nChild; i++) {
-            stack.push_back({child[node].child[i], false});
-        }
+AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal,
+                                         int deepPen) {
+    std::vector<bool> is_root(maxnode, false);
+    std::vector<int64_t> weights(maxnode, 1);
+    weights[root] = maxnode;
+    std::vector<int64_t> pen_weights(maxnode, deepPen > 0 ? 0 : 1);
 
+    std::list<int64_t> branchs;
+    std::vector<int64_t> partition;
+    std::vector<int64_t> bestPartition;
+    int64_t bestWeight = weights[root];
+
+    for (int i = 0; i < child[root].nChild; i++) {
+        partition.push_back(child[root].child[i]);
     }
 
-    int64_t maxPartitions = (int64_t) options.threadSubtrees * (int64_t) options.threads;
-    int64_t minPartition = (weights[root] / options.threads * 2) - 1;
-    std::vector<int64_t> bestPartition = {child[root].child[0], child[root].child[1], child[root].child[2]};
-    int64_t bestQuality = treePartitionQuality(weights, bestPartition);
-    std::vector<int64_t> partition = bestPartition;
-    int64_t quality = bestQuality;
-
-    /*
-     * Quick search of nodes that create subtrees with a similar number of nodes
-     * to balance the process time in threads.
-     */
-    bool updated = true;
-    while (weights[partition.front()] > minPartition && updated) {
-
-        /*std::cerr << "partition: (" << partition[0] << "(" << weights[partition[0]] << ")";
-        for (int i = 1; i < (int) partition.size(); i++) {
-            std::cerr << ", " << partition[i] << "(" << weights[partition[i]] << ")";
+    for (int64_t i = 0; i < maxnode; i++) {
+        if (child[i].nChild == 0) {
+            branchs.push_back(i);
+            is_root[i] = true;
         }
-        std::cerr << ") quality: " << quality << std::endl;*/
-
-        updated = false;
-        if ((quality - p * (int64_t) partition.size()) > (bestQuality - p * (int64_t) bestPartition.size())) {
-            bestPartition = partition;
-            bestQuality = quality;
-        }
-
-        if (child[partition.front()].nChild == 2) {
-            int64_t node = partition.front();
-            partition.front() = child[node].child[0];
-            partition.push_back(child[node].child[1]);
-            updated = true;
-        }
-
-        if (maxPartitions < (int64_t) partition.size()) {
-            partition.resize(maxPartitions);
-            updated = true;
-        }
-
-        while (!partition.empty() && weights[partition.back()] < 3 * (int64_t) partition.size()) {
-            partition.resize(partition.size() - 1);
-            updated = true;
-        }
-
-        quality = treePartitionQuality(weights, partition);
     }
 
-    treeChunks(bestPartition, weights, chunks);
+    while (true) {
+        int64_t node = branchs.front();
+        int64_t pnode = parent[node];
+        branchs.pop_front();
+        /* if the parent is root and the nodes are its children, we are finished */
+        if (pnode == root) {
+            branchs.push_back(node);
+            if (branchs.size() < 4) {
+                int64_t sum = 1;
+                for (int64_t ni: branchs) {
+                    sum += weights[ni];
+                }
+                if (weights[root] == sum) {
+                    break;
+                }
+            }
+            continue;
+        }
+
+        /*if it is an only child, add its father*/
+        if (child[pnode].nChild == 1) {
+            is_root[node] = false;
+            is_root[pnode] = true;
+            weights[pnode] = weights[node] + 1;
+            branchs.push_back(pnode);
+            continue;
+        }
+
+        int64_t sib = child[pnode].child[0] != node ? child[pnode].child[0] : child[pnode].child[1];
+        /*we can only proceed if its sibling is a root*/
+        if (!is_root[sib]) {
+            /*if sibling has not processed the parent, it must keep its nodes.*/
+            if (is_root[node]) {
+                branchs.push_back(node);
+            }
+            continue;
+        }
+
+        is_root[sib] = false;
+        is_root[node] = false;
+        is_root[pnode] = true;
+        weights[pnode] = weights[node] + weights[sib] + 1;
+        branchs.push_back(pnode);
+        pen_weights[node] = pen_weights[sib] = 0; /*sibling is still in the partition, so we delete children nodes*/
+        pen_weights[pnode] = treePenWeight(pnode, weights, deepPen);
+
+        for (int64_t branch: branchs) {
+            if (pen_weights[branch] > 0) {
+                partition.push_back(branch);
+            }
+        }
+
+        int64_t pw = treeWeight(partition, pen_weights, weights[root]);
+        if (pw < bestWeight && !partition.empty()) {
+            bestWeight = pw;
+            std::swap(bestPartition, partition);
+        }
+        partition.clear();
+    }
+
+    for (int64_t branch: bestPartition) {
+        pen_weights[branch] = treePenWeight(branch, weights, deepPen);
+    }
+
+    treeChunks(bestPartition, pen_weights, chunks);
+
     if (options.verbose > 0) {
-        if (false) {
-            printVisualTree(root);
-        }
         log << "The tree has " << weights[root] << " nodes and it was divided into " << bestPartition.size()
             << " subtrees:" << std::endl;
-        int64_t used = 0;
-        int64_t maxNodes = 0;
+        int64_t skipped = weights[root];
         for (int i = 0; i < (int) chunks.size(); i++) {
-            int64_t nodes = 0;
+            int64_t w = 0;
             for (int j = 0; j < (int) chunks[i].size(); j++) {
-                nodes += weights[chunks[i][j]];
+                w += pen_weights[chunks[i][j]];
             }
-            used += nodes;
-            if (nodes > maxNodes) {
-                maxNodes = nodes;
-            }
-            log << strformat("    thread%2d(%3.2f%%):", i, 100.0 * nodes / weights[root]);
-            log << "roots[";
+            skipped -= w;
+            log << strformat("    thread%2d(%3.2f%%):", i, 100.0 * w / weights[root]);
+            log << "branchs[";
             for (int j = 0; j < (int) chunks[i].size(); j++) {
                 log << chunks[i][j];
                 if (j + 1 < (int) chunks[i].size()) {
                     log << ", ";
                 }
             }
-            log << "], nodes " << nodes << std::endl;
+            log << "], nodes " << w << std::endl;
         }
-        int64_t skipped = weights[root] - used;
-        maxNodes += skipped;
-        log << strformat("    skipped (%3.2f%%): nodes %d", skipped * 100.0 / weights[root], weights[root] - used);
+        log << strformat("    skipped (%3.2f%%): nodes %d", skipped * 100.0 / weights[root], skipped);
         log << std::endl;
         log << strformat(" total (%3.2f%%), nodes %d, theoretical speedup %.2f of %d Time %.2f",
-                         maxNodes * 100.0 / weights[root],
-                         maxNodes, weights[root] / (float) maxNodes, options.threads, progressReport.clockDiff());
+                         100.0 * bestWeight / weights[root],
+                         bestWeight, weights[root] / (float) bestWeight, options.threads, progressReport.clockDiff());
         log << std::endl;
     }
 
@@ -5079,6 +5115,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
 #ifdef __GNUC__ //disable multiple false warning in gcc 8+
     #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
+
 AbsNeighbourJoining(inline int64_t)::traverseNNI(int64_t iRound, int64_t nRounds, bool useML,
                                                  std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
                                                  std::unique_ptr<Profile> upProfiles[],
@@ -5370,7 +5407,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
         buf += " NNI round %ld of %ld, %ld splits";
         progressReport.print(buf, iRound + 1, nRounds, (int64_t) (maxnode - seqs.size()));
         std::vector<std::vector<int64_t>> chunks;
-        treePartition(chunks, traversal);
+        treePartition(chunks, traversal, 2);
 
         #pragma omp parallel
         {
@@ -5380,7 +5417,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
 
             #pragma omp for schedule(static, 1)
             for (int i = 0; i < (int) chunks.size(); i++) {
-                for (int64_t subtreeRoot : chunks[i]) {
+                for (int64_t subtreeRoot: chunks[i]) {
                     /*
                      * the neighborhood of a node includes the parent, so in order not to modify the subtreeRoot node,
                      * we do not process their direct children.
@@ -5420,15 +5457,23 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
     return nNNIThisRound;
 }
 
-AbsNeighbourJoining(inline void)::traverseSPR(int64_t iRound, int64_t nRounds, int64_t nodeList[],
-                                              std::unique_ptr<Profile> upProfiles[], double last_tot_len) {
+AbsNeighbourJoining(inline void)::traverseSPR(int64_t iRound, int64_t nRounds, std::unique_ptr<Profile> upProfiles[],
+                                              std::vector<bool> &traversal, int64_t branchRoot, double last_tot_len) {
+    std::vector<int64_t> nodeList(maxnodes);
+    int64_t nodeListLen = 0;
+    int64_t node = branchRoot;
+    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr, branchRoot)) >= 0) {
+        nodeList[nodeListLen++] = node;
+    }
+
+    assert(nodeListLen == maxnode || options.threadsLevel > 1);
     std::vector<SprStep> steps(options.maxSPRLength); /* current chain of SPRs */
 
-    for (int64_t i = 0; i < maxnode; i++) {
+    for (int64_t i = 0; i < nodeListLen; i++) {
         int64_t node = nodeList[i];
-        if ((i % 100) == 0) {
+        if (((i % 100) == 0 && lockedNodes.empty()) || options.verbose > 3) {
             progressReport.print("SPR round %3ld of %3ld, %ld of %ld nodes",
-                                 iRound + 1, nRounds, i + 1, maxnode);
+                                 iRound + 1, nRounds, i + 1, nodeListLen);
         }
         if (node == root) {
             continue; /* nothing to do for root */
@@ -5532,20 +5577,56 @@ AbsNeighbourJoining(void)::SPR(int64_t iRound, int64_t nRounds) {
     if (options.slow) {
         last_tot_len = treeLength(/*recomputeLengths*/true);
     }
-    std::vector<int64_t> nodeList(maxnodes);
-    int64_t nodeListLen = 0;
+
     std::vector<bool> traversal(maxnodes, false);
-    int64_t node = root;
-    while ((node = traversePostorder(node, traversal, /*pUp*/nullptr, root)) >= 0) {
-        nodeList[nodeListLen++] = node;
+
+    if (options.threads > 1 && options.threadsLevel > 1) {
+
+        std::vector<std::vector<int64_t>> chunks;
+        treePartition(chunks, traversal, options.maxSPRLength + 1);
+
+        if (options.slow) {
+            lockedNodes.resize(maxnodes, false);
+            for (int i = 0; i < (int) chunks.size(); i++) {
+                for (int64_t subtreeRoot: chunks[i]) {
+                    lockedNodes[subtreeRoot] = true;
+                }
+            }
+        }
+
+        #pragma omp parallel
+        {
+            std::vector<std::unique_ptr<Profile>> upProfilesThread(maxnodes);
+
+            #pragma omp for schedule(static, 1)
+            for (int i = 0; i < (int) chunks.size(); i++) {
+                std::vector<int64_t> stackA = chunks[i];
+                std::vector<int64_t> stackB;
+
+                for (int i = 0; i < options.maxSPRLength + 1; i++) {
+                    for (int64_t subtreeRoot: stackA) {
+                        for (int j = 0; j < child[subtreeRoot].nChild; j++) {
+                            stackB.push_back(child[subtreeRoot].child[j]);
+                        }
+                    }
+                    stackA = std::move(stackB);
+                    stackB.clear();
+                    if (stackA.empty()) {
+                        break;
+                    }
+                }
+
+                for (int64_t subtreeRoot: stackA) {
+                    traverseSPR(iRound, nRounds, upProfilesThread.data(), traversal, subtreeRoot, last_tot_len);
+                }
+            }
+
+        }
+        lockedNodes.resize(0);
     }
-    assert(nodeListLen == maxnode);
-    traversal.clear();
-    traversal.reserve(0);
 
     std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
-
-    traverseSPR(iRound, nRounds, nodeList.data(), upProfiles.data(), last_tot_len);
+    traverseSPR(iRound, nRounds, upProfiles.data(), traversal, root, last_tot_len);
 }
 
 

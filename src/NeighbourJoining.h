@@ -286,6 +286,9 @@ namespace veryfasttree {
         /* auxilliary data for maximum likelihood (defaults to 1 category of rate=1.0) */
         Rates rates;
 
+        /*SPR auxilliary variables*/
+        std::vector<bool> lockedNodes;
+
         double logCorrect(double dist);
 
         /* Print topology using node indices as node names */
@@ -729,9 +732,11 @@ namespace veryfasttree {
         int64_t treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
                            std::vector<std::vector<int64_t>> &chunks);
 
-        int64_t treePartitionQuality(std::vector<int64_t> &weights, std::vector<int64_t> &partition);
+        int64_t treeWeight(std::vector<int64_t> &partition, std::vector<int64_t> &weights, int64_t rootWeight);
 
-        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal, int pen = 3);
+        int64_t treePenWeight(int64_t branch, std::vector<int64_t> &weights, int deep);
+
+        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal, int deepPen);
 
         void printVisualTree(int node, bool isFirst = false, const std::string &prefix = "");
 
@@ -740,9 +745,9 @@ namespace veryfasttree {
                                    std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
                                    std::unique_ptr<Profile> upProfiles[], std::vector<bool> &traversal);
 
-        inline void
-        traverseSPR(int64_t iRound, int64_t nRounds, int64_t nodeList[], std::unique_ptr<Profile> upProfiles[],
-                    double last_tot_len);
+        inline void traverseSPR(int64_t iRound, int64_t nRounds, std::unique_ptr<Profile> upProfiles[],
+                                std::vector<bool> &traversal, int64_t branchRoot, double last_tot_len);
+
 
         inline void traverseRecomputeMLProfiles(std::vector<bool> &traversal, int64_t node);
 

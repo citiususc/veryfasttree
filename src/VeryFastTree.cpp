@@ -91,7 +91,20 @@ void VeryFastTree::settings(std::ostream &log) {
             mlnniString += strformat(" opt-each=%d", options.mlAccuracy);
         }
 
-        log << "VeryFastTree Version " << Constants::version << " " << Constants::compileFlags << std::endl;
+        log << "VeryFastTree Version " << Constants::version << " " << Constants::compileFlags;
+        if(options.extension != "NONE"){
+            log <<  " with " << options.extension;
+        }
+        if(options.threads > 1){
+            log <<  " using " <<  "threads(" << options.threads << ") ";
+            log << "level " << options.threadsLevel;
+            if(options.deterministic){
+                log << " deterministic";
+            }else{
+                log << " NO deterministic";
+            }
+        }
+        log  << std::endl;
         log << "Alignment: " << (options.inFileName.empty() ? "standard input" : options.inFileName);
 
         if (options.nAlign > 1) {
@@ -165,6 +178,18 @@ void VeryFastTree::configOpenMP() {
 }
 
 void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
+    if(options.extension == "AUTO"){
+        options.extension = "NONE";
+        #ifdef __SSE2__
+        options.extension = "SSE3";
+        #endif
+        #ifdef __AVX__
+        if(options.doublePrecision){
+            options.extension = "AVX2";
+        }
+        #endif
+    }
+
     settings(log);
     configOpenMP();
 

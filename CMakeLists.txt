@@ -10,7 +10,7 @@ option(USE_AVX "enable/disable AVX" OFF)
 option(USE_AVX2 "enable/disable AVX2" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
 
-
+add_definitions(-DCLI11_BOOST_OPTIONAL=0)
 #add_definitions(-DNDEBUG)
 
 ADD_SUBDIRECTORY("libs/CLI11")
@@ -62,7 +62,7 @@ if (MSVC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE2 /D__SSE2__=1")
     endif ()
 else ()
-    set(CMAKE_CXX_FLAGS "-Wall -O3")
+    set(CMAKE_CXX_FLAGS "-Wall -O0")
     if (USE_AVX512)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f")
     elseif (USE_AVX2)

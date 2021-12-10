@@ -15,7 +15,141 @@ void Alignment::readAlignment() {
     std::string buf;
 
     readline(fp, buf);
-    if (buf[0] == '>') {
+    if (buf.find("#NEXUS") == 0) {
+        /* It is a Nexus file */
+        bool characters = false;
+        do {
+            /* loop blocks lines */
+            if (buf[0] == 'b' || buf[0] == 'B') {
+                std::for_each(buf.begin(), buf.end(), [](char &c) { c = std::tolower(c); });
+                if (buf.find("characters") != buf.npos) {
+                    characters = true;
+                    break;
+                }
+            }
+        } while (readline(fp, buf));
+        if (!characters) {
+            throw std::invalid_argument("No characters block found");
+        }
+
+        int64_t ntax = -1, nchar = -1;
+        bool interleave = false;
+        bool matrix = false;
+        char fgap = '-';
+        char fmatchchar = '.';
+
+        auto readValue = [&buf](const std::string &name) {
+            int64_t pos = buf.find(name);
+            pos+=name.size();
+            while (isspace(buf[pos])) { pos++; }
+            if(buf[pos++] != '='){return (int64_t) -1;}
+            while (isspace(buf[pos])) { pos++; }
+            return pos;
+        };
+
+        while (readline(fp, buf)) {
+            /* loop header lines */
+            std::for_each(buf.begin(), buf.end(), [](char &c) { c = std::tolower(c); });
+
+            if (buf.find("dimensions") != buf.npos) {
+                int64_t pos;
+                pos = readValue("nchar");
+                if (pos > 0) {
+                    nchar = std::atoll(&buf[pos]);
+                }
+                pos = readValue("ntax");
+                if (pos > 0) {
+                    ntax = std::atoll(&buf[pos]);
+                }
+            } else if (buf.find("format") != buf.npos) {
+                int64_t pos;
+                pos = readValue("interleave");
+                if (pos > 0) {
+                    interleave = buf[pos] == 'y';
+                }
+                pos = readValue("gap");
+                if (pos > 0) {
+                    fgap = buf[pos];
+                }
+                pos = readValue("matchchar");
+                if (pos > 0) {
+                    fmatchchar = buf[pos];
+                }
+            } else if (buf.find("matrix") != buf.npos) {
+                matrix = true;
+                break;
+            } else {
+                log << "Warning! Command  ignored: " << buf << std::endl;
+            }
+        }
+        if (!matrix) {
+            throw std::invalid_argument("No matrix command found in characters block");
+        }
+
+        if(ntax > 0){
+            seqs.reserve(ntax);
+            names.reserve(ntax);
+        }
+        int64_t seqi = 0;
+        while (readline(fp, buf)) {
+            /* loop matrix lines */
+            int64_t pos = 0;
+            while (isspace(buf[pos])) { pos++; }
+            if (buf[pos] == ';') {
+                break;
+            }
+            if(pos == '\n'){
+                if(interleave){
+                    seqi = 0;
+                }
+                continue;
+            }
+            int64_t init = pos;
+            if(buf[pos] == '\'' || buf[pos] == '"'){
+                pos++;
+                while(buf[pos] != buf[init] || pos == (int64_t)buf.size()){pos++;}
+                init++;
+            }else{
+                while (!isspace(buf[pos]) || pos == (int64_t)buf.size()) { pos++; }
+            }
+            if(pos == (int64_t)buf.size()){
+                throw std::invalid_argument("Wrong sequence name format: " + buf);
+            }
+            if(seqi == (int64_t)seqs.size()){
+                names.emplace_back(buf, init, pos - init);
+            }
+            pos++;
+            if(seqi <= (int64_t)seqs.size()){
+                seqs.emplace_back();
+                if(nchar > 0){
+                    seqs.back().reserve(nchar);
+                }
+            }
+
+            for(;pos < (int64_t)buf.size();pos++){
+                if(isspace(buf[pos])){
+                    continue;
+                }
+                if(buf[pos] == fgap){
+                    seqs[seqi].push_back('-');
+                }else if(buf[pos] == fmatchchar && seqi > 0){
+                    seqs[seqi].push_back(seqs[seqi - 1 ][seqs[seqi].size()]);
+                }else{
+                    seqs[seqi].push_back(buf[pos]);
+                }
+            }
+
+            seqi++;
+        }
+        if(!seqs.empty()){
+            nPos = seqs[0].size();
+        }
+
+        if (ntax > 0 && (int64_t)seqs.size() != ntax) {
+            throw std::invalid_argument(strformat("Wrong number of sequences: expected %ld", ntax));
+        }
+
+    } else if (buf[0] == '>') {
         /* FASTA, truncate names at any of these */
         auto nameStop = (options.bQuote ? "'\t" : "(),: \t"); /* bQuote supports the -quote option */
         auto seqSkip = " \t";    /* skip these characters in the sequence */
@@ -45,7 +179,7 @@ void Alignment::readAlignment() {
                 }
                 auto &seq = seqs[names.size() - 1];
                 seq.append(buf.begin(), buf.begin() + nKeep);
-                if ((int64_t)seq.size() > nPos) {
+                if ((int64_t) seq.size() > nPos) {
                     nPos = seq.size();
                 }
             }
@@ -108,7 +242,7 @@ void Alignment::readAlignment() {
                 }
                 for (; j < buf.size(); j++) {
                     if (buf[j] != ' ') {
-                        if ((int64_t)seqs[iSeq].size() >= nPos) {
+                        if ((int64_t) seqs[iSeq].size() >= nPos) {
                             throw std::invalid_argument(strformat(
                                     "Too many characters (expected %ld) for sequence named %s\nSo far have:\n%s",
                                     nPos, names[iSeq].c_str(), seqs[iSeq].c_str()));
@@ -124,7 +258,7 @@ void Alignment::readAlignment() {
                                      iSeq, names[iSeq].c_str(), seqs[iSeq].c_str()) << std::endl;
                 }
                 iSeq++;
-                if (iSeq == nSeq && (int64_t)seqs[0].size() == nPos) {
+                if (iSeq == nSeq && (int64_t) seqs[0].size() == nPos) {
                     break; /* finished alignment */
                 }
             }/* end else non-empty phylip line */
@@ -134,8 +268,8 @@ void Alignment::readAlignment() {
         }
     }
     /* Check lengths of sequences */
-    for (int64_t i = 0; i < (int64_t)seqs.size(); i++) {
-        if ((int64_t)seqs[i].size() != nPos) {
+    for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
+        if ((int64_t) seqs[i].size() != nPos) {
             throw std::invalid_argument(strformat(
                     "Wrong number of characters for %s: expected %ld but have %ld instead.\n"
                     "This sequence may be truncated, or another sequence may be too long.",
@@ -146,8 +280,8 @@ void Alignment::readAlignment() {
     /* If nucleotide sequences, replace U with T and N with X */
     bool findDot = false;
     #pragma omp parallel for schedule(static), reduction(||:findDot)
-    for (int64_t i = 0; i < (int64_t)seqs.size(); i++) {
-        for (int64_t j = 0; j < (int64_t)seqs[i].size(); j++) {
+    for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
+        for (int64_t j = 0; j < (int64_t) seqs[i].size(); j++) {
             if (seqs[i][j] == '.') {
                 seqs[i][j] = '-';
                 findDot = true;
@@ -188,7 +322,7 @@ Uniquify::Uniquify(const Alignment &aln) {
     alnNext.resize(aln.seqs.size(), -1);   /* i in aln -> next, or -1 */
     alnToUniq.resize(aln.seqs.size(), -1); /* i in aln -> iUnique; many -> -1 */
 
-    for (int64_t i = 0; i < (int64_t)aln.seqs.size(); i++) {
+    for (int64_t i = 0; i < (int64_t) aln.seqs.size(); i++) {
         assert(hashseqs.find(aln.seqs[i]) != nullptr);
         int64_t first = hashseqs[aln.seqs[i]];
         if (first == i) {
@@ -209,5 +343,5 @@ Uniquify::Uniquify(const Alignment &aln) {
             alnToUniq[i] = alnToUniq[last];
         }
     }
-    assert((int64_t)nUniqueSeq == (int64_t)uniqueSeq.size());
+    assert((int64_t) nUniqueSeq == (int64_t) uniqueSeq.size());
 }

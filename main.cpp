@@ -424,27 +424,33 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
     app.add_option("-thread-subtrees", options.threadSubtrees,
-                   "set a maximum number of subtrees assigned to a thread. This option could increase "
+                   "sets a maximum number of subtrees assigned to the threads. This option could increase "
                    "the accuracy for small datasets containing large sequences at the expense of reducing "
                    "the workload balance among threads")->type_name("n")
             ->check(Min(1))->group(optimizations);
+
     app.add_option("-threads-level", options.threadsLevel,
                    "to change the degree of parallelization. If level is 0, VeryFastTree uses the same "
                    "parallelization strategy followed by FastTree-2. If level is 1 (by default), VeryFastTree "
-                   "accelerates the rounds of ML NNIs using its tree partitioning method")->
-            type_name("lvl")->check(CLI::Range(0, 1))->group(optimizations);
+                   "accelerates the rounds of ML NNIs using its tree partitioning method. If level is 2, VeryFastTree "
+                   " accelerates the rounds of ML NNIs and SPR steps using its tree partitioning method"
+                   "(It only can used with datasets much larger than 2^sprlength).")->
+            type_name("lvl")->check(CLI::Range(0, 2))->group(optimizations);
 
-    app.add_flag("-double-precision", options.doublePrecision, "use double precision arithmetic")->
+    app.add_option("-threads-mode", options.deterministic,
+                   "to change the mode of parallelization. If level is 0, VeryFastTree uses all parallel parts "
+                   "of FastTree-2 including non-deterministic. If level is 1 (by default), VeryFastTree "
+                   " only use deterministic parallelization parts.")->
+            type_name("mode")->check(CLI::Range(0, 1))->group(optimizations);
+
+    app.add_flag("-double-precision", options.doublePrecision, "uses double precision arithmetic")->
             group(optimizations);
 
-    app.add_set_ignore_case("-ext", options.extension, {"NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512"},
+    app.add_set_ignore_case("-ext", options.extension, {"AUTO", "NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512"},
                             "to speed up computations enabling the vector extensions. "
-                            "Available: NONE, SSE3 (default), AVX, AVX2 or AVX512")->type_name("name")->group(optimizations)->
-            #if (defined __SSE2__) || (defined __AVX__)
-            default_val("SSE3");
-            #else
-            default_val("NONE");
-            #endif
+                            "Available: AUTO(default), NONE, SSE, SSE3 , AVX, AVX2 or AVX512")->type_name("name")
+            ->group(optimizations)->default_val("AUTO");
+
 
     app.add_option("-fastexp", options.fastexp,
                    "to select an alternative implementation for the exponential function exp(x), which has "
@@ -455,7 +461,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "of exp(x) using simple precision (not recommended with -double-precision option)")->
             type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
 
-    for (auto &c:options.extension) { c = (char) std::toupper(c); }
+    for (auto &c: options.extension) { c = (char) std::toupper(c); }
 
 
     auto deprecated = "Deprecated";
