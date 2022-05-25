@@ -233,7 +233,8 @@ AbsNeighbourJoining(void)::printNJInternal(std::ostream &out, bool useLen) {
 }
 
 AbsNeighbourJoining(void)::seqsToProfiles() {
-    profiles.resize(maxnodes, Profile(nPos, constraintSeqs.size()));
+    profiles.reserve(maxnodes);
+    profiles.resize(seqs.size(), Profile(nPos, constraintSeqs.size()));
     uint8_t charToCode[256];
     int64_t counts[256] = {}; /*Array of zeros*/
 
@@ -266,6 +267,7 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
                 profile.weights[j] = 1.0;
             }
         }
+        seqs[i] = std::string();
         if (!constraintSeqs.empty()) {
             auto &constraintSeq = constraintSeqs[i];
             for (int64_t j = 0; j < (int64_t) constraintSeq.size(); j++) {
@@ -288,6 +290,7 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
             }
         }
     }
+    profiles.resize(maxnodes, Profile(nPos, constraintSeqs.size()));
 
     int64_t totCount = 0;
     for (int i = 0; i < 256; i++) {

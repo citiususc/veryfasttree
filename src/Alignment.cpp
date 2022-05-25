@@ -304,7 +304,7 @@ void Alignment::readAlignment() {
 }
 
 void Alignment::clearAlignmentSeqs() {
-    seqs.clear();
+    seqs.resize(0);
 }
 
 void Alignment::clearAlignment() {
