@@ -37,7 +37,7 @@ namespace veryfasttree {
         std::vector<int64_t> alnToUniq;        /* iAln -> iUnique, or -1 if another was the exemplar */
         std::vector<std::string> uniqueSeq;    /* indexed by iUniq -- points to strings allocated elsewhere */
 
-        Uniquify(const Alignment& aln);
+        Uniquify(Alignment& aln);
     };
 }
 

@@ -4,30 +4,116 @@
 
 #include "NeighbourJoining.h"
 #include <list>
+#include <sys/mman.h>
+#include <fcntl.h>
 
 #define AbsNeighbourJoining(...) \
 template<typename Precision, template<class> class Operations> \
 __VA_ARGS__ veryfasttree::NeighbourJoining<Precision, Operations>
 
 
-AbsNeighbourJoining()::Profile::Profile() {}
-
 AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints) {
-    weights.resize(nPos);
-    codes.resize(nPos);
-    nGaps = 0;
-    nVectors = 0;
+    typename op_t::Allocator alloc;
+    diskLevel = 0;
+    weights = alloc.allocate(nPos);
+    codes = new char[nPos];
+    vectors = nullptr;
+    codeDist = nullptr;
     if (nConstraints == 0) {
-        nOn.resize(nConstraints, 0);
-        nOff.resize(nConstraints, 0);
+        nOn = nullptr;
+        nOff = nullptr;
+    } else {
+        nOn = new int64_t[nPos];
+        nOff = new int64_t[nPos];
+    }
+    reset();
+}
+
+AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool optAttr, bool test) {
+    diskLevel = optAttr ? 2 : 1;
+    size_t space = 10e6; // Just some big number.
+    void *ptr = (void *) men;
+
+    weights = (numeric_t *) std::align(op_t::ALIGNMENT, sizeof(Precision), ptr, space);
+    ptr = weights + sizeof(Precision) * nPos;
+
+    if(optAttr){
+        int nCodeSize = alignsz(nCodes, op_t::ALIGNMENT / sizeof(numeric_t));
+        vectors = (numeric_t *) std::align(op_t::ALIGNMENT, sizeof(Precision), ptr, space);
+        ptr = vectors + sizeof(Precision) * nPos * nCodeSize;
+
+        codeDist = (numeric_t *) std::align(op_t::ALIGNMENT, sizeof(Precision), ptr, space);
+        ptr = codeDist + sizeof(Precision) * nPos * nCodes;
+    } else {
+        vectors = nullptr;
+        codeDist = nullptr;
+    }
+
+    if (nConstraints == 0) {
+        nOn = nullptr;
+        nOff = nullptr;
+    } else {
+        nOn = (int64_t *) ptr;
+        ptr = nOn + nPos * sizeof(int64_t);
+
+        nOff = (int64_t *) ptr;
+        ptr = nOff + nPos * sizeof(int64_t);
+    }
+
+    codes = (char *) ptr;
+    ptr = codes + nPos * sizeof(char);
+
+    men = (uintptr_t) ptr;
+    if (!test) {
+        reset();
+    }
+}
+
+AbsNeighbourJoining()::Profile::~Profile() {
+    if (diskLevel < 1) {
+        typename op_t::Allocator alloc;
+        alloc.deallocate(weights, -1/*ignored*/);
+        delete[] codes;
+        if (nOn != nullptr) {
+            delete[] nOn;
+            delete[] nOff;
+        }
+    }
+    reset();
+}
+
+AbsNeighbourJoining(void)::Profile::setVectorSize(size_t n, numeric_t val) {
+    vectorsSize = n;
+    if (diskLevel < 2) {
+        typename op_t::Allocator alloc;
+        if (vectors != nullptr) {
+            alloc.deallocate(vectors, vectorsSize);
+        }
+        if (n > 0) {
+            vectors = alloc.allocate(n);
+        }
+    }
+    for (size_t i = 0; i < n; i++) { vectors[i] = val; }
+}
+
+AbsNeighbourJoining(void)::Profile::setCodeDistSize(size_t n) {
+    codeDistSize = n;
+    if (diskLevel < 2) {
+        typename op_t::Allocator alloc;
+        if (codeDist != nullptr) {
+            alloc.deallocate(codeDist, codeDistSize);
+        }
+        if (n > 0) {
+            codeDist = alloc.allocate(n);
+        }
     }
 }
 
 AbsNeighbourJoining(void)::Profile::reset() {
     nGaps = 0;
     nVectors = 0;
-    vectors.resize(0);
-    codeDist.resize(0);
+    setVectorSize(0, 0);
+    setCodeDistSize(0);
 }
 
 AbsNeighbourJoining()::Rates::Rates(int64_t nRateCategories, int64_t nPos) {
@@ -122,6 +208,18 @@ NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressRe
     branchlength.resize(maxnodes, 0); /* distance to parent */
     support.resize(maxnodes, -1.0);
     child.resize(maxnodes);
+}
+
+AbsNeighbourJoining()::~NeighbourJoining() {
+    if (profilesMapSize > 0) {
+        if (profilesMap != 0) {
+            munmap((void *) profilesMap, profilesMapSize);
+        }
+        if (profilesFile != -1) {
+            close(profilesFile);
+        }
+        remove(options.diskProfilesFile.c_str());
+    }
 }
 
 AbsNeighbourJoining(void)::printDistances(std::vector<std::string> &names, std::ostream &out) {
@@ -234,7 +332,36 @@ AbsNeighbourJoining(void)::printNJInternal(std::ostream &out, bool useLen) {
 
 AbsNeighbourJoining(void)::seqsToProfiles() {
     profiles.reserve(maxnodes);
-    profiles.resize(seqs.size(), Profile(nPos, constraintSeqs.size()));
+    profilesMapSize = 0;
+    int64_t diskProfiles = (int64_t) std::ceil(maxnodes * options.diskProfilesRatio);
+    if (diskProfiles > 0) {
+        profilesMap = (uintptr_t) &diskProfiles;
+        Profile(nPos, constraintSeqs.size(), profilesMap, options.nCodes, options.diskProfilesOpt, true); //Check profile size
+        int64_t profileSize = (int64_t) (profilesMap - (uintptr_t) &diskProfiles) + op_t::ALIGNMENT;
+        profilesMapSize = profileSize * diskProfiles;
+        profilesMap = 0;
+
+        profilesFile = open(options.diskProfilesFile.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        if (profilesFile == -1) {
+            throw std::runtime_error("disk memory file is invalid");
+        }
+        lseek(profilesFile, profilesMapSize, SEEK_SET);
+        if(write(profilesFile, "", 1) == -1){
+            throw std::runtime_error("disk memory file truncation error");
+        }
+        void *men = mmap(0, profilesMapSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, profilesFile, 0);
+        if (men == MAP_FAILED) {
+            throw std::runtime_error("profiles memory mapping fails");
+        }
+        profilesMap = (uintptr_t) men;
+
+        for (int64_t i = 0; i < diskProfiles; i++) {
+            profiles.emplace_back(nPos, constraintSeqs.size(), profilesMap, options.nCodes, options.diskProfilesOpt);
+        }
+    }
+    for (int64_t i = (int64_t) profiles.size(); i < maxnodes; i++) {
+        profiles.emplace_back(nPos, constraintSeqs.size());
+    }
     uint8_t charToCode[256];
     int64_t counts[256] = {}; /*Array of zeros*/
 
@@ -290,7 +417,6 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
             }
         }
     }
-    profiles.resize(maxnodes, Profile(nPos, constraintSeqs.size()));
 
     int64_t totCount = 0;
     for (int i = 0; i < 256; i++) {
@@ -536,18 +662,18 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     }
 
     /* Initialize the frequencies to 0 */
-    out.vectors.resize(out.nVectors * nCodeSize, 0);
+    out.setVectorSize(out.nVectors * nCodeSize, 0);
 
     /* Add up the weights, going through each sequence in turn */
     if (options.threads > 1 && nProfiles == (int64_t) seqs.size()) {
-        std::vector<decltype(out.vectors)> out_locals;
+        std::vector<std::vector<numeric_t, typename op_t::Allocator>> out_locals;
         for (int i = 0; i < options.threads; i++) {
             out_locals.emplace_back(out.nVectors * nCodeSize, 0);
         }
 
         #pragma omp parallel
         {
-            decltype(out.vectors) &out_local = out_locals[omp_get_thread_num()];
+            std::vector<numeric_t, typename op_t::Allocator> &out_local = out_locals[omp_get_thread_num()];
             #pragma omp for schedule(static)
             for (int64_t in = 0; in < nProfiles; in++) {
                 int64_t iFreqOut = 0;
@@ -565,7 +691,7 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
             }
         }
         for (int i = 0; i < options.threads; i++) {
-            operations.vector_add(&out.vectors[0], &out_locals[i][0], (int64_t) out.vectors.size());
+            operations.vector_add(&out.vectors[0], &out_locals[i][0], (int64_t) out.vectorsSize);
         }
     } else {
         for (int64_t in = 0; in < nProfiles; in++) {
@@ -666,8 +792,8 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Preci
 }
 
 AbsNeighbourJoining(void)::setCodeDist(Profile &profile) {
-    if (profile.codeDist.empty()) {
-        profile.codeDist.resize(nPos * options.nCodes);
+    if (profile.codeDistSize == 0) {
+        profile.setCodeDistSize(nPos * options.nCodes);
     }
     int64_t iFreq = 0;
     for (int64_t i = 0; i < nPos; i++) {
@@ -957,8 +1083,8 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
             double weight = profile1.weights[i] * profile2.weights[i];
             denom += weight;
             double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
-                                            (!profile2.codeDist.empty() ? &profile2.codeDist[i * options.nCodes]
-                                                                        : nullptr));
+                                            (!profile2.codeDistSize == 0 ? &profile2.codeDist[i * options.nCodes]
+                                                                         : nullptr));
             top += weight * piece;
         }
     }
@@ -1377,7 +1503,7 @@ AbsNeighbourJoining(bool)::quartetConstraintPenaltiesPiece(Profile *profiles4[4]
     return true;
 }
 
-AbsNeighbourJoining(void)::seqDist(std::string &codes1, std::string &codes2, Besthit &hit) {
+AbsNeighbourJoining(void)::seqDist(char codes1[], char codes2[], Besthit &hit) {
     double top = 0;        /* summed over positions */
     int64_t nUse = 0;
     if (!distanceMatrix) {
@@ -1868,7 +1994,7 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
     }
 
     /* Allocate and set the vectors */
-    out.vectors.resize(out.nVectors * nCodeSize, 0);
+    out.setVectorSize(out.nVectors * nCodeSize, 0);
 
     options.debug.nProfileFreqAlloc += out.nVectors;
     options.debug.nProfileFreqAvoid += nPos - out.nVectors;
@@ -1927,7 +2053,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
     }
 
     out.nVectors = nPos;
-    out.vectors.resize(out.nVectors * nCodeSize, 0);
+    out.setVectorSize(out.nVectors * nCodeSize, 0);
 
     int64_t iFreqOut = 0;
     int64_t iFreq1 = 0;
@@ -2211,7 +2337,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
 
     /* Reallocate out->vectors to be the right size */
     out.nVectors = iFreqOut;
-    out.vectors.resize(iFreqOut * nCodeSize, 0); /* try to save space */
+    out.setVectorSize(iFreqOut * nCodeSize, 0); /* try to save space */
 
     options.debug.nProfileFreqAlloc += out.nVectors;
     options.debug.nProfileFreqAvoid += nPos - out.nVectors;
@@ -4629,7 +4755,7 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
         for (int64_t i = 0; i < nPos; i++) {
             int nGapsThisPos = 0;
             for (node = 0; node < (int64_t) seqs.size(); node++) {
-                std::string &codes = profiles[node].codes;
+                auto &codes = profiles[node].codes;
                 if (codes[i] == NOCODE) {
                     nGapsThisPos++;
                 }
@@ -5673,7 +5799,7 @@ AbsNeighbourJoining(void)::setMLGtr(double freq_in[]) {
            caused gtr analyses to fail on analyses with >2e9 positions */
         int64_t n[4] = {1, 1, 1, 1};    /* pseudocounts */
         for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
-            std::string &codes = profiles[i].codes;
+            auto &codes = profiles[i].codes;
             for (int64_t iPos = 0; iPos < nPos; iPos++)
                 if (codes[iPos] < 4) {
                     n[(int) codes[iPos]]++;

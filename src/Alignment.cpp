@@ -313,7 +313,7 @@ void Alignment::clearAlignment() {
     nPos = 0;
 }
 
-Uniquify::Uniquify(const Alignment &aln) {
+Uniquify::Uniquify(Alignment &aln) {
     int64_t nUniqueSeq = 0;
     HashTable hashseqs(aln.seqs);
 

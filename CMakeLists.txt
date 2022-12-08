@@ -11,7 +11,7 @@ option(USE_AVX2 "enable/disable AVX2" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
 
 add_definitions(-DCLI11_BOOST_OPTIONAL=0)
-#add_definitions(-DNDEBUG)
+add_definitions(-DNDEBUG)
 
 ADD_SUBDIRECTORY("libs/CLI11")
 ADD_SUBDIRECTORY("libs/robin-map")
@@ -19,6 +19,10 @@ ADD_SUBDIRECTORY("libs/xxhash")
 ADD_SUBDIRECTORY("libs/boost-core")
 ADD_SUBDIRECTORY("libs/boost-sort")
 ADD_SUBDIRECTORY("libs/boost-align")
+ADD_SUBDIRECTORY("libs/zlib")
+ADD_SUBDIRECTORY("libs/zstr")
+
+set(LIBRARIES CLI11 robin-map xxhash boost-core boost-sort boost-align zlibstatic zstr)
 
 set(SOURCE_FILES
         src/operations/BasicOperations.tcc
@@ -51,8 +55,12 @@ set(SOURCE_FILES
         )
 
 if (MSVC)
+    ADD_SUBDIRECTORY("libs/mman-win32")
+    set(LIBRARIES ${LIBRARIES} mman-win32)
     set(CMAKE_CXX_FLAGS "/W2 /O2 /EHsc /bigobj")
-    if (USE_AVX2)
+    if (USE_AVX512)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX512 /D__AVX512F__=1 /D__AVX2__=1 /D__AVX__=1")
+    elseif (USE_AVX2)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2 /D__AVX2__=1 /D__AVX__=1")
     elseif (USE_AVX)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX /D__AVX__=1")
@@ -62,7 +70,7 @@ if (MSVC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE2 /D__SSE2__=1")
     endif ()
 else ()
-    set(CMAKE_CXX_FLAGS "-Wall -O0")
+    set(CMAKE_CXX_FLAGS "-Wall -O3")
     if (USE_AVX512)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f")
     elseif (USE_AVX2)
@@ -86,4 +94,4 @@ if(NOT TARGET OpenMP::OpenMP_CXX)
 endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX CLI11 robin-map xxhash boost-core boost-sort boost-align)
+target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX ${LIBRARIES})

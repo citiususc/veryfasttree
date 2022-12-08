@@ -4,6 +4,7 @@
 #include "src/VeryFastTree.h"
 #include "src/Utils.h"
 #include <cmath>
+#include <zstr.hpp>
 
 std::string isNotEmpty(const std::string &input) {
     if (input.size() == 0) {
@@ -38,6 +39,14 @@ void setDeprecated(CLI::Option *op) {
     });
 }
 
+bool ends_with(const std::string &str, const std::string &sub) {
+    size_t str_len = str.size();
+    size_t sub_len = sub.size();
+    if (str_len < sub_len) return false;
+
+    return str.compare(str_len - sub_len, sub_len, sub) == 0;
+}
+
 void cli(CLI::App &app, std::string &name, std::string &version, std::string &flags, veryfasttree::Options &options,
          std::vector<std::string> &args) {
     std::stringstream description;
@@ -61,14 +70,16 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     description << name << " [-nt] [-matrix Matrix | -nomatrix] [-rawdist] -makematrix [alignment]" << std::endl;
     description << padd << "[-n 100] > phylip_distance_matrix" << std::endl;
     description << std::endl;
-    description << "  VeryFastTree supports fasta or phylip interleaved alignments" << std::endl;
+    description << "  VeryFastTree supports NEXUS, Fasta or Phylip interleaved formats" << std::endl;
+    description << "  VeryFastTree supports Zlib-compressed (.zip and .gz) files" << std::endl;
     description << "  By default VeryFastTree expects protein alignments,  use -nt for nucleotides" << std::endl;
     description << "  VeryFastTree reads standard input if no alignment file is given" << std::endl;
 
     app.name(name);
     app.description(description.str());
     app.set_help_flag("-h,-help,--help")->group("");
-    app.add_option("protein_alignment", options.inFileName, "input file instead of stdin")->
+    app.add_option("protein_alignment", options.inFileName,
+                   "input file instead of stdin.")->
             type_name("")->check(isNotEmpty);
 
 
@@ -420,30 +431,36 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     auto optimizations = "Optimizations";
 
-    app.add_option("-threads", options.threads, "to specify the number of threads used in a parallel execution ")->
+    app.add_option("-threads", options.threads,
+                   "Number of threads (n) used in the parallel execution. If this option is not set, the "
+                   "corresponding value will be obtained from the environment variable OMP_NUM_THREADS. "
+                   "This is the same approach followed by FastTree-2. If n=1, VeryFastTree behaves in the same way "
+                   "than FastTree-2 compiled without the -DOPENMP flag.")->
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
-    app.add_option("-thread-subtrees", options.threadSubtrees,
-                   "sets a maximum number of subtrees assigned to the threads. This option could increase "
-                   "the accuracy for small datasets containing large sequences at the expense of reducing "
-                   "the workload balance among threads")->type_name("n")
-            ->check(Min(1))->group(optimizations);
-
     app.add_option("-threads-level", options.threadsLevel,
-                   "to change the degree of parallelization. If level is 0, VeryFastTree uses the same "
-                   "parallelization strategy followed by FastTree-2. If level is 1 (by default), VeryFastTree "
-                   "accelerates the rounds of ML NNIs using its tree partitioning method. If level is 2, VeryFastTree "
-                   " accelerates the rounds of ML NNIs and SPR steps using its tree partitioning method"
-                   "(It only can used with datasets much larger than 2^sprlength).")->
+                   "Degree of parallelization. If level is 0, VeryFastTree uses the same parallelization strategy "
+                   "followed by FastTree-2. If level is 1 (default value), VeryFastTree accelerates the rounds of "
+                   "ML NNIs using its tree partitioning method. If level is 2, VeryFastTree accelerates the rounds "
+                   "of ML NNIs and SPR steps using its tree partitioning method (it can only be used with datasets "
+                   "much larger than 2^sprlength).")->
             type_name("lvl")->check(CLI::Range(0, 2))->group(optimizations);
 
     app.add_option("-threads-mode", options.deterministic,
-                   "to change the mode of parallelization. If level is 0, VeryFastTree uses all parallel parts "
-                   "of FastTree-2 including non-deterministic. If level is 1 (by default), VeryFastTree "
-                   " only use deterministic parallelization parts.")->
+                   "Changes the mode of parallelization. If level is 0, VeryFastTree uses all parallel parts of "
+                   "FastTree-2 including non-deterministic. If level is 1 (by default), VeryFastTree only uses "
+                   "deterministic parallelization parts.")->
             type_name("mode")->check(CLI::Range(0, 1))->group(optimizations);
 
-    app.add_flag("-double-precision", options.doublePrecision, "uses double precision arithmetic")->
+    app.add_option("-thread-subtrees", options.threadSubtrees,
+                   "It sets a maximum number of subtrees assigned to the threads. This option could increase the "
+                   "accuracy for small datasets containing large sequences at the expense of reducing the workload "
+                   "balance among threads.")->type_name("n")
+            ->check(Min(1))->group(optimizations);
+
+    app.add_flag("-double-precision", options.doublePrecision,
+                 "To use double precision arithmetic. "
+                 "Therefore, it is equivalent to compile FastTree-2 with -DUSE_DOUBLE.")->
             group(optimizations);
 
     app.add_set_ignore_case("-ext", options.extension, {"AUTO", "NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512"},
@@ -460,6 +477,28 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "exp(x) using double precision, and 3 - fast implementation to compute an approximation "
                    "of exp(x) using simple precision (not recommended with -double-precision option)")->
             type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
+
+    app.add_option("-disk-profiles", options.diskProfilesRatio,
+                   "Reduce the amount of memory required using the disk. Some sequence profiles are stored on disk "
+                   "instead of in memory. Ratio between 0 and 1 specifies the number of profiles to be stored on disk. "
+                   "That is, 1 will store all profiles on disk. Storing more profiles on disk increases the running "
+                   "time. Note that even if the disk file is created, profiles will only be saved to disk when the "
+                   "memory is nearly full.")->
+            type_name("ratio")->check(CLI::Range(0, 1))->group(optimizations);
+
+    app.add_option("-disk-profiles-file", options.diskProfilesFile,
+                   "Select an alternative file location for storing profiles with -disk-profiles. The disk must have "
+                   "enough space to store the profiles. By default the path is the working directory.")->
+            type_name("path")->group(optimizations);
+
+    app.add_flag("-disk-profiles-opt", options.diskProfilesOpt,
+                 "This parameter forces that all attributes within the profiles are saved to disk. It saves more memory "
+                 "but the file disk could be huge.")->
+            group(optimizations);
+
+    app.add_flag("-no-compression", options.noCompression,
+                 "Only .zip or .gz files will be decompressed.")->
+            group(optimizations);
 
     for (auto &c: options.extension) { c = (char) std::toupper(c); }
 
@@ -493,7 +532,8 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     description << "  " << name << " -nt nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " -nt -gtr < nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " < nucleotide_alignment > tree" << std::endl;
-    description << name << " accepts alignments in fasta or phylip interleaved formats" << std::endl;
+    description << "  " << name << "accepts alignments in NEXUS, Fasta or Phylip interleaved formats,"
+                                   " and also Zlib-compressed (.zip and .gz) files." << std::endl;
     app.description(description.str());
 
     auto common = "Common options";
@@ -531,6 +571,14 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     app.get_option("-constraints")->description(
             "to constrain the topology search constraintAlignment should have 1s or 0s to indicates splits")->
             type_name("constraintAlignment")->group(common);
+
+    app.get_option("-threads")->description("Number of threads (n) used in the parallel execution.")->
+            group(common);
+
+    app.get_option("-double-precision")->group(common);
+
+    app.get_option("-ext")->group(common);
+
     app.get_option("-expert")->description("see more options")->group(common);
 }
 
@@ -562,19 +610,33 @@ int main(int argc, char *argv[]) {
         CLI11_PARSE(app2, "-h", false);
     }
 
-    std::ifstream input;
+    std::istream *input = &std::cin;
+    std::ifstream finput;
+    zstr::istream zfinput(finput);
+    zstr::istream zin(std::cin);
     std::ofstream output;
     std::ofstream log;
     veryfasttree::TeeStream tee(log, std::cerr);
     std::ostream teelog(&tee);
 
-    if (options.inFileName.empty()) {
-        input.setstate(std::ios_base::badbit);
-    } else {
-        input.open(options.inFileName);
-        if (input.fail()) {
+    if (!options.inFileName.empty()) {
+        finput.open(options.inFileName);
+        if (finput.fail()) {
             std::cerr << "Couldn't open the input file! " << options.inFileName << std::endl;
             return EXIT_FAILURE;
+        }
+        input = &finput;
+    }
+
+    if (ends_with(options.inFileName, ".zip") || ends_with(options.inFileName, ".gz") || !options.noCompression) {
+        if (options.inFileName.empty()) {
+            input = &zin;
+        } else {
+            if (ends_with(options.inFileName, "tar.gz")) {
+                std::cerr << "tar.gz is not supported" << std::endl;
+                return EXIT_FAILURE;
+            }
+            input = &zfinput;
         }
     }
 
@@ -606,7 +668,7 @@ int main(int argc, char *argv[]) {
 
     try {
         fastTree.run(
-                input ? input : std::cin,
+                *input,
                 output ? output : std::cout,
                 applog);
 

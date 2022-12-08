@@ -100,6 +100,10 @@ namespace veryfasttree {
         bool doublePrecision = false;
         int fastexp = 0;
         std::string extension;
+        bool noCompression = false;
+        float diskProfilesRatio = 0;
+        bool diskProfilesOpt = false;
+        std::string diskProfilesFile = "diskprofiles.men";
 
         /*Precision*/
         double MLMinBranchLengthTolerance;

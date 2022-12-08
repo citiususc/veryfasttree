@@ -25,6 +25,8 @@ namespace veryfasttree {
                          DistanceMatrix<Precision, op_t::ALIGNMENT> &distanceMatrix,
                          TransitionMatrix<Precision, op_t::ALIGNMENT> &transmat);
 
+        ~NeighbourJoining();
+
         void printDistances(std::vector<std::string> &names, std::ostream &out);
 
         /* ReadTree ignores non-unique leaves after the first instance.
@@ -122,23 +124,34 @@ namespace veryfasttree {
 
         struct Profile {
             /* alignment profile */
-            std::vector<numeric_t, typename op_t::Allocator> weights;
-            std::string codes;
+            numeric_t *weights;
+            char *codes;
             /* empty if no non-constant positions, e.g. for leaves */
-            std::vector<numeric_t, typename op_t::Allocator> vectors;
+            numeric_t *vectors;
+            size_t vectorsSize;
+
+            void setVectorSize(size_t n, numeric_t val);
+
             int64_t nVectors;
             /* Optional -- distance to each code at each position */
-            std::vector<numeric_t, typename op_t::Allocator> codeDist;
+            numeric_t *codeDist;
+            size_t codeDistSize;
+
+            void setCodeDistSize(size_t n);
 
             /* constraint profile */
-            std::vector<int64_t> nOn;
-            std::vector<int64_t> nOff;
+            int64_t *nOn;
+            int64_t *nOff;
 
             int64_t nGaps; /*precalculated in construction*/
 
+            int8_t diskLevel; /*profile stored in disk: 0 disabled; 1: weights and codes; 2: all variables*/
+
             Profile(int64_t nPos, int64_t nConstraints);
 
-            Profile();
+            Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool optAttr, bool test=false);
+
+            ~Profile();
 
             void reset();
         };
@@ -260,6 +273,9 @@ namespace veryfasttree {
         int64_t maxnode;            /* The next index to allocate */
         int64_t maxnodes;            /* Space allocated in data structures below */
         std::vector<Profile> profiles; /* Profiles of leaves and intermediate nodes */
+        int profilesFile; /* Profiles file descriptor */
+        uintptr_t profilesMap; /* Profiles memory mapping */
+        size_t  profilesMapSize; /* Profiles memory mapping size*/
         std::vector<numeric_t, typename op_t::Allocator> diameter;    /* To correct for distance "up" from children (if any) */
         std::vector<numeric_t, typename op_t::Allocator> varDiameter; /* To correct variances for distance "up" */
         std::vector<numeric_t, typename op_t::Allocator> selfdist;    /* Saved for use in some formulas */
@@ -524,7 +540,7 @@ namespace veryfasttree {
         */
         bool quartetConstraintPenaltiesPiece(Profile *profiles[4], int64_t iConstraint, double piece[3]);
 
-        void seqDist(std::string &codes1, std::string &codes2, Besthit &hit);
+        void seqDist(char codes1[], char codes2[], Besthit &hit);
 
 
         /* Set a node's profile from its children.
