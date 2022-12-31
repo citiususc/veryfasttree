@@ -5,6 +5,7 @@
 #include "NeighbourJoining.h"
 #include <list>
 #include <sys/mman.h>
+#include <cstring>
 #include <fcntl.h>
 
 #define AbsNeighbourJoining(...) \
@@ -29,7 +30,8 @@ AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints) {
     reset();
 }
 
-AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool optAttr, bool test) {
+AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool optAttr,
+                                        bool test) {
     diskLevel = optAttr ? 2 : 1;
     size_t space = 10e6; // Just some big number.
     void *ptr = (void *) men;
@@ -37,7 +39,7 @@ AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uint
     weights = (numeric_t *) std::align(op_t::ALIGNMENT, sizeof(Precision), ptr, space);
     ptr = weights + sizeof(Precision) * nPos;
 
-    if(optAttr){
+    if (optAttr) {
         int nCodeSize = alignsz(nCodes, op_t::ALIGNMENT / sizeof(numeric_t));
         vectors = (numeric_t *) std::align(op_t::ALIGNMENT, sizeof(Precision), ptr, space);
         ptr = vectors + sizeof(Precision) * nPos * nCodeSize;
@@ -88,6 +90,7 @@ AbsNeighbourJoining(void)::Profile::setVectorSize(size_t n, numeric_t val) {
         typename op_t::Allocator alloc;
         if (vectors != nullptr) {
             alloc.deallocate(vectors, vectorsSize);
+            vectors = nullptr;
         }
         if (n > 0) {
             vectors = alloc.allocate(n);
@@ -96,12 +99,27 @@ AbsNeighbourJoining(void)::Profile::setVectorSize(size_t n, numeric_t val) {
     for (size_t i = 0; i < n; i++) { vectors[i] = val; }
 }
 
+AbsNeighbourJoining(void)::Profile::resizeVector(size_t n) {
+    if (vectors != nullptr && vectorsSize != n) {
+        if (diskLevel < 2) {
+            typename op_t::Allocator alloc;
+            numeric_t *tmp = vectors;
+            vectors = alloc.allocate(n);
+            std::memcpy(vectors, tmp, n * sizeof(numeric_t));
+            alloc.deallocate(tmp, vectorsSize);
+        }
+        vectorsSize = n;
+    }
+}
+
+
 AbsNeighbourJoining(void)::Profile::setCodeDistSize(size_t n) {
     codeDistSize = n;
     if (diskLevel < 2) {
         typename op_t::Allocator alloc;
         if (codeDist != nullptr) {
             alloc.deallocate(codeDist, codeDistSize);
+            codeDist = nullptr;
         }
         if (n > 0) {
             codeDist = alloc.allocate(n);
@@ -336,7 +354,8 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
     int64_t diskProfiles = (int64_t) std::ceil(maxnodes * options.diskProfilesRatio);
     if (diskProfiles > 0) {
         profilesMap = (uintptr_t) &diskProfiles;
-        Profile(nPos, constraintSeqs.size(), profilesMap, options.nCodes, options.diskProfilesOpt, true); //Check profile size
+        Profile(nPos, constraintSeqs.size(), profilesMap, options.nCodes, options.diskProfilesOpt,
+                true); //Check profile size
         int64_t profileSize = (int64_t) (profilesMap - (uintptr_t) &diskProfiles) + op_t::ALIGNMENT;
         profilesMapSize = profileSize * diskProfiles;
         profilesMap = 0;
@@ -346,7 +365,7 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
             throw std::runtime_error("disk memory file is invalid");
         }
         lseek(profilesFile, profilesMapSize, SEEK_SET);
-        if(write(profilesFile, "", 1) == -1){
+        if (write(profilesFile, "", 1) == -1) {
             throw std::runtime_error("disk memory file truncation error");
         }
         void *men = mmap(0, profilesMapSize, PROT_READ | PROT_WRITE, MAP_PRIVATE, profilesFile, 0);
@@ -363,7 +382,7 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
         profiles.emplace_back(nPos, constraintSeqs.size());
     }
     uint8_t charToCode[256];
-    int64_t counts[256] = {}; /*Array of zeros*/
+    std::unique_ptr<int64_t[]> counts(new int64_t[256 * options.threads]); /*Array of zeros*/
 
     for (int c = 0; c < 256; c++) {
         charToCode[c] = static_cast<uint8_t>(options.nCodes);
@@ -373,51 +392,65 @@ AbsNeighbourJoining(void)::seqsToProfiles() {
     }
     charToCode['-'] = NOCODE;
 
-    #pragma omp parallel for schedule(static)
-    for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
-        auto &seq = seqs[i];
-        auto &profile = profiles[i];
-        for (int64_t j = 0; j < nPos; j++) {
-            auto character = (uint8_t) seq[j];
-            counts[character]++;
-            auto c = charToCode[character];
-            if (options.verbose > 10 && j < 2) {
-                log << strformat("pos %ld char %c code %u", j, seq[j], c) << std::endl;
+    #pragma omp parallel
+    {
+        int64_t *lcounts = counts.get() + (256 * omp_get_thread_num());
+        for (int c = 0; c < 256; c++) {
+            lcounts[c] = 0;
+        }
+        #pragma omp for schedule(static)
+        for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
+            auto &seq = seqs[i];
+            auto &profile = profiles[i];
+            for (int64_t j = 0; j < nPos; j++) {
+                auto character = (uint8_t) seq[j];
+                lcounts[character]++;
+                auto c = charToCode[character];
+                if (options.verbose > 10 && j < 2) {
+                    log << strformat("pos %ld char %c code %u", j, seq[j], c) << std::endl;
+                }
+                /* treat unknowns as gaps */
+                if (c == options.nCodes || c == NOCODE) {
+                    profile.codes[j] = NOCODE;
+                    profile.weights[j] = 0.0;
+                    profile.nGaps++;
+                } else {
+                    profile.codes[j] = c;
+                    profile.weights[j] = 1.0;
+                }
             }
-            /* treat unknowns as gaps */
-            if (c == options.nCodes || c == NOCODE) {
-                profile.codes[j] = NOCODE;
-                profile.weights[j] = 0.0;
-                profile.nGaps++;
-            } else {
-                profile.codes[j] = c;
-                profile.weights[j] = 1.0;
+            seqs[i] = std::string();
+            if (!constraintSeqs.empty()) {
+                auto &constraintSeq = constraintSeqs[i];
+                for (int64_t j = 0; j < (int64_t) constraintSeq.size(); j++) {
+                    if (constraintSeq[j] == '1') {
+                        profile.nOn[j] = 1;
+                    } else if (constraintSeq[j] == '0') {
+                        profile.nOff[j] = 1;
+                    } else if (constraintSeq[j] != '-') {
+                        #pragma omp critical
+                        {
+                            log << strformat("Constraint characters in unique sequence %ld replaced with gap: %c%ld",
+                                             i + 1, constraintSeq[j], j + 1) << std::endl;
+
+                        };
+                        /* For the benefit of ConstraintSequencePenalty -- this is a bit of a hack, as
+                           this modifies the value read from the alignment
+                        */
+                        constraintSeq[j] = '-';
+                    }
+                }
             }
         }
-        seqs[i] = std::string();
-        if (!constraintSeqs.empty()) {
-            auto &constraintSeq = constraintSeqs[i];
-            for (int64_t j = 0; j < (int64_t) constraintSeq.size(); j++) {
-                if (constraintSeq[j] == '1') {
-                    profile.nOn[j] = 1;
-                } else if (constraintSeq[j] == '0') {
-                    profile.nOff[j] = 1;
-                } else if (constraintSeq[j] != '-') {
-                    #pragma omp critical
-                    {
-                        log << strformat("Constraint characters in unique sequence %ld replaced with gap: %c%ld",
-                                         i + 1, constraintSeq[j], j + 1) << std::endl;
-
-                    };
-                    /* For the benefit of ConstraintSequencePenalty -- this is a bit of a hack, as
-                       this modifies the value read from the alignment
-                    */
-                    constraintSeq[j] = '-';
+        if (options.threads > 1) {
+            #pragma omp for schedule(static)
+            for (int i = 0; i < 256; i++) {
+                for (int j = 1; j < options.threads; j++) {
+                    counts[i] += counts[i + j * 256];
                 }
             }
         }
     }
-
     int64_t totCount = 0;
     for (int i = 0; i < 256; i++) {
         totCount += counts[i];
@@ -2337,7 +2370,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
 
     /* Reallocate out->vectors to be the right size */
     out.nVectors = iFreqOut;
-    out.setVectorSize(iFreqOut * nCodeSize, 0); /* try to save space */
+    out.resizeVector(iFreqOut * nCodeSize); /* try to save space */
 
     options.debug.nProfileFreqAlloc += out.nVectors;
     options.debug.nProfileFreqAvoid += nPos - out.nVectors;
@@ -4620,8 +4653,9 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
     while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr, root)) >= 0) {
         int64_t nChild = child[node].nChild;
         if (nChild > 0) {
-            if ((iDone % 100) == 0)
+            if ((iDone % 100) == 0) {
                 progressReport.print("ML Lengths %ld of %ld splits", iDone + 1, (int64_t) (maxnode - seqs.size()));
+            }
             iDone++;
 
             /* optimize the branch lengths between self, parent, and children,
@@ -5531,10 +5565,11 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
         }
     }
 
+    std::string buf = useML ? "ML" : "ME";
+    buf += " NNI round %ld of %ld, %ld splits";
+    progressReport.print(buf, iRound + 1, nRounds, (int64_t) (maxnode - seqs.size()));
+
     if (useML && options.threads > 1 && options.threadsLevel > 0) {
-        std::string buf = useML ? "ML" : "ME";
-        buf += " NNI round %ld of %ld, %ld splits";
-        progressReport.print(buf, iRound + 1, nRounds, (int64_t) (maxnode - seqs.size()));
         std::vector<std::vector<int64_t>> chunks;
         treePartition(chunks, traversal, 2);
 

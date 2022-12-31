@@ -239,7 +239,7 @@ AbsFastTreeImpl(void)::run() {
                 }
 
                 /* Do maximum-likelihood computations */
-                DistanceMatrix <Precision, op_t::ALIGNMENT> tmatAsDist;
+                DistanceMatrix <Precision, op_t::ALIGNMENT> tmatAsDist = {};
                 /* Convert profiles to use the transition matrix */
                 transMatToDistanceMat(tmatAsDist);
                 nj.recomputeProfiles(tmatAsDist);

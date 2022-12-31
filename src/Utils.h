@@ -165,7 +165,7 @@ namespace veryfasttree {
             }
 
             auto timeNow = Clock::now();
-            int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count();
+            int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeLast).count();
 
             if (mili > 100 || options.verbose > 1) {
                 std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));

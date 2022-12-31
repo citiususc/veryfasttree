@@ -132,6 +132,8 @@ namespace veryfasttree {
 
             void setVectorSize(size_t n, numeric_t val);
 
+            void resizeVector(size_t n);
+
             int64_t nVectors;
             /* Optional -- distance to each code at each position */
             numeric_t *codeDist;
