@@ -151,7 +151,7 @@ namespace veryfasttree {
 
             Profile(int64_t nPos, int64_t nConstraints);
 
-            Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool optAttr, bool test=false);
+            Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool optAttr, bool test = false);
 
             ~Profile();
 
@@ -277,7 +277,7 @@ namespace veryfasttree {
         std::vector<Profile> profiles; /* Profiles of leaves and intermediate nodes */
         int profilesFile; /* Profiles file descriptor */
         uintptr_t profilesMap; /* Profiles memory mapping */
-        size_t  profilesMapSize; /* Profiles memory mapping size*/
+        size_t profilesMapSize; /* Profiles memory mapping size*/
         std::vector<numeric_t, typename op_t::Allocator> diameter;    /* To correct for distance "up" from children (if any) */
         std::vector<numeric_t, typename op_t::Allocator> varDiameter; /* To correct variances for distance "up" */
         std::vector<numeric_t, typename op_t::Allocator> selfdist;    /* Saved for use in some formulas */
@@ -465,7 +465,7 @@ namespace veryfasttree {
         /* Returns SH-like support given resampling spec. (in col) and site likelihods
            for the three quartets
         */
-        double SHSupport(std::vector<int64_t> &col, double loglk[3], std::vector<double> &site_likelihoods);
+        double SHSupport(const std::vector<int64_t> &col, double loglk[3], std::vector<double> &site_likelihoods);
 
         /* ProfileDist and SeqDist only set the dist and weight fields
            If using an outprofile, use the second argument of ProfileDist
@@ -768,6 +768,10 @@ namespace veryfasttree {
 
 
         inline void traverseRecomputeMLProfiles(std::vector<bool> &traversal, int64_t node);
+
+        inline int64_t traverseTestSplitsML(int64_t node, SplitCount &splitcount, const std::vector<int64_t> &col,
+                                     std::unique_ptr<Profile> upProfiles[],
+                                     std::vector<bool> &traversal);
 
         /* One-dimensional minimization using brent's function, with
         a fractional and an absolute tolerance */

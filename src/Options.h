@@ -94,6 +94,7 @@ namespace veryfasttree {
 
         /*Optimizations*/
         int threads = 1;
+        bool threadsVerbose = false;
         bool deterministic = true;
         int threadsLevel = 1;
         int threadSubtrees = (unsigned int)~0 >> 1;

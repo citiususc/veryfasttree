@@ -8,6 +8,11 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 
 **Release Notes**:
 
+- v3.3.0 (in development):
+	- Improved performance with new parallel regions.
+	- New thread levels have been introduced.
+	- Tree partitioning method logging now is hidden by default.
+
 - v3.2.0 (December 2022):
     - Decrease in the peak memory usage.
     - Now profiles can be optionally stored on disk. It causes an important reduction in the memory usage.
@@ -16,12 +21,9 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 - v3.1.0 (December 2021):
     - NEXUS format is now supported.
     - Parallelization of SPR (Subtree-Prune-Regraft) moves.
-    - New tree partitioning algorithm for NJ and SPR.
+    - New tree partitioning algorithm for NNI and SPR.
     - Choose between deterministic and non-deterministic parallelization (best performance).
     - Minor fixes.
-
-- v3.0.1 (July 2020):
-    - Minor fixes to process input arguments.
 
 - v3.0 (May 2020):
     - AVX2 and AVX512 support.
@@ -109,13 +111,25 @@ On the other hand, VeryFastTree has its own extra arguments which have been grou
 Number of threads (*n*) used in the parallel execution. If this option is not set, the corresponding value will be obtained from the environment variable *OMP\_NUM\_THREADS*. This is the same approach followed by FastTree-2. If *n=1*, VeryFastTree behaves in the same way than FastTree-2 compiled without the *-DOPENMP* flag.
 
 - **-threads-level [level]**
-Degree of parallelization. If level is *0*, VeryFastTree uses the same parallelization strategy followed by FastTree-2. If level is *1* (default value), VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method. If level is *2*, VeryFastTree accelerates the rounds of ML NNIs and SPR steps using its tree partitioning method (it can only be used with datasets much larger than 2^sprlength).
+Degree of parallelization: 
+	- If level is *0*, VeryFastTree uses the same parallelization strategy as FastTree-2 with some new parallel blocks. 
+	- If level is *1*, VeryFastTree uses its tree partitioning method to perform tree computation in sequential order. 
+	- If level is *2*, VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method. 
+	- If level is *3* (default), VeryFastTree uses its tree partitioning method to perform tree computation without preserving sequential order.
+	- If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^sprlength). 
+
+    Note: Each level includes the previous ones, and computation at level *2* and above is performed in a different tree traverse order, so the result may change but is still correct.
 
 - **-threads-mode [mode]**
-Changes the mode of parallelization. If level is *0*, VeryFastTree uses all parallel parts of FastTree-2 including non-deterministic. If level is 1 (by default), VeryFastTree only uses deterministic parallelization parts.
+Changes the mode of parallelization: 
+	- If level is *0*, VeryFastTree uses all parallel parts of FastTree-2 including non-deterministic. 
+	- If level is *1* (default), VeryFastTree only uses deterministic parallelization parts.
 
 - **-thread-subtrees [num\_subtrees]**
 It sets a maximum number of subtrees assigned to the threads. This option could increase the accuracy for small datasets containing large sequences at the expense of reducing the workload balance among threads.
+
+- **-threads-verbose**
+To show subtrees assigned to the threads and theoretical speedup, only with verbose > 0
 
 - **-double-precision**
 To use double precision arithmetic. Therefore, it is equivalent to compile FastTree-2 with *-DUSE\_DOUBLE*.

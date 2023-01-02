@@ -439,16 +439,20 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
     app.add_option("-threads-level", options.threadsLevel,
-                   "Degree of parallelization. If level is 0, VeryFastTree uses the same parallelization strategy "
-                   "followed by FastTree-2. If level is 1 (default value), VeryFastTree accelerates the rounds of "
-                   "ML NNIs using its tree partitioning method. If level is 2, VeryFastTree accelerates the rounds "
-                   "of ML NNIs and SPR steps using its tree partitioning method (it can only be used with datasets "
-                   "much larger than 2^sprlength).")->
-            type_name("lvl")->check(CLI::Range(0, 2))->group(optimizations);
+                   "Degree of parallelization. If level is 0, VeryFastTree uses the same parallelization strategy as "
+                   "FastTree-2 with some new parallel blocks. If level is 1, VeryFastTree uses its tree partitioning "
+                   "method to perform tree computation in sequential order. If level is 2, VeryFastTree accelerates the "
+                   "rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
+                   "uses its tree partitioning method to perform tree computation without preserving sequential order."
+                   "If level is 4, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method "
+                   "(it can only be used with datasets larger than 2^sprlength). Note: Each level includes the previous "
+                   "ones, and computation at level 2 and above is performed in a different tree traverse order, so the result may "
+                   "change but is still correct.")->
+            type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);
 
     app.add_option("-threads-mode", options.deterministic,
                    "Changes the mode of parallelization. If level is 0, VeryFastTree uses all parallel parts of "
-                   "FastTree-2 including non-deterministic. If level is 1 (by default), VeryFastTree only uses "
+                   "FastTree-2 including non-deterministic. If level is 1 (default), VeryFastTree only uses "
                    "deterministic parallelization parts.")->
             type_name("mode")->check(CLI::Range(0, 1))->group(optimizations);
 
@@ -457,6 +461,11 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "accuracy for small datasets containing large sequences at the expense of reducing the workload "
                    "balance among threads.")->type_name("n")
             ->check(Min(1))->group(optimizations);
+
+    app.add_flag("-threads-verbose", options.threadsVerbose,
+                 "To show subtrees assigned to the threads and theoretical speedup, only with verbose > 0")->
+            group(optimizations);
+
 
     app.add_flag("-double-precision", options.doublePrecision,
                  "To use double precision arithmetic. "
