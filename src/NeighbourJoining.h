@@ -334,7 +334,7 @@ namespace veryfasttree {
         /* Reports the (min. evo.) support for the (1,2) vs. (3,4) split
            col[iBoot*nPos+j] is column j for bootstrap iBoot
         */
-        double splitSupport(Profile &p1, Profile &p2, Profile &p3, Profile &p4, std::vector<int64_t> &col);
+        double splitSupport(Profile &p1, Profile &p2, Profile &p3, Profile &p4, const std::vector<int64_t> &col);
 
         /* Pick columns for resampling, stored as returned_vector[iBoot*nPos + j] */
         void resampleColumns(std::vector<int64_t> &col);
@@ -759,19 +759,36 @@ namespace veryfasttree {
         void printVisualTree(int node, bool isFirst = false, const std::string &prefix = "");
 
 
-        inline int64_t traverseNNI(int64_t iRound, int64_t nRounds, bool useML,
+        inline int64_t traverseNNI(int64_t iRound, int64_t nRounds, int64_t &nNNIThisRound, bool useML,
                                    std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
                                    std::unique_ptr<Profile> upProfiles[], std::vector<bool> &traversal);
 
-        inline void traverseSPR(int64_t iRound, int64_t nRounds, std::unique_ptr<Profile> upProfiles[],
-                                std::vector<bool> &traversal, int64_t branchRoot, double last_tot_len);
+        inline int64_t traverseSPR(int64_t iRound, int64_t nRounds, std::unique_ptr<Profile> upProfiles[],
+                                   std::vector<bool> &traversal, int64_t branchRoot, double last_tot_len);
 
 
-        inline void traverseRecomputeMLProfiles(std::vector<bool> &traversal, int64_t node);
+        inline void traverseRecomputeProfiles(int64_t node, std::vector<bool> &traversal,
+                                              DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
+
+        inline void traverseRecomputeMLProfiles(int64_t node, std::vector<bool> &traversal);
+
+        inline double traverseTreeLogLk(int64_t node, std::vector<double> &site_likelihood, double n_site_loglk[],
+                                        std::vector<bool> &traversal);
 
         inline int64_t traverseTestSplitsML(int64_t node, SplitCount &splitcount, const std::vector<int64_t> &col,
-                                     std::unique_ptr<Profile> upProfiles[],
-                                     std::vector<bool> &traversal);
+                                            std::unique_ptr<Profile> upProfiles[],
+                                            std::vector<bool> &traversal);
+
+        inline void traverseUpdateBranchLengths(int64_t node, std::unique_ptr<Profile> upProfiles[],
+                                                std::vector<bool> &traversal);
+
+        inline void traverseTestSplitsMinEvo(int64_t node, SplitCount &splitcount,
+                                             std::unique_ptr<Profile> upProfiles[],
+                                             std::vector<bool> &traversal);
+
+        inline int64_t traverseReliabilityNJ(int64_t node, const std::vector<int64_t> &col,
+                                             std::unique_ptr<Profile> upProfiles[],
+                                             std::vector<bool> &traversal);
 
         /* One-dimensional minimization using brent's function, with
         a fractional and an absolute tolerance */
