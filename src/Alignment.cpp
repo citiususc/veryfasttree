@@ -189,6 +189,52 @@ void Alignment::readAlignment() {
             throw std::invalid_argument("No sequence data for last entry " + names.back());
         }
 
+    } else if (buf[0] == '@') {
+        /* FASTQ, truncate names at any of these */
+        auto nameStop = (options.bQuote ? "'\t" : "(),: \t"); /* bQuote supports the -quote option */
+        auto seqSkip = " \t";    /* skip these characters in the sequence */
+        bool qualityLine = false;
+        names.reserve(100);
+        seqs.reserve(100);
+        nPos = 0;
+
+        do {
+            /* loop over lines */
+            if (qualityLine){
+                //Quality values are ignored
+                qualityLine = false;
+            }else if (buf[0] == '+')
+                qualityLine = true;
+            if (buf[0] == '@') {
+                if (!seqs.empty()) {
+                    seqs.back().shrink_to_fit();
+                }
+                /* truncate the name */
+                auto found = buf.find_first_of(nameStop);
+                if (found != std::string::npos) {
+                    buf.resize(found);
+                }
+                names.push_back(buf.substr(1));
+                names.back().shrink_to_fit();
+                seqs.resize(seqs.size() + 1);
+            } else {
+                /* count non-space characters and append to sequence */
+                auto nKeep = buf.find_first_of(seqSkip);
+                if (nKeep == std::string::npos) {
+                    nKeep = buf.size();
+                }
+                auto &seq = seqs[names.size() - 1];
+                seq.append(buf.begin(), buf.begin() + nKeep);
+                if ((int64_t) seq.size() > nPos) {
+                    nPos = seq.size();
+                }
+            }
+        } while (readline(fp, buf));
+
+        if (names.size() != seqs.size()) {
+            throw std::invalid_argument("No sequence data for last entry " + names.back());
+        }
+
     } else {
         /* PHYLIP interleaved-like format
            Allow arbitrary length names, require spaces between names and sequences

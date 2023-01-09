@@ -93,7 +93,9 @@ AbsFastTreeImpl(void)::run() {
             }    /* end load constraints */
 
             if (options.nCodes == 20) {
-                if (options.bUseLg) {
+                if(!options.transitionFile.empty()){
+                    transmat.readAATransitionMatrix(options, options.transitionFile);
+                } else if (options.bUseLg) {
                     transmat.createTransitionMatrixLG08(options);
                 } else if (options.bUseWag) {
                     transmat.createTransitionMatrixWAG01(options);

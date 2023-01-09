@@ -60,8 +60,9 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     description << padd << "[-mlacc 2] [-cat 20 | -nocat] [-gamma]" << std::endl;
     description << padd << "[-slow | -fastest] [-2nd | -no2nd] [-slownni] [-seed 1253]" << std::endl;
     description << padd << "[-top | -notop] [-topm 1.0 [-close 0.75] [-refresh 0.8]]" << std::endl;
+    description << padd << "[-gtr] [-gtrrates ac ag at cg ct gt] [-gtrfreq A C G T]" << std::endl;
+    description << padd << "[ -lg | -wag | -trans transitionmatrixfile ]" << std::endl;
     description << padd << "[-matrix Matrix | -nomatrix] [-nj | -bionj]" << std::endl;
-    description << padd << "[-lg] [-wag] [-nt] [-gtr] [-gtrrates ac ag at cg ct gt] [-gtrfreq A C G T]" << std::endl;
     description << padd << "[ -constraints constraintAlignment [ -constraintWeight 100.0 ] ]" << std::endl;
     description << padd << "[-log logfile]" << std::endl;
     description << padd << "[ alignment_file ]" << std::endl;
@@ -70,7 +71,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     description << name << " [-nt] [-matrix Matrix | -nomatrix] [-rawdist] -makematrix [alignment]" << std::endl;
     description << padd << "[-n 100] > phylip_distance_matrix" << std::endl;
     description << std::endl;
-    description << "  VeryFastTree supports NEXUS, Fasta or Phylip interleaved formats" << std::endl;
+    description << "  VeryFastTree supports NEXUS, Fasta, Fastq or Phylip interleaved formats" << std::endl;
     description << "  VeryFastTree supports Zlib-compressed (.zip and .gz) files" << std::endl;
     description << "  By default VeryFastTree expects protein alignments,  use -nt for nucleotides" << std::endl;
     description << "  VeryFastTree reads standard input if no alignment file is given" << std::endl;
@@ -279,6 +280,14 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_flag_function("-nocat", [&options](size_t) {
         options.nRateCats = 1;
     }, "no CAT model (just 1 category)")->group(model);
+
+    app.add_option("-trans", options.transitionFile,
+                   "use the transition matrix from filename."
+                   "This is supported for amino acid alignments only."
+                   "The file must be tab-delimited with columns in the order ARNDCQEGHILKMFPSTWYV*."
+                   "The additional column named * is for the stationary distribution."
+                   "Each row must have a row name in the same order ARNDCQEGHILKMFPSTWYV")->
+            type_name("filename")->group(model);
 
     app.add_flag_function("-gamma", [&options](size_t) {
                               options.gammaLogLk = true;
@@ -541,7 +550,7 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     description << "  " << name << " -nt nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " -nt -gtr < nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " < nucleotide_alignment > tree" << std::endl;
-    description << "  " << name << "accepts alignments in NEXUS, Fasta or Phylip interleaved formats,"
+    description << "  " << name << "accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats,"
                                    " and also Zlib-compressed (.zip and .gz) files." << std::endl;
     app.description(description.str());
 
@@ -556,7 +565,7 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     app.get_option("-log")->description("save intermediate trees, settings, and model details")->group(common);
     app.get_option("-quote")->description(
             "allow spaces and other restricted characters (but not ' ) in sequence names and quote names in the output "
-            "tree (fasta input only; VeryFastTree will not be able to read these trees back in)")->group(common);
+            "tree (fasta/fastq input only; VeryFastTree will not be able to read these trees back in)")->group(common);
     app.get_option("-pseudo")->description("to use pseudocounts (recommended for highly gapped sequences)")->
             group(common);
     app.get_option("-fastest")->description(

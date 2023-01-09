@@ -61,6 +61,101 @@ AbsTransitionMatrix(void)::createGTR(const Options &options, double r[], double 
     createTransitionMatrix(options, matrix, f);
 }
 
+AbsTransitionMatrix(void)::readAATransitionMatrix(const Options &options, /*IN*/ const std::string &filename) {
+    assert(nCodes == 20);
+    double stat[20];
+    double matrix[MAXCODES][MAXCODES];
+    std::string buf;
+    std::ifstream fp(filename);
+    if (fp.fail()) {
+        throw std::invalid_argument("Cannot read transition matrix file " + filename);
+    }
+    std::string expected;
+    expected.reserve(2 * MAXCODES + 20);
+    for (int i = 0; i < 20; i++) {
+        expected.insert(expected.end(), Constants::codesStringAA[i]);
+        expected.insert(expected.end(), '\t');
+    }
+    expected.insert(expected.end(), '*');
+
+    if (!readline(fp, buf)) {
+        throw std::invalid_argument("Error reading header line from transition matrix file");
+    }
+    if (buf != expected) {
+        throw std::invalid_argument("Invalid header line in transition matrix file, it must match: " + expected);
+    }
+    for (int i = 0; i < 20; i++) {
+        if (!readline(fp, buf)) {
+            throw std::invalid_argument("Error reading matrix line");
+        }
+        std::istringstream sfields(buf);
+        std::string field;
+
+        if (!std::getline(sfields, field, '\t') || field.size() != 1 || field[0] != Constants::codesStringAA[i]) {
+            throw std::invalid_argument(strformat("Line for amino acid %c does not have the expected beginning",
+                                                  Constants::codesStringAA[i]));
+        }
+        for (int j = 0; j < 20; j++) {
+            if (!std::getline(sfields, field, '\t')) {
+                throw std::invalid_argument(
+                        strformat("Not enough fields for amino acid %c", Constants::codesStringAA[i]));
+            }
+            matrix[i][j] = std::stod(field);
+        }
+        if (!std::getline(sfields, field, '\t')) {
+            throw std::invalid_argument(strformat("Not enough fields for amino acid %c", Constants::codesStringAA[i]));
+        }
+        stat[i] = std::stod(field);
+    }
+
+    double tol = 1e-5;
+    /* Verify that stat is positive and sums to 1 */
+    double statTot = 0;
+    for (int i = 0; i < 20; i++) {
+        if (stat[i] < tol) {
+            throw std::invalid_argument(strformat("stationary frequency for amino acid %c must be positive",
+                                                  Constants::codesStringAA[i]));
+        }
+        statTot += stat[i];
+    }
+    if (fabs(statTot - 1) > tol) {
+        throw std::invalid_argument(strformat("stationary frequencies must sum to 1 -- actual sum is %g", statTot));
+    }
+
+    /* Verify that diagonals are negative and dot product of stat and diagonals is -1 */
+    double totRate = 0;
+    for (int i = 0; i < 20; i++) {
+        double diag = matrix[i][i];
+        if (diag > -tol) {
+            throw std::invalid_argument(strformat("transition rate(%c,%c) must be negative",
+                                                  Constants::codesStringAA[i], Constants::codesStringAA[i]));
+        }
+        totRate += stat[i] * diag;
+    }
+    if (fabs(totRate + 1) > tol) {
+        throw std::invalid_argument(strformat("Dot product of matrix diagonal and stationary frequencies must "
+                                              "be -1 -- actual dot product is %g", totRate));
+    }
+
+    /* Verify that each off-diagonal entry is nonnegative and that each column sums to 0 */
+    for (int j = 0; j < 20; j++) {
+        double colSum = 0;
+        for (int i = 0; i < 20; i++) {
+            double value = matrix[i][j];
+            colSum += value;
+            if (i != j && value < 0) {
+                throw std::invalid_argument(strformat("Off-diagonal matrix entry for (%c,%c) is negative",
+                                                      Constants::codesStringAA[i], Constants::codesStringAA[j]));
+            }
+        }
+        if (fabs(colSum) > tol) {
+            throw std::invalid_argument(strformat("Sum of column %c must be zero -- actual sum is %g",
+                                                  Constants::codesStringAA[j], colSum));
+        }
+    }
+    return createTransitionMatrix(options, matrix, stat);
+}
+
 AbsTransitionMatrix(void)::
 createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAXCODES], const double _stat[MAXCODES]) {
     double sqrtstat[20];

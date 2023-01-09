@@ -5979,7 +5979,7 @@ AbsNeighbourJoining(void)::setMLGtr(double freq_in[]) {
         for (int i = 0; i < 4; i++)
             gtr.freq[i] = freq_in[i];
     } else {
-        /* n[] and sum were int in VeryFastTree 2.1.9 and earlier -- this
+        /* n[] and sum were int in FastTree 2.1.9 and earlier -- this
            caused gtr analyses to fail on analyses with >2e9 positions */
         int64_t n[4] = {1, 1, 1, 1};    /* pseudocounts */
         for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {

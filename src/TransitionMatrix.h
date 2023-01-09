@@ -85,6 +85,8 @@ namespace veryfasttree {
 
         void createGTR(const Options &options, double gtrrates[]/*ac,ag,at,cg,ct,gt*/, double gtrfreq[]/*ACGT*/);
 
+        void readAATransitionMatrix(const Options &options, /*IN*/ const std::string& filename);
+
         operator bool();
 
     private:

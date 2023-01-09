@@ -66,6 +66,7 @@ namespace veryfasttree {
 
         int64_t nAlign = 1; /* number of alignments to read */
         std::string matrixPrefix;
+        std::string transitionFile;
         bool makeMatrix = false;
         std::string constraintsFile;
         std::string intreeFile;

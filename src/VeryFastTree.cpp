@@ -6,15 +6,21 @@
 #include "operations/BasicOperations.h"
 
 #if (defined __SSE2__) || (defined __AVX__)
+
 #include "operations/SSE128Operations.h"
+
 #endif
 
 #ifdef __AVX__
+
 #include "operations/AVX256Operations.h"
+
 #endif
 
 #ifdef __AVX512F__
+
 #include "operations/AVX512Operations.h"
+
 #endif
 
 using namespace veryfasttree;
@@ -26,6 +32,19 @@ void VeryFastTree::settings(std::ostream &log) {
 
     if (options.nCodes == 4 && options.matrixPrefix.empty()) {
         options.useMatrix = false;        /* no default nucleotide matrix */
+    }
+
+    if (!options.transitionFile.empty() && options.nCodes != 20) {
+        throw std::invalid_argument("The -trans option is only supported for amino acid alignments");
+    }
+
+    if (!options.transitionFile.empty()) {
+        log << "Warning: custom matrices may create numerical problems for single-precision VeryFastTree.\n"
+               "You may want to use with -double-precision";
+    }
+
+    if (options.slow && options.fastest) {
+        throw std::invalid_argument("Cannot be both slow and fastest");
     }
 
     if (options.slow && options.tophitsMult > 0) {
@@ -92,19 +111,19 @@ void VeryFastTree::settings(std::ostream &log) {
         }
 
         log << "VeryFastTree Version " << Constants::version << " " << Constants::compileFlags;
-        if(options.extension != "NONE"){
-            log <<  " with " << options.extension;
+        if (options.extension != "NONE") {
+            log << " with " << options.extension;
         }
-        if(options.threads > 1){
-            log <<  " using " <<  "threads(" << options.threads << ") ";
+        if (options.threads > 1) {
+            log << " using " << "threads(" << options.threads << ") ";
             log << "level " << options.threadsLevel;
-            if(options.deterministic){
+            if (options.deterministic) {
                 log << " deterministic";
-            }else{
+            } else {
                 log << " NO deterministic";
             }
         }
-        log  << std::endl;
+        log << std::endl;
         log << "Alignment: " << (options.inFileName.empty() ? "standard input" : options.inFileName);
 
         if (options.nAlign > 1) {
@@ -140,8 +159,9 @@ void VeryFastTree::settings(std::ostream &log) {
             log << "ML Model: ",
                     log << ((options.nCodes == 4) ?
                             (options.bUseGtr ? "Generalized Time-Reversible" : "Jukes-Cantor") :
-                            (options.bUseLg ? "Le-Gascuel 2008" : (options.bUseWag ? "Whelan-And-Goldman"
-                                                                                   : "Jones-Taylor-Thorton")));
+                            (!options.transitionFile.empty() ? options.transitionFile :
+                             (options.bUseLg ? "Le-Gascuel 2008" : (options.bUseWag ? "Whelan-And-Goldman"
+                                                                                    : "Jones-Taylor-Thorton"))));
             log << ",";
             if (options.nRateCats == 1) {
                 log << " No rate variation across sites";
@@ -178,13 +198,13 @@ void VeryFastTree::configOpenMP() {
 }
 
 void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
-    if(options.extension == "AUTO"){
+    if (options.extension == "AUTO") {
         options.extension = "NONE";
         #ifdef __SSE2__
         options.extension = "SSE3";
         #endif
         #ifdef __AVX__
-        if(options.doublePrecision){
+        if (options.doublePrecision) {
             options.extension = "AVX2";
         }
         #endif
@@ -200,34 +220,34 @@ void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
             VeyFastTreeImpl<float, BasicOperations>(options, in, out, log).run();
         }
     }
-    #if (defined __SSE2__) || (defined __AVX__)
-    else if(options.extension == "SSE" || options.extension == "SSE3"){
-        if(options.doublePrecision){
+            #if (defined __SSE2__) || (defined __AVX__)
+    else if (options.extension == "SSE" || options.extension == "SSE3") {
+        if (options.doublePrecision) {
             VeyFastTreeImpl<double, SSE128Operations>(options, in, out, log).run();
-        }else{
+        } else {
             VeyFastTreeImpl<float, SSE128Operations>(options, in, out, log).run();
         }
     }
-    #endif
-    #ifdef __AVX__
-    else if(options.extension == "AVX" || options.extension == "AVX2"){
-        if(options.doublePrecision){
+            #endif
+            #ifdef __AVX__
+    else if (options.extension == "AVX" || options.extension == "AVX2") {
+        if (options.doublePrecision) {
             VeyFastTreeImpl<double, AVX256Operations>(options, in, out, log).run();
-        }else{
+        } else {
             VeyFastTreeImpl<float, AVX256Operations>(options, in, out, log).run();
         }
     }
-    #endif
-    #ifdef __AVX512F__
-    else if(options.extension == "AVX512"){
-        if(options.doublePrecision){
+            #endif
+            #ifdef __AVX512F__
+    else if (options.extension == "AVX512") {
+        if (options.doublePrecision) {
             VeyFastTreeImpl<double, AVX512Operations>(options, in, out, log).run();
-        }else{
+        } else {
             VeyFastTreeImpl<float, AVX512Operations>(options, in, out, log).run();
         }
     }
-    #endif
-    else{
+            #endif
+    else {
         throw std::invalid_argument("This version has not been compiled with " + options.extension + " extension");
     }
 
