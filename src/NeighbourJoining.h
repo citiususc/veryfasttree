@@ -307,6 +307,10 @@ namespace veryfasttree {
         /*SPR auxilliary variables*/
         std::vector<bool> lockedNodes;
 
+        /*treePartition variables*/
+        std::vector<std::vector<int64_t>> chunksPartitionCache;
+        std::vector<int64_t> chunksToRootCache;
+
         double logCorrect(double dist);
 
         /* Print topology using node indices as node names */
@@ -747,6 +751,23 @@ namespace veryfasttree {
         void MLSiteLikelihoodsByRate(std::vector<numeric_t, typename op_t::Allocator> &rates,
                                      std::vector<double> &site_loglk);
 
+        /*
+         * Splits the tree in partitions to perform a parallalel computing
+         *
+         *  readTree                    sequential
+         *  reliabilityNJ               level-1
+         *  recomputeProfiles           level-1
+         *  recomputeMLProfiles         level-1
+         *  optimizeAllBranchLengths    level-3
+         *  treeLogLk                   level-3
+         *  DoNNI                       level-2
+         *  SPR                         level-4
+         *  updateBranchLengths         level-1
+         *  testSplitsMinEvo            level-1
+         *  testSplitsML                level-1
+        */
+        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal, int deepPen);
+
         int64_t treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
                            std::vector<std::vector<int64_t>> &chunks);
 
@@ -754,7 +775,7 @@ namespace veryfasttree {
 
         int64_t treePenWeight(int64_t branch, std::vector<int64_t> &weights, int deep);
 
-        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal, int deepPen);
+        std::vector<int64_t> treeChunksPaths();
 
         void printVisualTree(int node, bool isFirst = false, const std::string &prefix = "");
 

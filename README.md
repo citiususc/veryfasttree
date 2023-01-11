@@ -9,9 +9,10 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 **Release Notes**:
 
 - v3.3.0 (in development):
-	- Improved performance with new parallel regions.
+	- Improved performance with new parallel regions (Local bootstraps, ML Lengths, LogLk, ML splits, etc.).
 	- New thread levels have been introduced.
 	- Tree partitioning method logging now is hidden by default.
+	- Tree partitioning algorithm is faster and has a cache.
 	- Added FastTree-2.11 changes.
 	- Fastq format is now supported. 
 

@@ -3465,7 +3465,6 @@ AbsNeighbourJoining(double)::quartetWeight(Profile *profiles4[4]) {
 }
 
 AbsNeighbourJoining(void)::pathToRoot(int64_t node, std::vector<int64_t> &path) {
-    path.reserve(maxnodes);
     int64_t ancestor = node;
     while (ancestor >= 0) {
         path.push_back(ancestor);
@@ -5211,8 +5210,6 @@ treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights, std::
  * */
 AbsNeighbourJoining(int64_t)::treeWeight(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
                                          int64_t rootWeight) {
-    std::sort(partition.begin(), partition.end(),
-              [&weights](int64_t x, int64_t y) { return weights[x] > weights[y]; });
     if (options.threadSubtrees < (int64_t) partition.size()) {
         partition.resize(options.threadSubtrees);
     }
@@ -5253,14 +5250,38 @@ AbsNeighbourJoining(int64_t)::treePenWeight(int64_t branch, std::vector<int64_t>
     return weight;
 }
 
+AbsNeighbourJoining(std::vector<int64_t>)::treeChunksPaths() {
+    std::vector<int64_t> path;
+    for (auto &chunk: chunksPartitionCache) {
+        for (int64_t branchRoot: chunk) {
+            int64_t node = branchRoot;
+            path.push_back(node);
+            while (node != -1) {
+                node = parent[node];
+                path.push_back(node);
+            }
+        }
+    }
+    return path;
+}
+
 AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<bool> &traversal,
                                          int deepPen) {
+    if (!chunksToRootCache.empty() && treeChunksPaths() == chunksToRootCache) {
+        if (options.verbose > 0 && options.threadsVerbose) {
+            log << "The tree has not changed and it was divided using the previous subtrees" << std::endl;
+        }
+        chunks = chunksPartitionCache;
+        return;
+    }
     std::vector<bool> is_root(maxnode, false);
     std::vector<int64_t> weights(maxnode, 1);
     weights[root] = maxnode;
     std::vector<int64_t> pen_weights(maxnode, deepPen > 0 ? 0 : 1);
 
     std::list<int64_t> branchs;
+    auto cmp = [&weights](int64_t x, int64_t y) { return weights[x] > weights[y]; };
+    std::vector<int64_t> sortedPartition;
     std::vector<int64_t> partition;
     std::vector<int64_t> bestPartition;
     int64_t bestWeight = weights[root];
@@ -5268,6 +5289,7 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
     for (int64_t i = 0; i < maxnode; i++) {
         if (child[i].nChild == 0) {
             branchs.push_back(i);
+            sortedPartition.push_back(i);
             is_root[i] = true;
         }
     }
@@ -5315,10 +5337,23 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
         is_root[pnode] = true;
         weights[pnode] = weights[node] + weights[sib] + 1;
         branchs.push_back(pnode);
+
+        auto it = std::lower_bound(sortedPartition.begin(), sortedPartition.end(), node, cmp);
+        while (*it != node) {
+            it++;
+        }
+        sortedPartition.erase(it);
+        it = std::lower_bound(sortedPartition.begin(), sortedPartition.end(), sib, cmp);
+        while (*it != sib) {
+            it++;
+        }
+        sortedPartition.erase(it);
+        sortedPartition.insert(std::lower_bound(sortedPartition.begin(), sortedPartition.end(), pnode, cmp), pnode);
+
         pen_weights[node] = pen_weights[sib] = 0; /*sibling is still in the partition, so we delete children nodes*/
         pen_weights[pnode] = treePenWeight(pnode, weights, deepPen);
 
-        for (int64_t branch: branchs) {
+        for (int64_t branch: sortedPartition) {
             if (pen_weights[branch] > 0) {
                 partition.push_back(branch);
             }
@@ -5337,6 +5372,8 @@ AbsNeighbourJoining(void)::treePartition(std::vector<std::vector<int64_t>> &chun
     }
 
     treeChunks(bestPartition, pen_weights, chunks);
+    chunksPartitionCache = chunks;
+    chunksToRootCache = treeChunksPaths();
 
     if (options.verbose > 0 && options.threadsVerbose) {
         log << "The tree has " << weights[root] << " nodes and it was divided into " << bestPartition.size()

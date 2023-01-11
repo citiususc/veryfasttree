@@ -150,7 +150,7 @@ namespace veryfasttree {
 
         typedef std::chrono::high_resolution_clock Clock;
 
-        ProgressReport(const Options &options) : clockStart(Clock::now()), options(options) {}
+        ProgressReport(const Options &options) : clockStart(Clock::now()), timeLast(Clock::now()), options(options) {}
 
         inline double clockDiff() {
             auto timeNow = Clock::now();
