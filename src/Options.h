@@ -97,7 +97,7 @@ namespace veryfasttree {
         int threads = 1;
         bool threadsVerbose = false;
         bool deterministic = true;
-        int threadsLevel = 1;
+        int threadsLevel = 3;
         int threadSubtrees = (unsigned int)~0 >> 1;
         bool doublePrecision = false;
         int fastexp = 0;

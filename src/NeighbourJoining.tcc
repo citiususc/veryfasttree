@@ -4688,33 +4688,19 @@ MLQuartetNNI(Profile *profiles4[4], double criteria[3], numeric_t len[5], bool b
     }
 }
 
-AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
-    if (seqs.size() < 2) {
-        return;
-    }
-    if (seqs.size() == 2) {
-        int64_t parent = root;
-        assert(child[parent].nChild == 2);
-        int64_t nodes[2] = {child[parent].child[0], child[parent].child[1]};
-        double length = 1.0;
-        MLPairOptimize(profiles[nodes[0]], profiles[nodes[1]], /*IN/OUT*/&length);
-        branchlength[nodes[0]] = length / 2.0;
-        branchlength[nodes[1]] = length / 2.0;
-        return;
-    };
-
-    std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
-    std::vector<bool> traversal(maxnodes, false);
-
-    int64_t node = root;
-    int64_t iDone = 0;
-    while ((node = traversePostorder(node, /*IN/OUT*/traversal, /*pUp*/nullptr, root)) >= 0) {//level-3(TODO)
+AbsNeighbourJoining(inline int64_t)::traverseOptimizeAllBranchLengths(int64_t node,
+                                                                      std::unique_ptr<Profile> upProfiles[],
+                                                                      std::vector<bool> &traversal) {
+    const bool parallel = omp_in_parallel();
+    int64_t branchRoot = node;
+    int64_t iNodesDone = 0;
+    while ((node = traversePostorder(node,/*IN/OUT*/traversal, /*pUp*/nullptr, branchRoot)) >= 0) {//level-3
         int64_t nChild = child[node].nChild;
         if (nChild > 0) {
-            if ((iDone % 100) == 0) {
-                progressReport.print("ML Lengths %ld of %ld splits", iDone + 1, (int64_t) (maxnode - seqs.size()));
+            if (iNodesDone > 0 && (iNodesDone % 100) == 0 && !parallel) {
+                progressReport.print("ML Lengths %ld of %ld splits", iNodesDone + 1, (int64_t) (maxnode - seqs.size()));
             }
-            iDone++;
+            iNodesDone++;
 
             /* optimize the branch lengths between self, parent, and children,
                with two iterations
@@ -4726,7 +4712,7 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
             Profile *profiles3[3] = {&profiles[nodes[0]],
                                      &profiles[nodes[1]],
                                      nChild == 3 ? &profiles[nodes[2]]
-                                                 : getUpProfile(/*IN/OUT*/upProfiles.data(), node, /*useML*/true)};
+                                                 : getUpProfile(/*IN/OUT*/upProfiles, node, /*useML*/true)};
             for (int iter = 0; iter < 2; iter++) {
                 for (int i = 0; i < 3; i++) {
                     Profile &pA = *profiles3[i];
@@ -4748,11 +4734,64 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
                 }
             }
             if (node != root) {
-                recomputeProfile(/*IN/OUT*/upProfiles.data(), node, /*useML*/true);
+                recomputeProfile(/*IN/OUT*/upProfiles, node, /*useML*/true);
                 upProfiles[node].reset();
             }
         }
     }
+    return iNodesDone;
+}
+
+AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
+    if (seqs.size() < 2) {
+        return;
+    }
+    if (seqs.size() == 2) {
+        int64_t parent = root;
+        assert(child[parent].nChild == 2);
+        int64_t nodes[2] = {child[parent].child[0], child[parent].child[1]};
+        double length = 1.0;
+        MLPairOptimize(profiles[nodes[0]], profiles[nodes[1]], /*IN/OUT*/&length);
+        branchlength[nodes[0]] = length / 2.0;
+        branchlength[nodes[1]] = length / 2.0;
+        return;
+    };
+
+    std::vector<bool> traversal(maxnodes, false);
+
+    if (options.threads > 1 && options.threadsLevel > 2) {
+        std::vector<std::vector<int64_t>> chunks;
+        treePartition(chunks, traversal, 1);
+        int64_t done = 0;
+
+        #pragma omp parallel
+        {
+            std::vector<std::unique_ptr<Profile>> upProfiles2(maxnodes);
+            int64_t done2;
+
+            #pragma omp for schedule(static, 1)
+            for (int i = 0; i < (int) chunks.size(); i++) {
+                for (int64_t subtreeRoot: chunks[i]) {
+                    done2 = traverseOptimizeAllBranchLengths(subtreeRoot, upProfiles2.data(), traversal);
+                    if (options.verbose > 0) {
+                        #pragma omp critical
+                        {
+                            done += done2;
+                            if (done > 100) {
+                                progressReport.print("ML Lengths %ld of %ld splits",
+                                                     done + 1, (int64_t) (maxnode - seqs.size()));
+                                done = done % 100;
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    std::vector<std::unique_ptr<Profile>> upProfiles(maxnodes);
+    traverseOptimizeAllBranchLengths(root, upProfiles.data(), traversal);
 }
 
 AbsNeighbourJoining(inline double)::traverseTreeLogLk(int64_t node, std::vector<double> &site_likelihood,
@@ -5699,7 +5738,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
     buf += " NNI round %ld of %ld, %ld splits";
     progressReport.print(buf, iRound + 1, nRounds, (int64_t) (maxnode - seqs.size()));
 
-    if (useML && options.threads > 1 && options.threadsLevel > 1) {
+    if (options.threads > 1 && options.threadsLevel > 1) {
         std::vector<std::vector<int64_t>> chunks;
         treePartition(chunks, traversal, 2);
         int64_t done = 0;

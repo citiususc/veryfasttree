@@ -800,6 +800,9 @@ namespace veryfasttree {
                                             std::unique_ptr<Profile> upProfiles[],
                                             std::vector<bool> &traversal);
 
+        inline int64_t traverseOptimizeAllBranchLengths(int64_t node, std::unique_ptr<Profile> upProfiles[],
+                                                        std::vector<bool> &traversal);
+
         inline void traverseUpdateBranchLengths(int64_t node, std::unique_ptr<Profile> upProfiles[],
                                                 std::vector<bool> &traversal);
 
