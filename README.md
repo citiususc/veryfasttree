@@ -19,7 +19,7 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 - v3.2.0 (December 2022):
     - Decrease in the peak memory usage.
     - Now profiles can be optionally stored on disk. It causes an important reduction in the memory usage.
-    - All supported input files (NEXUS, Fasta and Phylip) can be used in compressed format (.zip and .gz)
+    - All supported input files (NEXUS, Fasta and Phylip) supports Zlib compression.
 
 - v3.1.0 (December 2021):
     - NEXUS format is now supported.
