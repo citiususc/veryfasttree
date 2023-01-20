@@ -14,7 +14,7 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 	- Tree partitioning method logging now is hidden by default.
 	- Tree partitioning algorithm is faster and has a cache.
 	- Added FastTree-2.11 changes.
-	- Fastq format is now supported. 
+	- Fastq format and libBZ2 compression is now supported. 
 
 - v3.2.0 (December 2022):
     - Decrease in the peak memory usage.
@@ -106,7 +106,7 @@ Linux/MacOS:
 
 **To improve the usability and facilitate the adoption of VeryFastTree, it implements the same command interface than FastTree-2. It means that arguments have exactly the same behavior as in FastTree-2.** All these arguments can be consulted with the *-h* option. As a consequence, to take advantage of the performance benefits provided by VeryFastTree is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options.  
 
-VeryFastTree accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats, and also Zlib-compressed (.zip and .gz) files.
+VeryFastTree accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats compressed with ZLib and libBZ2.
 
 On the other hand, VeryFastTree has its own extra arguments which have been grouped in the  *Optimizations* section. These arguments are related to the parametrization of the different parallelization and vectorization strategies included in VeryFastTree. Next we list and explain the new arguments available:
 
@@ -161,6 +161,3 @@ Select an alternative file location for storing profiles with **-disk-profiles**
 
 - **-disk-profiles-opt**
 This parameter forces that all attributes within the profiles are saved to disk. It saves more memory but the file disk could be huge.
-
-- **-no-compression**
-Only .zip or .gz files will be decompressed.

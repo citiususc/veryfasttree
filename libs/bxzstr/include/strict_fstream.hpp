@@ -1,10 +1,20 @@
-#pragma once
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * This file is a part of bxzstr (https://github.com/tmaklin/bxzstr)
+ * Written by Tommi Mäklin (tommi@maklin.fi)
+ * The core functionality is largely based on the strict_fstream.hpp
+ * file from the zstr project https://github.com/mateidavid/zstr
+ * written by Matei David (https://github.com/mateidavid). */
+
+#ifndef BXZSTR_STRICT_FSTREAM_HPP
+#define BXZSTR_STRICT_FSTREAM_HPP
 
 #include <cassert>
 #include <fstream>
 #include <cstring>
 #include <string>
-#include <vector>
 
 /**
  * This namespace defines wrappers for std::ifstream, std::ofstream, and
@@ -17,67 +27,31 @@
 namespace strict_fstream
 {
 
-// Help people out a bit, it seems like this is a common recommenation since
-// musl breaks all over the place.
-#if defined(__NEED_size_t) && !defined(__MUSL__)
-#warning "It seems to be recommended to patch in a define for __MUSL__ if you use musl globally: https://www.openwall.com/lists/musl/2013/02/10/5"
-#define __MUSL__
-#endif
-
-// Workaround for broken musl implementation
-// Since musl insists that they are perfectly compatible, ironically enough,
-// they don't officially have a __musl__ or similar. But __NEED_size_t is defined in their
-// relevant header (and not in working implementations), so we can use that.
-#ifdef __MUSL__
-#warning "Working around broken strerror_r() implementation in musl, remove when musl is fixed"
-#endif
-
-// Non-gnu variants of strerror_* don't necessarily null-terminate if
-// truncating, so we have to do things manually.
-inline std::string trim_to_null(const std::vector<char> &buff)
-{
-    std::string ret(buff.begin(), buff.end());
-
-    const std::string::size_type pos = ret.find('\0');
-    if (pos == std::string::npos) {
-        ret += " [...]"; // it has been truncated
-    } else {
-        ret.resize(pos);
-    }
-    return ret;
-}
-
-/// Overload of error-reporting function, to enable use with VS and non-GNU
-/// POSIX libc's
-/// Ref:
-///   - http://stackoverflow.com/a/901316/717706
-static std::string strerror()
-{
-    // Can't use std::string since we're pre-C++17
-    std::vector<char> buff(256, '\0');
-
-#ifdef _WIN32
-    // Since strerror_s might set errno itself, we need to store it.
-    const int err_num = errno;
-    if (strerror_s(buff.data(), buff.size(), err_num) != 0) {
-        return trim_to_null(buff);
-    } else {
-        return "Unknown error (" + std::to_string(err_num) + ")";
-    }
-#elif ((_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600 || defined(__APPLE__)) && ! _GNU_SOURCE) || defined(__MUSL__)
-// XSI-compliant strerror_r()
-    const int err_num = errno; // See above
-    if (strerror_r(err_num, buff.data(), buff.size()) == 0) {
-        return trim_to_null(buff);
-    } else {
-        return "Unknown error (" + std::to_string(err_num) + ")";
-    }
-#else
-// GNU-specific strerror_r()
-    char * p = strerror_r(errno, &buff[0], buff.size());
-    return std::string(p, std::strlen(p));
-#endif
-}
+/// Overload of error-reporting function, to enable use with VS.
+/// Ref: http://stackoverflow.com/a/901316/717706
+// static std::string strerror()
+// {
+//     std::string buff(80, '\0');
+// #ifdef _WIN32
+//     if (strerror_s(&buff[0], buff.size(), errno) != 0)
+//     {
+//         buff = "Unknown error";
+//     }
+// #elif (_POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600) && ! _GNU_SOURCE || defined(__APPLE__)
+// // XSI-compliant strerror_r()
+//     if (strerror_r(errno, &buff[0], buff.size()) != 0)
+//     {
+//         buff = "Unknown error";
+//     }
+// #else
+// // GNU-specific strerror_r()
+//     auto p = strerror_r(errno, &buff[0], buff.size());
+//     std::string tmp(p, std::strlen(p));
+//     std::swap(buff, tmp);
+// #endif
+//     buff.resize(buff.find('\0'));
+//     return buff;
+// }
 
 /// Exception class thrown by failed operations.
 class Exception
@@ -144,16 +118,14 @@ struct static_method_holder
             throw Exception(std::string("strict_fstream: open('") + filename + "'): mode error: trunc and app");
         }
      }
-    static void check_open(std::ios * s_p, const std::string& filename, std::ios_base::openmode mode)
+    static void check_open(std::ios * s_p)
     {
         if (s_p->fail())
         {
-            throw Exception(std::string("strict_fstream: open('")
-                            + filename + "'," + mode_to_string(mode) + "): open failed: "
-                            + strerror());
+	    s_p->setstate(std::ios::failbit);
         }
     }
-    static void check_peek(std::istream * is_p, const std::string& filename, std::ios_base::openmode mode)
+    static void check_peek(std::istream * is_p)
     {
         bool peek_failed = true;
         try
@@ -161,14 +133,13 @@ struct static_method_holder
             is_p->peek();
             peek_failed = is_p->fail();
         }
-        catch (const std::ios_base::failure &) {}
+        catch (std::ios_base::failure &e) {}
         if (peek_failed)
         {
-            throw Exception(std::string("strict_fstream: open('")
-                            + filename + "'," + mode_to_string(mode) + "): peek failed: "
-                            + strerror());
-        }
-        is_p->clear();
+	    is_p->setstate(std::ios::failbit);
+        } else {
+	    is_p->clear();
+	}
     }
 }; // struct static_method_holder
 
@@ -189,8 +160,8 @@ public:
         exceptions(std::ios_base::badbit);
         detail::static_method_holder::check_mode(filename, mode);
         std::ifstream::open(filename, mode);
-        detail::static_method_holder::check_open(this, filename, mode);
-        detail::static_method_holder::check_peek(this, filename, mode);
+        detail::static_method_holder::check_open(this);
+        detail::static_method_holder::check_peek(this);
     }
 }; // class ifstream
 
@@ -209,7 +180,7 @@ public:
         exceptions(std::ios_base::badbit);
         detail::static_method_holder::check_mode(filename, mode);
         std::ofstream::open(filename, mode);
-        detail::static_method_holder::check_open(this, filename, mode);
+        detail::static_method_holder::check_open(this);
     }
 }; // class ofstream
 
@@ -228,10 +199,11 @@ public:
         exceptions(std::ios_base::badbit);
         detail::static_method_holder::check_mode(filename, mode);
         std::fstream::open(filename, mode);
-        detail::static_method_holder::check_open(this, filename, mode);
-        detail::static_method_holder::check_peek(this, filename, mode);
+        detail::static_method_holder::check_open(this);
+        detail::static_method_holder::check_peek(this);
     }
 }; // class fstream
 
 } // namespace strict_fstream
 
+#endif

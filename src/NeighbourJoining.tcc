@@ -4847,7 +4847,6 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
         return 0.0;
     }
     double loglk = 0.0;
-    int64_t n_site_loglk = 0;
     std::vector<double> site_likelihood;
 
     if (site_loglk != nullptr) {

@@ -4,7 +4,7 @@
 #include "src/VeryFastTree.h"
 #include "src/Utils.h"
 #include <cmath>
-#include <zstr.hpp>
+#include <bxzstr.hpp>
 
 std::string isNotEmpty(const std::string &input) {
     if (input.size() == 0) {
@@ -39,14 +39,6 @@ void setDeprecated(CLI::Option *op) {
     });
 }
 
-bool ends_with(const std::string &str, const std::string &sub) {
-    size_t str_len = str.size();
-    size_t sub_len = sub.size();
-    if (str_len < sub_len) return false;
-
-    return str.compare(str_len - sub_len, sub_len, sub) == 0;
-}
-
 void cli(CLI::App &app, std::string &name, std::string &version, std::string &flags, veryfasttree::Options &options,
          std::vector<std::string> &args) {
     std::stringstream description;
@@ -72,7 +64,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     description << padd << "[-n 100] > phylip_distance_matrix" << std::endl;
     description << std::endl;
     description << "  VeryFastTree supports NEXUS, Fasta, Fastq or Phylip interleaved formats" << std::endl;
-    description << "  VeryFastTree supports Zlib-compressed (.zip and .gz) files" << std::endl;
+    description << "  VeryFastTree supports files compressed with ZLib and libBZ2" << std::endl;
     description << "  By default VeryFastTree expects protein alignments,  use -nt for nucleotides" << std::endl;
     description << "  VeryFastTree reads standard input if no alignment file is given" << std::endl;
 
@@ -514,10 +506,6 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                  "but the file disk could be huge.")->
             group(optimizations);
 
-    app.add_flag("-no-compression", options.noCompression,
-                 "Only .zip or .gz files will be decompressed.")->
-            group(optimizations);
-
     for (auto &c: options.extension) { c = (char) std::toupper(c); }
 
 
@@ -550,8 +538,8 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     description << "  " << name << " -nt nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " -nt -gtr < nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " < nucleotide_alignment > tree" << std::endl;
-    description << "  " << name << "accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats,"
-                                   " and also Zlib-compressed (.zip and .gz) files." << std::endl;
+    description << "  " << name << "accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats"
+                                   " compressed with ZLib and libBZ2." << std::endl;
     app.description(description.str());
 
     auto common = "Common options";
@@ -628,11 +616,8 @@ int main(int argc, char *argv[]) {
         CLI11_PARSE(app2, "-h", false);
     }
 
-    std::istream *input = &std::cin;
     std::ifstream finput;
-    zstr::istream zfinput(finput);
-    zstr::istream zin(std::cin);
-    std::ofstream output;
+    std::ofstream foutput;
     std::ofstream log;
     veryfasttree::TeeStream tee(log, std::cerr);
     std::ostream teelog(&tee);
@@ -643,26 +628,13 @@ int main(int argc, char *argv[]) {
             std::cerr << "Couldn't open the input file! " << options.inFileName << std::endl;
             return EXIT_FAILURE;
         }
-        input = &finput;
-    }
-
-    if (ends_with(options.inFileName, ".zip") || ends_with(options.inFileName, ".gz") || !options.noCompression) {
-        if (options.inFileName.empty()) {
-            input = &zin;
-        } else {
-            if (ends_with(options.inFileName, "tar.gz")) {
-                std::cerr << "tar.gz is not supported" << std::endl;
-                return EXIT_FAILURE;
-            }
-            input = &zfinput;
-        }
     }
 
     if (options.outFileName.empty()) {
-        output.setstate(std::ios_base::badbit);
+        foutput.setstate(std::ios_base::badbit);
     } else {
-        output.open(options.outFileName);
-        if (output.fail()) {
+        foutput.open(options.outFileName);
+        if (foutput.fail()) {
             std::cerr << "Couldn't open the output file! " << options.outFileName << std::endl;
             return EXIT_FAILURE;
         }
@@ -684,12 +656,10 @@ int main(int argc, char *argv[]) {
     std::copy(argv, argv + argc - 1, std::ostream_iterator<char *>(applog, " "));
     applog << argv[argc - 1] << std::endl;
 
+    bxz::istream input(finput ? finput : std::cin);
+    std::ostream &output = foutput ? foutput : std::cout;
     try {
-        fastTree.run(
-                *input,
-                output ? output : std::cout,
-                applog);
-
+        fastTree.run( input, output, applog);
     } catch (std::invalid_argument &ex) {
         std::cerr << ex.what() << std::endl;
         return EXIT_FAILURE;

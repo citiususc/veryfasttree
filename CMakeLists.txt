@@ -20,9 +20,10 @@ ADD_SUBDIRECTORY("libs/boost-core")
 ADD_SUBDIRECTORY("libs/boost-sort")
 ADD_SUBDIRECTORY("libs/boost-align")
 ADD_SUBDIRECTORY("libs/zlib")
-ADD_SUBDIRECTORY("libs/zstr")
+ADD_SUBDIRECTORY("libs/bzip2")
+ADD_SUBDIRECTORY("libs/bxzstr")
 
-set(LIBRARIES CLI11 robin-map xxhash boost-core boost-sort boost-align zlibstatic zstr)
+set(LIBRARIES CLI11 robin-map xxhash boost-core boost-sort boost-align zlibstatic bzip2static bxzstr)
 
 set(SOURCE_FILES
         src/operations/BasicOperations.tcc
