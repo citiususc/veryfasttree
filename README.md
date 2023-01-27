@@ -10,6 +10,9 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 
 - v3.3.0 (in development):
 	- Improved performance with new parallel regions (Local bootstraps, ML Lengths, LogLk, ML splits, etc.).
+	- Tree creation (Top hits, TopHitNJSearch, and FastNJSearch, ExhaustiveNJSearch(-slow)) now use threads.
+	- Improved non-deterministic mode and no longer uses mutex. 
+	- Deterministic mode now also parallelizes non-deterministic parts, but require more computation.
 	- New thread levels have been introduced.
 	- Tree partitioning method logging now is hidden by default.
 	- Tree partitioning algorithm is faster and has a cache.
@@ -118,7 +121,7 @@ Degree of parallelization:
 	- If level is *0*, VeryFastTree uses the same parallelization strategy as FastTree-2 with some new parallel blocks. 
 	- If level is *1*, VeryFastTree uses its tree partitioning method to perform tree computation in sequential order. 
 	- If level is *2*, VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method. 
-	- If level is *3* (default), VeryFastTree uses its tree partitioning method to perform tree computation without preserving sequential order.
+	- If level is *3* (default), VeryFastTree performs the computation without preserving sequential order.
 	- If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^sprlength). 
 
     Note: Each level includes the previous ones, and computation at level *2* and above is performed in a different tree traverse order, so the result may change but is still correct.

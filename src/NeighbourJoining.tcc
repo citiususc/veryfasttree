@@ -154,7 +154,7 @@ AbsNeighbourJoining()::TopHits::TopHits() {}
 
 AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) :
         m(_m), q((int64_t) (0.5 + options.tophits2Mult * std::sqrt(m))),
-        maxnodes(_maxnodes), topvisibleAge(0), locks(options.threads > 1 && !options.deterministic ? maxnodes : 0) {
+        maxnodes(_maxnodes), topvisibleAge(0) {
     assert(m > 0);
     if (!options.useTopHits2nd || q >= m) {
         q = 0;
@@ -3128,12 +3128,8 @@ AbsNeighbourJoining(void)::reliabilityNJ() {
                         #pragma omp critical
                         {
                             done += done2;
-                            if (done > 100) {
-                                progressReport.print("Local bootstrap for %6ld of %6ld internal splits", done,
-                                                     (int64_t) (seqs.size() - 3));
-                                done = done % 100;
-                            }
-
+                            progressReport.print("Local bootstrap for %6ld of %6ld internal splits", done,
+                                                 (int64_t) (seqs.size() - 3));
                         }
                     }
                 }
@@ -3530,25 +3526,36 @@ AbsNeighbourJoining(void)::exhaustiveNJSearch(int64_t nActive, Besthit &join) {
     join.weight = 0;
     join.dist = (numeric_t) 1e20;
     join.criterion = (numeric_t) 1e20;
-    double bestCriterion = 1e20;
 
-    for (int64_t i = 0; i < maxnode - 1; i++) {
-        if (parent[i] < 0) {
-            for (int64_t j = i + 1; j < maxnode; j++) {
-                if (parent[j] < 0) {
-                    Besthit hit;
-                    hit.i = i;
-                    hit.j = j;
-                    setDistCriterion(nActive, hit);
-                    if (hit.criterion < bestCriterion) {
-                        join = hit;
-                        bestCriterion = hit.criterion;
+    #pragma omp parallel
+    {
+        Besthit join2 = join;
+        #pragma omp  for schedule(dynamic)
+        for (int64_t i = 0; i < maxnode - 1; i++) {
+            if (parent[i] < 0) {
+                for (int64_t j = i + 1; j < maxnode; j++) {
+                    if (parent[j] < 0) {
+                        Besthit hit;
+                        hit.i = i;
+                        hit.j = j;
+                        setDistCriterion(nActive, hit);
+                        if (hit.criterion < join2.criterion) {
+                            join2 = hit;
+                        }
                     }
                 }
             }
         }
-    }
+        #pragma omp critical
+        {
+            if (join2.criterion < join.criterion) {
+                join = join2;
+            }
+        };
+    };
+
     assert (join.i >= 0 && join.j >= 0);
+    std::cerr << join.i << " " << join.j << std::endl;
 }
 
 AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &besthits, Besthit &join) {
@@ -3611,7 +3618,7 @@ AbsNeighbourJoining(void)::fastNJSearch(int64_t nActive, std::vector<Besthit> &b
     }
 }
 
-AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
+AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
     double close = options.tophitsClose;
     if (close < 0) {
         if (options.fastest && seqs.size() >= 50000) {
@@ -3641,110 +3648,170 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
     assert(2 * tophits.m <= (int64_t) seqs.size());
 
     int64_t nHasTopHits = 0;
+    TopHits tophits_ref = tophits_g;
+    tophits_ref.visible.resize(0);
+    tophits_ref.topvisible.resize(0);
+    std::vector<TopHits> threadTophits(options.threads - 1, tophits_ref);
+    std::vector<bool> visited(tophits_g.topHitsLists.size(), false);
+    int64_t count = 0;
 
-    #pragma omp parallel for schedule(dynamic) if(!options.deterministic)
-    for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
-        int64_t seed = seeds[iSeed];
-        if (iSeed > 0 && (iSeed % 100) == 0 && options.threads == 1) {
-            progressReport.print("Top hits for %6ld of %6ld seqs (at seed %6ld)",
-                                 nHasTopHits, (int64_t) seqs.size(), iSeed);
-        }
-        if (tophits.topHitsLists[seed].hits.size() > 0) {
-            if (options.verbose > 2) {
-                log << strformat("Skipping seed %ld", seed) << std::endl;
+    auto get_visited = [&](int iSeed) -> bool {
+        if (options.deterministic && options.threads > 1) {
+            for (int i = 0; i < omp_get_thread_num(); i++) {
+                if (!threadTophits[i].topHitsLists[iSeed].hits.empty()) {
+                    return true;
+                }
             }
-            continue;
+            return !tophits_g.topHitsLists[iSeed].hits.empty();
+        } else {
+            return visited[iSeed];
         }
+    };
 
-        std::vector<Besthit> besthitsSeed(seqs.size());
-        std::vector<Besthit> besthitsNeighbor(2 * tophits.m);
-        Besthit bestjoin;
-
-        if (options.verbose > 2) {
-            log << strformat("Trying seed %ld", seed) << std::endl;
-        }
-        setBestHit(seed, seqs.size(), bestjoin, besthitsSeed.data());
-
-        /* sort & save top hits of self. besthitsSeed is now sorted. */
-        sortSaveBestHits(seed, besthitsSeed, seqs.size(), tophits.m, tophits);
-        nHasTopHits++;
-
-        /* find "close" neighbors and compute their top hits */
-        double neardist = besthitsSeed[2 * tophits.m - 1].dist * close;
-        /* must have at least average weight, rem higher is better
-           and allow a bit more than average, e.g. if we are looking for within 30% away,
-           20% more gaps than usual seems OK
-           Alternatively, have a coverage requirement in case neighbor is short
-           If fastest, consider the top q/2 hits to be close neighbors, regardless
-        */
-        double nearweight = 0;
-        for (int64_t iClose = 0; iClose < 2 * tophits.m; iClose++) {
-            nearweight += besthitsSeed[iClose].weight;
-        }
-        nearweight = nearweight / (2.0 * tophits.m); /* average */
-        nearweight *= (1.0 - 2.0 * neardist / 3.0);
-        double nearcover = 1.0 - neardist / 2.0;
-
-        if (options.verbose > 2) {
-            log << strformat("Distance limit for close neighbors %f weight %f ungapped %ld",
-                             neardist, nearweight, nPos - nGaps[seed]) << std::endl;
-        }
-        for (int64_t iClose = 0; iClose < tophits.m; iClose++) {
-            Besthit &closehit = besthitsSeed[iClose];
-            auto closeNode = closehit.j;
-            if (tophits.topHitsLists[closeNode].hits.size() > 0) {
+    #pragma omp parallel firstprivate(nHasTopHits) if(!options.deterministic || options.threadsLevel > 2)
+    {
+        #pragma omp for schedule(static, (seqs.size() / options.threads) + 1)
+        for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
+            int64_t seed = seeds[iSeed];
+            if (options.threads == 1) {
+                if (iSeed > 0 && (iSeed % 100) == 0) {
+                    progressReport.print("Top hits for %6ld of %6ld seqs (at seed %6ld)",
+                                         nHasTopHits, (int64_t) seqs.size(), iSeed);
+                }
+            }
+            if (get_visited(seed)) {
+                if (options.verbose > 2) {
+                    log << strformat("Skipping seed %ld", seed) << std::endl;
+                }
                 continue;
             }
-
-            /* If within close-distance, or identical, use as close neighbor */
-            bool isClose = closehit.dist <= neardist && (closehit.weight >= nearweight
-                                                         || closehit.weight >= (nPos - nGaps[closeNode]) * nearcover);
-            bool identical = closehit.dist < 1e-6
-                             && fabs(closehit.weight - (nPos - nGaps[seed])) < 1e-5
-                             && fabs(closehit.weight - (nPos - nGaps[closeNode])) < 1e-5;
-            if (options.useTopHits2nd && iClose < tophits.q && (isClose || identical)) {
-                nHasTopHits++;
-                options.debug.nClose2Used++;
-                auto nUse = std::min(tophits.q * options.tophits2Safety, 2 * tophits.m);
-                std::vector<Besthit> besthitsClose(nUse);
-                transferBestHits(seqs.size(), closeNode, besthitsSeed, nUse, besthitsClose.data(), true);
-                sortSaveBestHits(closeNode, besthitsClose, nUse, tophits.q, tophits);
-                tophits.topHitsLists[closeNode].hitSource = seed;
-            } else if (isClose || identical || (options.fastest && iClose < (tophits.q + 1) / 2)) {
-                nHasTopHits++;
-                options.debug.nCloseUsed++;
-                if (options.verbose > 2) {
-                    log << strformat("Near neighbor %ld (rank %ld weight %f ungapped %ld %ld)",
-                                     closeNode, iClose, besthitsSeed[iClose].weight,
-                                     nPos - nGaps[seed],
-                                     nPos - nGaps[closeNode]) << std::endl;
-                }
-
-                /* compute top 2*m hits */
-                transferBestHits(seqs.size(), closeNode, besthitsSeed, 2 * tophits.m, besthitsNeighbor.data(), true);
-                sortSaveBestHits(closeNode, besthitsNeighbor, 2 * tophits.m, tophits.m, tophits);
-
-                /* And then try for a second level of transfer. We assume we
-                   are in a good area, because of the 1st
-                   level of transfer, and in a small neighborhood, because q is
-                   small (32 for 1 million sequences), so we do not make any close checks.
-                 */
-                for (int64_t iClose2 = 0; iClose2 < tophits.q && iClose2 < 2 * tophits.m; iClose2++) {
-                    int64_t closeNode2 = besthitsNeighbor[iClose2].j;
-                    assert(closeNode2 >= 0);
-                    if (tophits.topHitsLists[closeNode2].hits.empty()) {
-                        options.debug.nClose2Used++;
-                        nHasTopHits++;
-                        auto nUse = std::min(tophits.q * options.tophits2Safety, 2 * tophits.m);
-                        std::vector<Besthit> besthitsClose2(nUse);
-                        transferBestHits(seqs.size(), closeNode2, besthitsNeighbor, nUse, besthitsClose2.data(), true);
-                        sortSaveBestHits(closeNode2, besthitsClose2, nUse, tophits.q, tophits);
-                        tophits.topHitsLists[closeNode2].hitSource = closeNode;
-                    } /* end if should do 2nd-level transfer */
+            if (options.threads > 1 && options.verbose > 0) {
+                if (nHasTopHits > 100) {
+                    #pragma omp critical
+                    {
+                        count += nHasTopHits;
+                        progressReport.print("Top hits for %6ld of %6ld seqs (at seed %6ld)",
+                                             count + 1, (int64_t) seqs.size(), iSeed);
+                        nHasTopHits = 0;
+                    }
                 }
             }
-        } /* end loop over close candidates */
-    } /* end loop over seeds */
+            TopHits &tophits = omp_get_thread_num() > 0 ? threadTophits[omp_get_thread_num() - 1] : tophits_g;
+
+            std::vector<Besthit> besthitsSeed(seqs.size());
+            std::vector<Besthit> besthitsNeighbor(2 * tophits.m);
+            Besthit bestjoin;
+
+            if (options.verbose > 2) {
+                log << strformat("Trying seed %ld", seed) << std::endl;
+            }
+            setBestHit(seed, seqs.size(), bestjoin, besthitsSeed.data());
+
+            /* sort & save top hits of self. besthitsSeed is now sorted. */
+            visited[seed] = true;
+            sortSaveBestHits(seed, besthitsSeed, seqs.size(), tophits.m, tophits);
+            nHasTopHits++;
+
+            /* find "close" neighbors and compute their top hits */
+            double neardist = besthitsSeed[2 * tophits.m - 1].dist * close;
+            /* must have at least average weight, rem higher is better
+               and allow a bit more than average, e.g. if we are looking for within 30% away,
+               20% more gaps than usual seems OK
+               Alternatively, have a coverage requirement in case neighbor is short
+               If fastest, consider the top q/2 hits to be close neighbors, regardless
+            */
+            double nearweight = 0;
+            for (int64_t iClose = 0; iClose < 2 * tophits.m; iClose++) {
+                nearweight += besthitsSeed[iClose].weight;
+            }
+            nearweight = nearweight / (2.0 * tophits.m); /* average */
+            nearweight *= (1.0 - 2.0 * neardist / 3.0);
+            double nearcover = 1.0 - neardist / 2.0;
+
+            if (options.verbose > 2) {
+                log << strformat("Distance limit for close neighbors %f weight %f ungapped %ld",
+                                 neardist, nearweight, nPos - nGaps[seed]) << std::endl;
+            }
+            for (int64_t iClose = 0; iClose < tophits.m; iClose++) {
+                Besthit &closehit = besthitsSeed[iClose];
+                auto closeNode = closehit.j;
+                if (get_visited(closeNode)) {
+                    continue;
+                }
+
+                /* If within close-distance, or identical, use as close neighbor */
+                bool isClose = closehit.dist <= neardist && (closehit.weight >= nearweight ||
+                                                             closehit.weight >= (nPos - nGaps[closeNode]) * nearcover);
+                bool identical = closehit.dist < 1e-6
+                                 && fabs(closehit.weight - (nPos - nGaps[seed])) < 1e-5
+                                 && fabs(closehit.weight - (nPos - nGaps[closeNode])) < 1e-5;
+                if (options.useTopHits2nd && iClose < tophits.q && (isClose || identical)) {
+                    nHasTopHits++;
+                    options.debug.nClose2Used++;
+                    auto nUse = std::min(tophits.q * options.tophits2Safety, 2 * tophits.m);
+                    std::vector<Besthit> besthitsClose(nUse);
+                    transferBestHits(seqs.size(), closeNode, besthitsSeed, nUse, besthitsClose.data(), true);
+                    visited[closeNode] = true;
+                    sortSaveBestHits(closeNode, besthitsClose, nUse, tophits.q, tophits);
+                    tophits.topHitsLists[closeNode].hitSource = seed;
+                } else if (isClose || identical || (options.fastest && iClose < (tophits.q + 1) / 2)) {
+                    nHasTopHits++;
+                    options.debug.nCloseUsed++;
+                    if (options.verbose > 2) {
+                        log << strformat("Near neighbor %ld (rank %ld weight %f ungapped %ld %ld)",
+                                         closeNode, iClose, besthitsSeed[iClose].weight,
+                                         nPos - nGaps[seed],
+                                         nPos - nGaps[closeNode]) << std::endl;
+                    }
+
+                    /* compute top 2*m hits */
+                    transferBestHits(seqs.size(), closeNode, besthitsSeed, 2 * tophits.m, besthitsNeighbor.data(),
+                                     true);
+                    visited[closeNode] = true;
+                    sortSaveBestHits(closeNode, besthitsNeighbor, 2 * tophits.m, tophits.m, tophits);
+
+                    /* And then try for a second level of transfer. We assume we
+                       are in a good area, because of the 1st
+                       level of transfer, and in a small neighborhood, because q is
+                       small (32 for 1 million sequences), so we do not make any close checks.
+                     */
+                    for (int64_t iClose2 = 0; iClose2 < tophits.q && iClose2 < 2 * tophits.m; iClose2++) {
+                        int64_t closeNode2 = besthitsNeighbor[iClose2].j;
+                        assert(closeNode2 >= 0);
+                        if (!get_visited(closeNode2)) {
+                            options.debug.nClose2Used++;
+                            nHasTopHits++;
+                            auto nUse = std::min(tophits.q * options.tophits2Safety, 2 * tophits.m);
+                            std::vector<Besthit> besthitsClose2(nUse);
+                            transferBestHits(seqs.size(), closeNode2, besthitsNeighbor, nUse, besthitsClose2.data(),
+                                             true);
+                            visited[closeNode2] = true;
+                            sortSaveBestHits(closeNode2, besthitsClose2, nUse, tophits.q, tophits);
+                            tophits.topHitsLists[closeNode2].hitSource = closeNode;
+                        } /* end if should do 2nd-level transfer */
+                    }
+                }
+            } /* end loop over close candidates */
+        } /* end loop over seeds */
+
+        // merge parallel tophits
+        if (options.threads > 1) {
+            #pragma omp  for schedule(dynamic)
+            for (int64_t iSeed = 0; iSeed < (int64_t) seqs.size(); iSeed++) {
+                for (int i = 0; i < options.threads - 1; i++) {
+                    if (!tophits_g.topHitsLists[iSeed].hits.empty()) {
+                        break;
+                    }
+                    if (!threadTophits[i].topHitsLists[iSeed].hits.empty()) {
+                        std::swap(tophits_g.topHitsLists[iSeed].hits, threadTophits[i].topHitsLists[iSeed].hits);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    TopHits &tophits = tophits_g;
 
     for (int64_t iNode = 0; iNode < (int64_t) seqs.size(); iNode++) {
         TopHitsList &l = tophits.topHitsLists[iNode];
@@ -3846,7 +3913,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits) {
 	using best-hit lists only, and updating
 	all out-distances in every best-hit list
 */
-AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Besthit &join) {
+AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Besthit &join) {//TODO
 /* first, do we have at least m/2 candidates in topvisible?
      And remember the best one */
     int64_t nCandidate = 0;
@@ -3930,37 +3997,48 @@ AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Bes
         return;
     }
 
-    int64_t changed;
-    do {
-        changed = 0;
+    bool changed;
+    Besthit join2 = join;
+    std::vector<Besthit> bests(options.threads);
 
-        Besthit bestI;
-        getBestFromTopHits(join.i, nActive, tophits, bestI);
-        assert(bestI.i == join.i);
-        if (bestI.j != join.j && bestI.criterion < join.criterion) {
-            changed = 1;
-            if (options.verbose > 2) {
-                log << strformat("BetterI\t%ld\t%ld\t%ld\t%ld\t%f\t%f",
-                                 join.i, join.j, bestI.i, bestI.j,
-                                 join.criterion, bestI.criterion) << std::endl;
+    #pragma omp parallel firstprivate(join2) private (changed)
+    do {
+        changed = false;
+
+        getBestFromTopHits(join2.i, nActive, tophits, bests[omp_get_thread_num()]);
+        for (int i = 0; i < options.threads; i++) {
+            auto &best = bests[i];
+            if (i > 0 && best.i == -1) break;
+            assert(best.i == join2.i);
+            if (best.j != join2.j && best.criterion < join2.criterion) {
+                changed = true;
+                if (options.verbose > 2) {
+                    log << strformat("BetterI\t%ld\t%ld\t%ld\t%ld\t%f\t%f",
+                                     join2.i, join2.j, best.i, best.j,
+                                     join2.criterion, best.criterion) << std::endl;
+                }
+                join2 = best;
             }
-            join = bestI;
         }
 
-        Besthit bestJ;
-        getBestFromTopHits(join.j, nActive, tophits, bestJ);
-        assert(bestJ.i == join.j);
-        if (bestJ.j != join.i && bestJ.criterion < join.criterion) {
-            changed = 1;
-            if (options.verbose > 2)
-                log << strformat("BetterJ\t%ld\t%ld\t%ld\t%ld\t%f\t%f\n",
-                                 join.i, join.j, bestJ.i, bestJ.j,
-                                 join.criterion, bestJ.criterion) << std::endl;
-            join = bestJ;
+        getBestFromTopHits(join2.j, nActive, tophits, bests[omp_get_thread_num()]);
+        for (int i = 0; i < options.threads; i++) {
+            auto &best = bests[i];
+            if (i > 0 && best.i == -1) break;
+            assert(best.i == join2.j);
+            if (best.j != join2.i && best.criterion < join2.criterion) {
+                changed = true;
+                if (options.verbose > 2)
+                    log << strformat("BetterJ\t%ld\t%ld\t%ld\t%ld\t%f\t%f\n",
+                                     join2.i, join2.j, best.i, best.j,
+                                     join2.criterion, best.criterion) << std::endl;
+                join2 = best;
+            }
         }
         if (changed) {
             options.debug.nHillBetter++;
         }
+        join = join2;
     } while (changed);
 }
 
@@ -3972,7 +4050,10 @@ AbsNeighbourJoining(void)::getBestFromTopHits(int64_t iNode, int64_t nActive, To
     assert(!l.hits.empty());
 
     if (!options.fastest) {
-        setOutDistance(iNode, nActive); /* ensure out-distances are not stale */
+        if (omp_get_thread_num() == 0) {
+            setOutDistance(iNode, nActive); /* ensure out-distances are not stale */
+        }
+        #pragma omp barrier
     }
 
     bestjoin.i = -1;
@@ -3980,8 +4061,8 @@ AbsNeighbourJoining(void)::getBestFromTopHits(int64_t iNode, int64_t nActive, To
     bestjoin.dist = (numeric_t) 1e20;
     bestjoin.criterion = (numeric_t) 1e20;
 
-    int iBest;
-    for (iBest = 0; iBest < (int64_t) l.hits.size(); iBest++) {
+    #pragma omp for schedule(static)
+    for (int iBest = 0; iBest < (int64_t) l.hits.size(); iBest++) {
         Besthit bh;
         hitToBestHit(iNode, l.hits[iBest], bh);
         if (updateBestHit(nActive, bh, true)) {
@@ -4250,9 +4331,7 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
     }
 
     assert(nSave > 0);
-    if (!tophits.locks.empty() && omp_get_num_threads() > 1) {
-        tophits.locks[iNode].lock();
-    }
+
     TopHitsList &l = tophits.topHitsLists[iNode];
     l.hits.resize(nSave);
 
@@ -4268,9 +4347,6 @@ AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> 
         }
     }
     assert(iSave == nSave);
-    if (!tophits.locks.empty() && omp_get_num_threads() > 1) {
-        tophits.locks[iNode].unlock();
-    }
 }
 
 AbsNeighbourJoining(void)::transferBestHits(int64_t nActive, int64_t iNode, std::vector<Besthit> &oldhits,
@@ -4777,12 +4853,8 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
                         #pragma omp critical
                         {
                             done += done2;
-                            if (done > 100) {
-                                progressReport.print("ML Lengths %ld of %ld splits",
-                                                     done + 1, (int64_t) (maxnode - seqs.size()));
-                                done = done % 100;
-                            }
-
+                            progressReport.print("ML Lengths %ld of %ld splits",
+                                                 done + 1, (int64_t) (maxnode - seqs.size()));
                         }
                     }
                 }
@@ -5766,21 +5838,18 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
                                 #pragma omp critical
                                 {
                                     done += done2;
-                                    if (done > 100) {
-                                        std::string buf;
-                                        buf.reserve(100);
-                                        buf += useML ? "ML" : "ME";
-                                        buf += " NNI round %ld of %ld, %ld of %ld splits";
-                                        if (done > 0) {
-                                            buf += strformat(", %ld changes", nNNIThisRound);
-                                        }
-                                        if (nNNIThisRound > 0) {
-                                            buf += strformat(" (max delta %.3f)", dMaxDelta);
-                                        }
-                                        progressReport.print(buf, iRound + 1, nRounds, done + 1,
-                                                             (int64_t) (maxnode - seqs.size()));
-                                        done = done % 100;
+                                    std::string buf;
+                                    buf.reserve(100);
+                                    buf += useML ? "ML" : "ME";
+                                    buf += " NNI round %ld of %ld, %ld of %ld splits";
+                                    if (done > 0) {
+                                        buf += strformat(", %ld changes", nNNIThisRound);
                                     }
+                                    if (nNNIThisRound > 0) {
+                                        buf += strformat(" (max delta %.3f)", dMaxDelta);
+                                    }
+                                    progressReport.print(buf, iRound + 1, nRounds, done + 1,
+                                                         (int64_t) (maxnode - seqs.size()));
                                 }
                             }
                         }
@@ -5987,11 +6056,8 @@ AbsNeighbourJoining(void)::SPR(int64_t iRound, int64_t nRounds) {
                         #pragma omp critical
                         {
                             done += done2;
-                            if (done > 100) {
-                                progressReport.print("SPR round %3ld of %3ld, %ld of %ld nodes",
-                                                     iRound + 1, nRounds, done + 1, maxnode);
-                                done = done % 100;
-                            }
+                            progressReport.print("SPR round %3ld of %3ld, %ld of %ld nodes",
+                                                 iRound + 1, nRounds, done + 1, maxnode);
                         }
                     }
                 }
@@ -6414,12 +6480,8 @@ AbsNeighbourJoining(void)::testSplitsML(SplitCount &splitcount) {
                         #pragma omp critical
                         {
                             done += done2;
-                            if (done > 100) {
-                                progressReport.print("ML split tests for %6ld of %6ld internal splits", done,
-                                                     (int64_t) (seqs.size() - 3));
-                                done = done % 100;
-                            }
-
+                            progressReport.print("ML split tests for %6ld of %6ld internal splits", done,
+                                                 (int64_t) (seqs.size() - 3));
                         }
                     }
                 }

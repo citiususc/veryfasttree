@@ -28,6 +28,32 @@ using namespace veryfasttree;
 VeryFastTree::VeryFastTree(const Options &options) : options(options) {}
 
 void VeryFastTree::settings(std::ostream &log) {
+    if (options.extension == "AUTO") {
+        options.extension = "NONE";
+        #ifdef __SSE2__
+        options.extension = "SSE3";
+        #endif
+        #ifdef __AVX__
+        if (options.doublePrecision) {
+            options.extension = "AVX2";
+        }
+        #endif
+    }
+
+    if (options.nCodes == 4){
+        if (options.extension == "AVX512") {
+            options.extension = "AVX2";
+        }
+        if(!options.doublePrecision && options.extension == "AVX2"){
+            options.extension = "SSE3";
+        }
+    }
+
+    if (options.threads > 1){
+        options.verbose = 1;
+    }
+
+
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
     if (options.nCodes == 4 && options.matrixPrefix.empty()) {
@@ -198,18 +224,6 @@ void VeryFastTree::configOpenMP() {
 }
 
 void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
-    if (options.extension == "AUTO") {
-        options.extension = "NONE";
-        #ifdef __SSE2__
-        options.extension = "SSE3";
-        #endif
-        #ifdef __AVX__
-        if (options.doublePrecision) {
-            options.extension = "AVX2";
-        }
-        #endif
-    }
-
     settings(log);
     configOpenMP();
 

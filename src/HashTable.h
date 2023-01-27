@@ -43,6 +43,10 @@ namespace veryfasttree {
             return nullptr;
         }
 
+        inline void clear() {
+            table = {};
+        }
+
     private:
 
         struct Hash {

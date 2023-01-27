@@ -442,13 +442,13 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-threads-level", options.threadsLevel,
                    "Degree of parallelization. If level is 0, VeryFastTree uses the same parallelization strategy as "
                    "FastTree-2 with some new parallel blocks. If level is 1, VeryFastTree uses its tree partitioning "
-                   "method to perform tree computation in sequential order. If level is 2, VeryFastTree accelerates the "
-                   "rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
-                   "uses its tree partitioning method to perform tree computation without preserving sequential order."
-                   "If level is 4, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method "
-                   "(it can only be used with datasets larger than 2^sprlength). Note: Each level includes the previous "
-                   "ones, and computation at level 2 and above is performed in a different tree traverse order, so the result may "
-                   "change but is still correct.")->
+                   "method to perform tree computation in sequential order. If level is 2, VeryFastTree accelerates the"
+                   " rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
+                   "performs the computation without preserving sequential order. If level is 4, VeryFastTree "
+                   "accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with "
+                   "datasets larger than 2^sprlength). Note: Each level includes the previous ones, and computation at "
+                   "level 2 and above is performed in a different tree traverse order, so the result may change but is "
+                   "still correct.")->
             type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);
 
     app.add_option("-threads-mode", options.deterministic,
@@ -477,7 +477,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                             "to speed up computations enabling the vector extensions. "
                             "Available: AUTO(default), NONE, SSE, SSE3 , AVX, AVX2 or AVX512")->type_name("name")
             ->group(optimizations)->default_val("AUTO");
-
+    for (auto &c: options.extension) { c = (char) std::toupper(c); }
 
     app.add_option("-fastexp", options.fastexp,
                    "to select an alternative implementation for the exponential function exp(x), which has "
@@ -505,8 +505,6 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                  "This parameter forces that all attributes within the profiles are saved to disk. It saves more memory "
                  "but the file disk could be huge.")->
             group(optimizations);
-
-    for (auto &c: options.extension) { c = (char) std::toupper(c); }
 
 
     auto deprecated = "Deprecated";
@@ -659,7 +657,7 @@ int main(int argc, char *argv[]) {
     bxz::istream input(finput ? finput : std::cin);
     std::ostream &output = foutput ? foutput : std::cout;
     try {
-        fastTree.run( input, output, applog);
+        fastTree.run(input, output, applog);
     } catch (std::invalid_argument &ex) {
         std::cerr << ex.what() << std::endl;
         return EXIT_FAILURE;

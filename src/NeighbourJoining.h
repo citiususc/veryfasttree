@@ -239,10 +239,6 @@ namespace veryfasttree {
 
             int64_t topvisibleAge;        /* joins since the top-visible list was recomputed */
 
-
-            /* 1 lock to read or write any top hits list, no thread grabs more than one */
-            std::vector<std::mutex> locks;
-
             TopHits(const Options &options, int64_t maxnodes, int64_t m);
 
             TopHits();

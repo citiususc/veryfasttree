@@ -71,6 +71,7 @@ AbsFastTreeImpl(void)::run() {
             NeighbourJoining <Precision, Operations> nj(options, log, progressReport, aln.seqs, aln.nPos,
                                                         constraintSeqs, distanceMatrix, transmat);
             nj.printDistances(aln.names, output);
+            hashnames.clear();
         } else {
             /* reset counters*/
             options.debug.reset();
@@ -134,6 +135,7 @@ AbsFastTreeImpl(void)::run() {
             } else {
                 nj.fastNJ();
             }
+            hashnames.clear();
             nj.logTree("NJ", 0, aln.names, unique);
 
             int64_t nniToDo = options.nni == -1 ? (int64_t) (0.5 + 4.0 * std::log(unSeq) / std::log(2)) :
