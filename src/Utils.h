@@ -3,6 +3,8 @@
 #ifndef FASTTREE_UTILS_H
 #define FASTTREE_UTILS_H
 
+typedef int8_t ibool;
+
 #if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
 
 #include <io.h>
@@ -86,6 +88,18 @@ namespace veryfasttree {
         return aln == 0 ? sz : ((sz / aln + ((sz % aln) != 0)) * aln);
     }
 
+    template<typename T>
+    inline void vecrelease(std::vector<T>&v){
+        v.resize(0);
+        v.shrink_to_fit();
+    }
+
+    inline void strrelease(std::string& s){
+        if(s.size() > 0){
+            s.resize(0);
+        }
+        s.shrink_to_fit();
+    }
 
     template<typename Iter, typename Compare>
     inline void psort(Iter first, Iter last, const Compare &comp) {

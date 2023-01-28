@@ -71,7 +71,6 @@ AbsFastTreeImpl(void)::run() {
             NeighbourJoining <Precision, Operations> nj(options, log, progressReport, aln.seqs, aln.nPos,
                                                         constraintSeqs, distanceMatrix, transmat);
             nj.printDistances(aln.names, output);
-            hashnames.clear();
         } else {
             /* reset counters*/
             options.debug.reset();
@@ -111,6 +110,7 @@ AbsFastTreeImpl(void)::run() {
             int64_t nSeq = (int64_t) aln.seqs.size();
             int64_t unSeq = (int64_t) unique.uniqueSeq.size();
             int64_t unConstraints = (int64_t) uniqConstraints.size();
+            vecrelease(unique.uniqueSeq);
 
             if (options.verbose > 2) {
                 log << strformat("read %s seqs %ld (%ld unique) positions %ld nameLast %s seqLast %s",

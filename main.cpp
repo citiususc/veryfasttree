@@ -441,10 +441,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     app.add_option("-threads-level", options.threadsLevel,
                    "Degree of parallelization. If level is 0, VeryFastTree uses the same parallelization strategy as "
-                   "FastTree-2 with some new parallel blocks. If level is 1, VeryFastTree uses its tree partitioning "
-                   "method to perform tree computation in sequential order. If level is 2, VeryFastTree accelerates the"
+                   "FastTree-2 with some new parallel blocks. If level is 1, VeryFastTree uses parallel blocks that "
+                   "require additional memory for computation. If level is 2, VeryFastTree accelerates the"
                    " rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
-                   "performs the computation without preserving sequential order. If level is 4, VeryFastTree "
+                   "performs more computations without preserving sequential order. If level is 4, VeryFastTree "
                    "accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with "
                    "datasets larger than 2^sprlength). Note: Each level includes the previous ones, and computation at "
                    "level 2 and above is performed in a different tree traverse order, so the result may change but is "
@@ -452,9 +452,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);
 
     app.add_option("-threads-mode", options.deterministic,
-                   "Changes the mode of parallelization. If level is 0, VeryFastTree uses all parallel parts of "
-                   "FastTree-2 including non-deterministic. If level is 1 (default), VeryFastTree only uses "
-                   "deterministic parallelization parts.")->
+                   "Changes the mode of parallelization. If level is 0, VeryFastTree uses non-deterministic parts, some"
+                   " inspired by FastTree-2 but improved. If level is 1 (default), VeryFastTree only uses deterministic"
+                   " parallelization. Non-deterministic is faster because it requires less computation, but this"
+                   " difference is only notable with very large datasets.")->
             type_name("mode")->check(CLI::Range(0, 1))->group(optimizations);
 
     app.add_option("-thread-subtrees", options.threadSubtrees,

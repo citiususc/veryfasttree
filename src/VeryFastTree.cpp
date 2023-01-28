@@ -53,6 +53,12 @@ void VeryFastTree::settings(std::ostream &log) {
         options.verbose = 1;
     }
 
+    if(options.useTopHits2nd && options.threads > 1){
+        options.useTopHits2nd = false;
+        log << "Warning: 2nd-level will be ignored because using at least 2 threads results in the best performance "
+               "without marginal reductions in tree quality";
+    }
+
 
     options.codesString = options.nCodes == 20 ? Constants::codesStringAA : Constants::codesStringNT;
 
