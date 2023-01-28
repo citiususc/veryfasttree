@@ -619,7 +619,7 @@ namespace veryfasttree {
            Note that the following routines do not handle the tophits heuristic
            and assume that out-distances are up to date.
         */
-        void setBestHit(int64_t node, int64_t nActive, Besthit &bestjoin, Besthit allhits[]);
+        void setBestHit(int64_t node, int64_t nActive, Besthit &bestjoin, Besthit allhits[], bool shared = false);
 
         void exhaustiveNJSearch(int64_t nActive, Besthit &bestjoin);
 
@@ -655,7 +655,7 @@ namespace veryfasttree {
            Saved list may be shorter than requested if there are insufficient entries
         */
         void sortSaveBestHits(int64_t iNode, std::vector<Besthit> &besthits, int64_t nIn, int64_t nOut,
-                              TopHits &tophits);
+                              TopHits &tophits, bool sort = true);
 
         /* Given candidate hits from one node, "transfer" them to another node:
            Stores them in a new place in the same order

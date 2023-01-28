@@ -3468,23 +3468,19 @@ AbsNeighbourJoining(void)::pathToRoot(int64_t node, std::vector<int64_t> &path) 
     }
 }
 
-AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &bestjoin, Besthit allhits[]) {
+AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &bestjoin, Besthit allhits[],
+                                      bool shared) {
     assert(parent[node] < 0);
 
-    bestjoin.i = node;
-    bestjoin.j = -1;
-    bestjoin.dist = (numeric_t) 1e20;
-    bestjoin.criterion = (numeric_t) 1e20;
-
-    Besthit tmp;
-
-    /* Note -- if we are already in a parallel region, this will be ignored */
-    #pragma omp parallel
-    {
-        Besthit bestjoin2 = bestjoin;
+    if (shared) {
+        bestjoin.i = node;
+        bestjoin.j = -1;
+        bestjoin.dist = (numeric_t) 1e20;
+        bestjoin.criterion = (numeric_t) 1e20;
+        #pragma omp barrier
         #pragma omp for schedule(dynamic)
         for (int64_t j = 0; j < maxnode; j++) {
-            Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
+            Besthit &sv = allhits[j];
             sv.i = node;
             sv.j = j;
             if (parent[j] >= 0) {
@@ -3498,18 +3494,47 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
                that we return...
             */
             setDistCriterion(nActive, sv);
-            /*
-             * Local comparisons in each thread to remove non deterministic results
-             */
-            if (sv.criterion < bestjoin2.criterion && node != j) {
-                bestjoin2 = sv;
-            }
         }
+    } else {
+        bestjoin.i = node;
+        bestjoin.j = -1;
+        bestjoin.dist = (numeric_t) 1e20;
+        bestjoin.criterion = (numeric_t) 1e20;
 
-        #pragma omp critical
+        Besthit tmp;
+
+        #pragma omp parallel
         {
-            if (bestjoin2.criterion < bestjoin.criterion) {
-                bestjoin = bestjoin2;
+            Besthit bestjoin2 = bestjoin;
+            #pragma omp for schedule(dynamic)
+            for (int64_t j = 0; j < maxnode; j++) {
+                Besthit &sv = allhits != nullptr ? allhits[j] : tmp;
+                sv.i = node;
+                sv.j = j;
+                if (parent[j] >= 0) {
+                    sv.i = -1;        /* illegal/empty join */
+                    sv.weight = 0.0;
+                    sv.criterion = sv.dist = (numeric_t) 1e20;
+                    continue;
+                }
+                /* Note that we compute self-distances (allow j==node) because the top-hit heuristic
+                   expects self to be within its top hits, but we exclude those from the bestjoin
+                   that we return...
+                */
+                setDistCriterion(nActive, sv);
+                /*
+                 * Local comparisons in each thread to remove non deterministic results
+                 */
+                if (sv.criterion < bestjoin2.criterion && node != j) {
+                    bestjoin2 = sv;
+                }
+            }
+
+            #pragma omp critical
+            {
+                if (bestjoin2.criterion < bestjoin.criterion) {
+                    bestjoin = bestjoin2;
+                }
             }
         }
     }
@@ -3651,34 +3676,13 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
     int64_t count = 0;
     std::vector<ibool> visited(nSeqs, false);
 
-    if (options.deterministic && options.threads > 1 && options.threadsLevel > 0) {
-        std::vector<std::vector<Besthit>> globalBesthitsSeed(nSeqs);
+    if (options.deterministic && options.threads > 1) {
+        std::vector<Besthit> besthitsSeed(nSeqs);
         TopHits &tophits = tophits_g;
+        Besthit bestjoin;
 
         #pragma omp parallel firstprivate(nHasTopHits)
         {
-            #pragma omp  for schedule(dynamic)
-            for (int64_t iSeed = 0; iSeed < (int64_t) nSeqs; iSeed++) {
-                int64_t seed = seeds[iSeed];
-                globalBesthitsSeed[seed].resize(nSeqs);
-                Besthit bestjoin;
-                setBestHit(seed, nSeqs, bestjoin, globalBesthitsSeed[seed].data());
-                sortSaveBestHits(seed, globalBesthitsSeed[seed], nSeqs, tophits_g.m, tophits_g);
-                if (options.verbose > 0) {
-                    if (nHasTopHits > 100) {
-                        #pragma omp critical
-                        {
-                            count += nHasTopHits;
-                            progressReport.print("Precomputing Top hits for %6ld of %6ld seqs (at seed %6ld)",
-                                                 count + 1, (int64_t) nSeqs, iSeed);
-                            nHasTopHits = 0;
-                        }
-                    }
-                }
-                nHasTopHits++;
-            }
-
-            nHasTopHits = 0;
             for (int64_t iSeed = 0; iSeed < (int64_t) nSeqs; iSeed++) {
                 int64_t seed = seeds[iSeed];
                 if (options.verbose > 0 && nHasTopHits > 100) {
@@ -3693,10 +3697,16 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
                 if (visited[seed]) {
                     continue;
                 }
+                setBestHit(seed, nSeqs, bestjoin, besthitsSeed.data(), true);
+                #pragma omp master
+                {
+                    nHasTopHits++;
+                    psort(besthitsSeed.begin(), besthitsSeed.end(), CompareHitsByCriterion(), true);
+                    sortSaveBestHits(seed, besthitsSeed, nSeqs, tophits_g.m, tophits_g, false);
+                };
                 #pragma omp barrier
                 visited[seed] = true;
 
-                std::vector<Besthit> &besthitsSeed = globalBesthitsSeed[seed];
 
                 /* find "close" neighbors and compute their top hits */
                 double neardist = besthitsSeed[2 * tophits.m - 1].dist * close;
@@ -3743,7 +3753,6 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
                         visited[closeNode] = true;
                         sortSaveBestHits(closeNode, besthitsClose, nUse, tophits.q, tophits);
                         tophits.topHitsLists[closeNode].hitSource = seed;
-                        vecrelease(globalBesthitsSeed[closeNode]);
                     } else if (isClose || identical || (options.fastest && iClose < (tophits.q + 1) / 2)) {
                         nHasTopHits++;
                         options.debug.nCloseUsed++;
@@ -3760,14 +3769,8 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
                                          true);
                         visited[closeNode] = true;
                         sortSaveBestHits(closeNode, besthitsNeighbor, 2 * tophits.m, tophits.m, tophits);
-                        vecrelease(globalBesthitsSeed[closeNode]);
                     }
                 } /* end loop over close candidates */
-                #pragma omp master
-                {
-                    nHasTopHits++;
-                    vecrelease(besthitsSeed);
-                }
             } /* end loop over seeds */
         }
     } else {
@@ -4418,11 +4421,13 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
 }
 
 AbsNeighbourJoining(void)::sortSaveBestHits(int64_t iNode, std::vector<Besthit> &besthits, int64_t nIn, int64_t nOut,
-                                            TopHits &tophits) {
+                                            TopHits &tophits, bool sort) {
     assert(nIn > 0);
     assert(nOut > 0);
 
-    psort(besthits.begin(), besthits.end(), CompareHitsByCriterion());
+    if (sort) {
+        psort(besthits.begin(), besthits.end(), CompareHitsByCriterion());
+    }
 
     /* First count how many we will save
        Not sure if removing duplicates is actually necessary.

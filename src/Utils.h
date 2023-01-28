@@ -38,7 +38,7 @@ namespace veryfasttree {
 #include <chrono>
 #include "cassert"
 #include <omp.h>
-#include <boost/sort/sample_sort/sample_sort.hpp>
+#include <boost/sort/parallel_stable_sort/parallel_stable_sort.hpp>
 #include <cmath>
 
 namespace veryfasttree {
@@ -102,9 +102,9 @@ namespace veryfasttree {
     }
 
     template<typename Iter, typename Compare>
-    inline void psort(Iter first, Iter last, const Compare &comp) {
+    inline void psort(Iter first, Iter last, const Compare &comp, bool force_parallel = false) {
         uint32_t threads = 1;
-        if (!omp_in_parallel()) {
+        if (!omp_in_parallel() || force_parallel) {
             threads = omp_get_num_threads();
         }
         #ifndef NDEBUG
@@ -120,7 +120,7 @@ namespace veryfasttree {
         qsort(&(*first), std::distance(first, last), sizeof(*first), cmp);
         return;
         #endif
-        boost::sort::sample_sort(first, last, comp, threads);
+        boost::sort::parallel_stable_sort(first, last, comp, threads);
     }
 
     template<typename ... Args>
