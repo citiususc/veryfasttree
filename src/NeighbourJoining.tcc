@@ -2763,8 +2763,9 @@ AbsNeighbourJoining(void)::fastNJ() {
     } else if (!options.slow) {
         visible.resize(maxnodes);
         besthitNew.resize(maxnodes);
-        for (int64_t iNode = 0; iNode < (int64_t) nSeqs; iNode++)
+        for (int64_t iNode = 0; iNode < (int64_t) nSeqs; iNode++) {
             setBestHit(iNode, /*nActive*/nSeqs, visible[iNode], /*OUT IGNORED*/nullptr);
+        }
     }
 
     /* Iterate over joins */
@@ -3683,15 +3684,16 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
 
         #pragma omp parallel firstprivate(nHasTopHits)
         {
+            bool showlog = false;
             for (int64_t iSeed = 0; iSeed < (int64_t) nSeqs; iSeed++) {
                 int64_t seed = seeds[iSeed];
-                if (options.verbose > 0 && nHasTopHits > 100) {
-                    #pragma omp master
-                    {
+                if (options.verbose > 0) {
+                    if(iSeed % options.threads == omp_get_thread_num()){
                         count += nHasTopHits;
-                        progressReport.print("Top hits for %6ld of %6ld seqs (at seed %6ld)",
-                                             count + 1, (int64_t) nSeqs, iSeed);
                         nHasTopHits = 0;
+                    }
+                    if(iSeed % 100 == 0){
+                        showlog = true;
                     }
                 }
                 if (visited[seed]) {
@@ -3700,6 +3702,11 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
                 setBestHit(seed, nSeqs, bestjoin, besthitsSeed.data(), true);
                 #pragma omp master
                 {
+                    if (showlog) {
+                        showlog = false;
+                        progressReport.print("Top hits for %6ld of %6ld seqs (at seed %6ld)",
+                                             count + 1, (int64_t) nSeqs, iSeed);
+                    }
                     nHasTopHits++;
                     psort(besthitsSeed.begin(), besthitsSeed.end(), CompareHitsByCriterion(), true);
                     sortSaveBestHits(seed, besthitsSeed, nSeqs, tophits_g.m, tophits_g, false);
@@ -4026,7 +4033,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
 	using best-hit lists only, and updating
 	all out-distances in every best-hit list
 */
-AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Besthit &join) {//TODO
+AbsNeighbourJoining(void)::topHitNJSearch(int64_t nActive, TopHits &tophits, Besthit &join) {
 /* first, do we have at least m/2 candidates in topvisible?
      And remember the best one */
     int64_t nCandidate = 0;
@@ -4195,7 +4202,7 @@ AbsNeighbourJoining(void)::getBestFromTopHits(int64_t iNode, int64_t nActive, To
   Also set visible set for newnode
   Also update visible set for other nodes if we stumble across a "better" hit
 */
-AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits &tophits) {
+AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits &tophits) {//TODO
     int64_t startProfileOps = options.debug.profileOps;
     int64_t startOutProfileOps = options.debug.outprofileOps;
     assert(child[newnode].nChild == 2);
@@ -4672,42 +4679,50 @@ AbsNeighbourJoining(void)::resetTopVisible(int64_t nActive, TopHits &tophits) {
 }
 
 AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> &combined, std::vector<Besthit> &out) {
-    for (int64_t iHit = 0; iHit < (int64_t) combined.size(); iHit++) {
-        Besthit &hit = combined[iHit];
-        updateBestHit(nActive, hit, false);
-    }
-    psort(combined.begin(), combined.end(), CompareHitsByIJ());
-
-    out.reserve(combined.size());
-    int64_t iSavedLast = -1;
-
-
-    /* First build the new list */
-    for (int64_t iHit = 0; iHit < (int64_t) combined.size(); iHit++) {
-        Besthit &hit = combined[iHit];
-        if (hit.i < 0 || hit.j < 0) {
-            continue;
+    #pragma omp parallel
+    {
+        #pragma omp for schedule(dynamic)
+        for (int64_t iHit = 0; iHit < (int64_t) combined.size(); iHit++) {
+            Besthit &hit = combined[iHit];
+            updateBestHit(nActive, hit, false);
         }
-        if (iSavedLast >= 0) {
-            /* toss out duplicates */
-            Besthit &saved = combined[iSavedLast];
-            if (saved.i == hit.i && saved.j == hit.j) {
-                continue;
+
+        #pragma omp master
+        {
+            psort(combined.begin(), combined.end(), CompareHitsByIJ(), true);
+
+            out.reserve(combined.size());
+            int64_t iSavedLast = -1;
+
+            /* First build the new list */
+            for (int64_t iHit = 0; iHit < (int64_t) combined.size(); iHit++) {
+                Besthit &hit = combined[iHit];
+                if (hit.i < 0 || hit.j < 0) {
+                    continue;
+                }
+                if (iSavedLast >= 0) {
+                    /* toss out duplicates */
+                    Besthit &saved = combined[iSavedLast];
+                    if (saved.i == hit.i && saved.j == hit.j) {
+                        continue;
+                    }
+                }
+                assert(hit.j >= 0 && parent[hit.j] < 0);
+                out.push_back(hit);
+                iSavedLast = iHit;
             }
         }
-        assert(hit.j >= 0 && parent[hit.j] < 0);
-        out.push_back(hit);
-        iSavedLast = iHit;
-    }
+        #pragma omp barrier
 
-    /* Then do any updates to the criterion or the distances in parallel */
-    #pragma omp parallel for schedule(static)
-    for (int64_t iHit = 0; iHit < (int64_t) out.size(); iHit++) {
-        Besthit &hit = out[iHit];
-        if (hit.dist < 0.0) {
-            setDistCriterion(nActive, hit);
-        } else {
-            setCriterion(nActive, hit);
+        /* Then do any updates to the criterion or the distances in parallel */
+        #pragma omp parallel for schedule(dynamic)
+        for (int64_t iHit = 0; iHit < (int64_t) out.size(); iHit++) {
+            Besthit &hit = out[iHit];
+            if (hit.dist < 0.0) {
+                setDistCriterion(nActive, hit);
+            } else {
+                setCriterion(nActive, hit);
+            }
         }
     }
 }
