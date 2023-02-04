@@ -174,10 +174,10 @@ NeighbourJoining(Options &options, std::ostream &log, ProgressReport &progressRe
                  TransitionMatrix <Precision, op_t::ALIGNMENT> &transmat) : log(log),
                                                                             options(options),
                                                                             progressReport(progressReport),
+                                                                            nSeqs((int64_t) seqs.size()),
                                                                             nCodeSize(alignsz(options.nCodes,
                                                                                               op_t::ALIGNMENT /
                                                                                               sizeof(numeric_t))),
-                                                                            nSeqs((int64_t) seqs.size()),
                                                                             distanceMatrix(distanceMatrix),
                                                                             transmat(transmat),
                                                                             constraintSeqs(constraintSeqs),
@@ -4715,7 +4715,7 @@ AbsNeighbourJoining(void)::uniqueBestHits(int64_t nActive, std::vector<Besthit> 
         #pragma omp barrier
 
         /* Then do any updates to the criterion or the distances in parallel */
-        #pragma omp parallel for schedule(dynamic)
+        #pragma omp for schedule(dynamic)
         for (int64_t iHit = 0; iHit < (int64_t) out.size(); iHit++) {
             Besthit &hit = out[iHit];
             if (hit.dist < 0.0) {
