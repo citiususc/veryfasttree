@@ -62,7 +62,7 @@ AbsTransitionMatrix(void)::createGTR(const Options &options, double r[], double 
 }
 
 AbsTransitionMatrix(void)::readAATransitionMatrix(const Options &options, /*IN*/ const std::string &filename) {
-    assert(nCodes == 20);
+    assert(options.nCodes == 20);
     double stat[20];
     double matrix[MAXCODES][MAXCODES];
     std::string buf;

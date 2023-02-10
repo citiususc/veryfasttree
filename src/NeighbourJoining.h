@@ -454,7 +454,7 @@ namespace veryfasttree {
         void normalizeFreq(numeric_t freq[], DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
 
         /* Allocate, if necessary, and recompute the codeDist*/
-        void setCodeDist(Profile &profile);
+        void setCodeDist(Profile &profile, bool shared = false);
 
         /* f1 can be NULL if code1 != NOCODE, and similarly for f2
            Or, if (say) weight1 was 0, then can have code1==NOCODE *and* f1==NULL

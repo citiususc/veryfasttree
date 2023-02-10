@@ -682,91 +682,81 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
     out.reset();
     double inweight = 1.0 / (double) nProfiles;   /* The maximal output weight is 1.0 */
 
-    /* First, set weights -- code is always NOCODE, prevent weight=0 */
-    for (int64_t i = 0; i < nPos; i++) {
-        out.weights[i] = 0;
-        for (int64_t in = 0; in < nProfiles; in++) {
-            out.weights[i] += asRef(_profiles[in]).weights[i] * inweight;
-        }
-        if (out.weights[i] <= 0) {
-            out.weights[i] = (numeric_t) 1e-20;
-        } /* always store a vector */
-        out.nVectors++;
-        out.codes[i] = NOCODE;        /* outprofile is normally complicated */
-    }
-
-    /* Initialize the frequencies to 0 */
-    out.setVectorSize(out.nVectors * nCodeSize, 0);
-
-    /* Add up the weights, going through each sequence in turn */
-    if (options.threads > 1 && nProfiles == (int64_t) nSeqs) {
-        std::vector<std::vector<numeric_t, typename op_t::Allocator>> out_locals;
-        for (int i = 0; i < options.threads; i++) {
-            out_locals.emplace_back(out.nVectors * nCodeSize, 0);
-        }
-
-        #pragma omp parallel
-        {
-            std::vector<numeric_t, typename op_t::Allocator> &out_local = out_locals[omp_get_thread_num()];
-            #pragma omp for schedule(static)
+    #pragma omp parallel
+    {
+        /* First, set weights -- code is always NOCODE, prevent weight=0 */
+        #pragma omp for schedule(dynamic)
+        for (int64_t i = 0; i < nPos; i++) {
+            out.weights[i] = 0;
             for (int64_t in = 0; in < nProfiles; in++) {
-                int64_t iFreqOut = 0;
-                int64_t iFreqIn = 0;
-                for (int64_t i = 0; i < nPos; i++) {
-                    numeric_t *fIn = getFreq(asRef(_profiles[in]), i, iFreqIn);
-                    getFreq(out, i, iFreqOut);
-                    if (asRef(_profiles[in]).weights[i] > 0) {
-                        numeric_t *lfOut = &out_local[nCodeSize * (iFreqOut - 1)];
-                        addToFreq(lfOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
-                    }
-                }
-                assert(iFreqOut == out.nVectors);
-                assert(iFreqIn == asRef(_profiles[in]).nVectors);
+                out.weights[i] += asRef(_profiles[in]).weights[i] * inweight;
             }
+            if (out.weights[i] <= 0) {
+                out.weights[i] = (numeric_t) 1e-20;
+            } /* always store a vector */
+            out.codes[i] = NOCODE;        /* outprofile is normally complicated */
         }
-        for (int i = 0; i < options.threads; i++) {
-            operations.vector_add(&out.vectors[0], &out_locals[i][0], (int64_t) out.vectorsSize);
+
+        #pragma omp single
+        {
+            out.nVectors = nPos;
+            /* Initialize the frequencies to 0 */
+            out.setVectorSize(out.nVectors * nCodeSize, 0);
         }
-    } else {
+        #pragma omp barrier
+
+        std::vector<numeric_t, typename op_t::Allocator> tmp(out.nVectors * nCodeSize, 0);
+        #pragma omp for schedule(dynamic)
         for (int64_t in = 0; in < nProfiles; in++) {
             int64_t iFreqOut = 0;
             int64_t iFreqIn = 0;
             for (int64_t i = 0; i < nPos; i++) {
                 numeric_t *fIn = getFreq(asRef(_profiles[in]), i, iFreqIn);
-                numeric_t *fOut = getFreq(out, i, iFreqOut);
+                getFreq(out, i, iFreqOut);
                 if (asRef(_profiles[in]).weights[i] > 0) {
-                    addToFreq(fOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
+                    numeric_t *lfOut = &tmp[nCodeSize * (iFreqOut - 1)];
+                    addToFreq(lfOut, asRef(_profiles[in]).weights[i], asRef(_profiles[in]).codes[i], fIn);
                 }
             }
             assert(iFreqOut == out.nVectors);
             assert(iFreqIn == asRef(_profiles[in]).nVectors);
         }
-    }
 
-    /* And normalize the frequencies to sum to 1 */
-    int64_t iFreqOut = 0;
-    for (int64_t i = 0; i < nPos; i++) {
-        numeric_t *fOut = getFreq(out, i, iFreqOut);
-        if (fOut != nullptr) {
+        #pragma omp critical
+        {
+            operations.vector_add(&out.vectors[0], &tmp[0], (int64_t) out.vectorsSize);
+        }
+        #pragma omp barrier
+
+        /* And normalize the frequencies to sum to 1 */
+        int64_t iFreqOut = 0;
+        #pragma omp for schedule(dynamic)
+        for (int64_t i = 0; i < nPos; i++) {
+            iFreqOut = i;// code is always NOCODE and weight>0
+            numeric_t *fOut = getFreq(out, i, iFreqOut);
+            assert(fOut != nullptr);
             normalizeFreq(fOut, distanceMatrix);
         }
-    }
-    assert(iFreqOut == out.nVectors);
-    if (options.verbose > 10) {
-        log << strformat("Average %ld profiles", nProfiles) << std::endl;
-    }
-    if (distanceMatrix) {
-        setCodeDist(out);
-    }
 
-    /* Compute constraints */
-    #pragma omp parallel for schedule(static)
-    for (int64_t i = 0; i < (int64_t) constraintSeqs.size(); i++) {
-        for (int64_t in = 0; in < nProfiles; in++) {
-            out.nOn[i] += asRef(_profiles[in]).nOn[i];
-            out.nOff[i] += asRef(_profiles[in]).nOff[i];
+        assert(nPos == out.nVectors);
+        if (options.verbose > 10) {
+            log << strformat("Average %ld profiles", nProfiles) << std::endl;
+        }
+
+        if (distanceMatrix) {
+            setCodeDist(out, /*shared*/true);
+        }
+
+        /* Compute constraints */
+        #pragma omp for schedule(static)
+        for (int64_t i = 0; i < (int64_t) constraintSeqs.size(); i++) {
+            for (int64_t in = 0; in < nProfiles; in++) {
+                out.nOn[i] += asRef(_profiles[in]).nOn[i];
+                out.nOff[i] += asRef(_profiles[in]).nOff[i];
+            }
         }
     }
+
 }
 
 AbsNeighbourJoining(void)::addToFreq(numeric_t fOut[], double weight, int64_t codeIn, numeric_t fIn[]) {
@@ -825,19 +815,31 @@ AbsNeighbourJoining(void)::normalizeFreq(numeric_t freq[], DistanceMatrix <Preci
     }
 }
 
-AbsNeighbourJoining(void)::setCodeDist(Profile &profile) {
-    if (profile.codeDistSize == 0) {
-        profile.setCodeDistSize(nPos * options.nCodes);
-    }
-    int64_t iFreq = 0;
-    for (int64_t i = 0; i < nPos; i++) {
-        numeric_t *f = getFreq(profile, i, iFreq);
-
-        for (int k = 0; k < options.nCodes; k++) {
-            profile.codeDist[i * options.nCodes + k] = profileDistPiece(profile.codes[i], k, f, nullptr, nullptr);
+AbsNeighbourJoining(void)::setCodeDist(Profile &profile, bool shared) {
+    if (shared) {
+        int64_t iFreq = 0;
+        #pragma omp for schedule(dynamic)
+        for (int64_t i = 0; i < nPos; i++) {
+            numeric_t *f = getFreq(profile, i, iFreq);
+            assert(f != nullptr);
+            for (int k = 0; k < options.nCodes; k++) {
+                profile.codeDist[i * options.nCodes + k] = profileDistPiece(profile.codes[i], k, f, nullptr, nullptr);
+            }
         }
+    } else {
+        if (profile.codeDistSize == 0) {
+            profile.setCodeDistSize(nPos * options.nCodes);
+        }
+        int64_t iFreq = 0;
+        for (int64_t i = 0; i < nPos; i++) {
+            numeric_t *f = getFreq(profile, i, iFreq);
+
+            for (int k = 0; k < options.nCodes; k++) {
+                profile.codeDist[i * options.nCodes + k] = profileDistPiece(profile.codes[i], k, f, nullptr, nullptr);
+            }
+        }
+        assert(iFreq == profile.nVectors);
     }
-    assert(iFreq == profile.nVectors);
 }
 
 AbsNeighbourJoining(double)::
@@ -1110,20 +1112,83 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
     double denom = 0;
     int64_t iFreq1 = 0;
     int64_t iFreq2 = 0;
-    for (int64_t i = 0; i < nPos; i++) {
-        numeric_t *f1 = getFreq(profile1, i, iFreq1);
-        numeric_t *f2 = getFreq(profile2, i, iFreq2);
-        if (profile1.weights[i] > 0 && profile2.weights[i] > 0) {
-            double weight = profile1.weights[i] * profile2.weights[i];
-            denom += weight;
-            double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
-                                            (!profile2.codeDistSize == 0 ? &profile2.codeDist[i * options.nCodes]
-                                                                         : nullptr));
-            top += weight * piece;
+    if (!omp_in_parallel() && options.threads > 1 && options.threadsLevel > 0) {
+        std::vector<int64_t> hasFreq1(nPos, 0);
+        std::vector<int64_t> hasFreq2(nPos, 0);
+        std::vector<int64_t> found1(options.threads, 0);
+        std::vector<int64_t> found2(options.threads, 0);
+
+        #pragma omp parallel firstprivate(iFreq1, iFreq2)
+        {
+            double top2 = top;
+            double denom2 = denom;
+            int id = omp_get_thread_num();
+            #pragma omp for schedule(static, (nPos / options.threads) + 1)
+            for (int64_t i = 0; i < nPos; i++) {
+                hasFreq1[i] = getFreq(profile1, i, iFreq1) != nullptr ? 1 : 0;
+                hasFreq2[i] = getFreq(profile2, i, iFreq2) != nullptr ? 1 : 0;
+            }
+
+            found1[id] = iFreq1;
+            found2[id] = iFreq2;
+            #pragma omp barrier
+            iFreq1 = 0;
+            iFreq2 = 0;
+            for (int i = 0; i < id; i++) {
+                iFreq1 += found1[i];
+                iFreq2 += found2[i];
+            }
+
+            #pragma omp for schedule(static, (nPos / options.threads) + 1)
+            for (int64_t i = 0; i < nPos; i++) {
+                if (hasFreq1[i] > 0) {
+                    hasFreq1[i] = iFreq1++;
+                }
+                if (hasFreq2[i] > 0) {
+                    hasFreq2[i] = iFreq2++;
+                }
+            }
+
+            assert(found1.back() == profile1.nVectors);
+            assert(found1.back() == profile2.nVectors);
+
+            #pragma omp for schedule(dynamic)
+            for (int64_t i = 0; i < nPos; i++) {
+                if (profile1.weights[i] > 0 && profile2.weights[i] > 0) {
+                    numeric_t *f1 = getFreq(profile1, i, hasFreq1[i]);
+                    numeric_t *f2 = getFreq(profile2, i, hasFreq2[i]);
+                    double weight = profile1.weights[i] * profile2.weights[i];
+                    denom2 += weight;
+                    double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
+                                                    (!profile2.codeDistSize == 0 ? &profile2.codeDist[i *
+                                                                                                      options.nCodes]
+                                                                                 : nullptr));
+                    top2 += weight * piece;
+                }
+            }
+
+            #pragma omp critical
+            {
+                denom += denom2;
+                top += top2;
+            }
         }
+    } else {
+        for (int64_t i = 0; i < nPos; i++) {
+            numeric_t *f1 = getFreq(profile1, i, iFreq1);
+            numeric_t *f2 = getFreq(profile2, i, iFreq2);
+            if (profile1.weights[i] > 0 && profile2.weights[i] > 0) {
+                double weight = profile1.weights[i] * profile2.weights[i];
+                denom += weight;
+                double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
+                                                (!profile2.codeDistSize == 0 ? &profile2.codeDist[i * options.nCodes]
+                                                                             : nullptr));
+                top += weight * piece;
+            }
+        }
+        assert(iFreq1 == profile1.nVectors);
+        assert(iFreq2 == profile2.nVectors);
     }
-    assert(iFreq1 == profile1.nVectors);
-    assert(iFreq2 == profile2.nVectors);
     hit.weight = denom > 0 ? denom : 0.01; /* 0.01 is an arbitrarily low value of weight (normally >>1) */
     hit.dist = denom > 0 ? top / denom : 1;
     options.debug.profileOps++;
@@ -3671,7 +3736,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
     psort(seeds.begin(), seeds.end(), CompareSeeds(outDistances, nGaps));
 
     /* For each seed, save its top 2*m hits and then look for close neighbors */
-    assert(2 * tophits.m <= (int64_t) nSeqs);
+    assert(2 * tophits_g.m <= (int64_t) nSeqs);
 
     int64_t nHasTopHits = 0;
     int64_t count = 0;
@@ -3688,11 +3753,11 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
             for (int64_t iSeed = 0; iSeed < (int64_t) nSeqs; iSeed++) {
                 int64_t seed = seeds[iSeed];
                 if (options.verbose > 0) {
-                    if(iSeed % options.threads == omp_get_thread_num()){
+                    if (iSeed % options.threads == omp_get_thread_num()) {
                         count += nHasTopHits;
                         nHasTopHits = 0;
                     }
-                    if(iSeed % 100 == 0){
+                    if (iSeed % 100 == 0) {
                         showlog = true;
                     }
                 }
