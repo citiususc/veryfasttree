@@ -13,7 +13,8 @@ __VA_ARGS__ veryfasttree::VeyFastTreeImpl<Precision, Operations>
 
 
 AbsFastTreeImpl()::VeyFastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log) :
-        options(options), input(input), output(output), log(log), progressReport(options) {
+        options(options), input(input), output(output), log(log),
+        progressReport(options.showProgress, options.verbose) {
     if (!options.matrixPrefix.empty()) {
         if (!options.useMatrix) {
             throw std::invalid_argument("Cannot use both -matrix and -nomatrix arguments!");
@@ -68,18 +69,21 @@ AbsFastTreeImpl(void)::run() {
         progressReport.print("Hashed the names");
         if (options.makeMatrix) {
             std::vector<std::string> constraintSeqs;
+            std::unique_ptr<DiskMemory> constraintSeqsDisk;
             NeighbourJoining <Precision, Operations> nj(options, log, progressReport, aln.seqs, aln.nPos,
-                                                        constraintSeqs, distanceMatrix, transmat);
+                                                        constraintSeqs, distanceMatrix, transmat, aln.disk,
+                                                        constraintSeqsDisk);
             nj.printDistances(aln.names, output);
         } else {
             /* reset counters*/
             options.debug.reset();
 
-            Uniquify unique(aln);
+            Uniquify unique = Uniquify(aln);
             progressReport.print("Identified unique sequences");
 
             /* read constraints */
             std::vector<std::string> uniqConstraints;
+            std::unique_ptr<DiskMemory> uniqConstraintsDisk;
             if (fpConstraints) {
                 Alignment constraints(options, fpConstraints, log);
                 constraints.readAlignment();
@@ -87,13 +91,13 @@ AbsFastTreeImpl(void)::run() {
                     log << "Warning: constraints file with less than 4 sequences ignored:" << std::endl;
                     log << strformat("alignment #%ld in ", iAln + 1) << options.constraintsFile << std::endl;
                 } else {
-                    alnToConstraints(uniqConstraints, constraints, unique, hashnames);
+                    alnToConstraints(uniqConstraints, uniqConstraintsDisk, constraints, unique, hashnames);
                     progressReport.print("Read the constraints");
                 }
             }    /* end load constraints */
 
             if (options.nCodes == 20) {
-                if(!options.transitionFile.empty()){
+                if (!options.transitionFile.empty()) {
                     transmat.readAATransitionMatrix(options, options.transitionFile);
                 } else if (options.bUseLg) {
                     transmat.createTransitionMatrixLG08(options);
@@ -106,19 +110,19 @@ AbsFastTreeImpl(void)::run() {
                 transmat.createGTR(options, options.gtrrates, options.gtrfreq);
             }
             NeighbourJoining <Precision, Operations> nj(options, log, progressReport, unique.uniqueSeq, aln.nPos,
-                                                        uniqConstraints, distanceMatrix, transmat);
+                                                        uniqConstraints, distanceMatrix, transmat, unique.disk,
+                                                        uniqConstraintsDisk);
             int64_t nSeq = (int64_t) aln.seqs.size();
             int64_t unSeq = (int64_t) unique.uniqueSeq.size();
             int64_t unConstraints = (int64_t) uniqConstraints.size();
-            vecrelease(unique.uniqueSeq);
 
             if (options.verbose > 2) {
                 log << strformat("read %s seqs %ld (%ld unique) positions %ld nameLast %s seqLast %s",
                                  options.inFileName.empty() ? "standard input" : options.inFileName.c_str(),
                                  nSeq, unSeq, aln.nPos,
-                                 aln.names[aln.seqs.size() - 1].c_str(),
-                                 aln.seqs[aln.seqs.size() - 1].c_str()) << std::endl;
+                                 aln.names.back().c_str(), unique.uniqueSeq.back().c_str()) << std::endl;
             }
+            vecrelease(unique.uniqueSeq);
             aln.clearAlignmentSeqs(); /*no longer needed*/
             if (fpInTree) {
                 if (options.intree1) {
@@ -458,8 +462,11 @@ AbsFastTreeImpl(void)::run() {
     }/* end loop over alignments */
 }
 
-AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraints, Alignment &constraints,
-                                        Uniquify &unique, HashTable &hashnames) {
+AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraints, std::unique_ptr<DiskMemory> &disk,
+                                        Alignment &constraints, Uniquify &unique, HashTable &hashnames) {
+    if (options.diskComputing) {
+        std::swap(constraints.disk, disk);
+    }
     /* look up constraints as names and map to unique-space */
     uniqConstraints.reserve(unique.uniqueSeq.size());
 
@@ -476,6 +483,11 @@ AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraint
         int64_t iSeqUnique = unique.alnToUniq[iSeqNonunique];
         assert(iSeqUnique >= 0 && iSeqUnique < (int64_t) unique.uniqueSeq.size());
         if (!uniqConstraints[iSeqUnique].empty()) {
+            size_t disk_tmp[2];
+            if (options.diskComputing) {
+                disk->load(uniqConstraints[iSeqUnique], disk_tmp[0]);
+                disk->load(constraintSeq, disk_tmp[1]);
+            }
             /* Already set a constraint for this group of sequences!
             Warn that we are ignoring this one unless the constraints match */
             if (uniqConstraints[iSeqUnique] != constraintSeq) {
@@ -483,8 +495,12 @@ AbsFastTreeImpl(void)::alnToConstraints(std::vector<std::string> &uniqConstraint
                 log << constraintSeq << std::endl;
                 log << "Another sequence has the same sequence but different constraints" << std::endl;
             }
+            if (options.diskComputing) {
+                disk->release(uniqConstraints[iSeqUnique], disk_tmp[0]);
+                disk->release(constraintSeq, disk_tmp[1]);
+            }
         } else {
-            uniqConstraints[iSeqUnique] = constraintSeq;
+            uniqConstraints[iSeqUnique] = std::move(constraintSeq);
         }
     }
 }

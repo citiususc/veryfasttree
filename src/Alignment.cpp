@@ -13,6 +13,47 @@ Alignment::Alignment(const Options &options, std::istream &fp, std::ostream &log
 
 void Alignment::readAlignment() {
     std::string buf;
+    const std::string fname = options.diskComputingPath + "-" + std::to_string((uintptr_t) this) +"-seqs.men";
+    size_t dumpCount = 0, dumpSecCount = 0;
+    size_t dumpSz = 0;
+
+    auto dump = [&](bool dumpSec) {//TODO
+        if (seqs.size() < 2 || seqs[1].empty()) {
+            return;
+        }
+        if (!disk) {
+            if (!dumpSec) {
+                dumpSz = seqs.capacity() * (seqs[0].capacity() + 2);
+            }
+            if (!options.inFileName.empty()) {
+                int f = open(options.inFileName.c_str(), O_RDONLY);
+                if (f != -1) {
+                    dumpSz = (size_t) std::max((int64_t) lseek(f, 0, SEEK_END), (int64_t) dumpSz);
+                    close(f);
+                }
+            }
+            if (dumpSz < 1024) {
+                dumpSz = 1024 * 1024 * 1024;
+            }
+            disk = make_unique<DiskMemory>(fname, dumpSz);
+        }
+        dumpCount += buf.size();
+        if (dumpCount > 1024 * 10) {
+            dumpCount = 0;
+            if (dumpSec) {
+                for (int64_t i = seqs.size() - 1; i > -1; i++) {
+                    if (!seqs[i].empty()) {
+                        disk->store(dumpSecCount, seqs[i]);
+                    }
+                }
+            } else {
+                size_t dumpPad = dumpSz / seqs.capacity();
+                for (int64_t i = 1; i < (int64_t) seqs.size(); i++) {
+                    disk->store(dumpPad * i, seqs[i]);
+                }
+            }
+        }
+    };
 
     readline(fp, buf);
     if (buf.find("#NEXUS") == 0) {
@@ -40,9 +81,9 @@ void Alignment::readAlignment() {
 
         auto readValue = [&buf](const std::string &name) {
             int64_t pos = buf.find(name);
-            pos+=name.size();
+            pos += name.size();
             while (isspace(buf[pos])) { pos++; }
-            if(buf[pos++] != '='){return (int64_t) -1;}
+            if (buf[pos++] != '=') { return (int64_t) -1; }
             while (isspace(buf[pos])) { pos++; }
             return pos;
         };
@@ -86,66 +127,67 @@ void Alignment::readAlignment() {
             throw std::invalid_argument("No matrix command found in characters block");
         }
 
-        if(ntax > 0){
+        if (ntax > 0) {
             seqs.reserve(ntax);
             names.reserve(ntax);
         }
         int64_t seqi = 0;
         while (readline(fp, buf)) {
+            if (options.diskComputing) { dump(false); }
             /* loop matrix lines */
             int64_t pos = 0;
             while (isspace(buf[pos])) { pos++; }
             if (buf[pos] == ';') {
                 break;
             }
-            if(pos == '\n'){
-                if(interleave){
+            if (pos == '\n') {
+                if (interleave) {
                     seqi = 0;
                 }
                 continue;
             }
             int64_t init = pos;
-            if(buf[pos] == '\'' || buf[pos] == '"'){
+            if (buf[pos] == '\'' || buf[pos] == '"') {
                 pos++;
-                while(buf[pos] != buf[init] || pos == (int64_t)buf.size()){pos++;}
+                while (buf[pos] != buf[init] || pos == (int64_t) buf.size()) { pos++; }
                 init++;
-            }else{
-                while (!isspace(buf[pos]) || pos == (int64_t)buf.size()) { pos++; }
+            } else {
+                while (!isspace(buf[pos]) || pos == (int64_t) buf.size()) { pos++; }
             }
-            if(pos == (int64_t)buf.size()){
+            if (pos == (int64_t) buf.size()) {
                 throw std::invalid_argument("Wrong sequence name format: " + buf);
             }
-            if(seqi == (int64_t)seqs.size()){
+            if (seqi == (int64_t) seqs.size()) {
                 names.emplace_back(buf, init, pos - init);
             }
             pos++;
-            if(seqi <= (int64_t)seqs.size()){
+            if (seqi <= (int64_t) seqs.size()) {
                 seqs.emplace_back();
-                if(nchar > 0){
+                if (nchar > 0) {
                     seqs.back().reserve(nchar);
                 }
             }
 
-            for(;pos < (int64_t)buf.size();pos++){
-                if(isspace(buf[pos])){
+            for (; pos < (int64_t) buf.size(); pos++) {
+                if (isspace(buf[pos])) {
                     continue;
                 }
-                if(buf[pos] == fgap){
+                if (buf[pos] == fgap) {
                     seqs[seqi].push_back('-');
-                }else if(buf[pos] == fmatchchar && seqi > 0){
-                    seqs[seqi].push_back(seqs[seqi - 1 ][seqs[seqi].size()]);
-                }else{
+                } else if (buf[pos] == fmatchchar && seqi > 0) {
+                    seqs[seqi].push_back(seqs[seqi - 1][seqs[seqi].size()]);
+                } else {
                     seqs[seqi].push_back(buf[pos]);
                 }
             }
 
             seqi++;
         }
-        if(!seqs.empty()){
+        if (!seqs.empty()) {
             nPos = seqs[0].size();
         }
 
-        if (ntax > 0 && (int64_t)seqs.size() != ntax) {
+        if (ntax > 0 && (int64_t) seqs.size() != ntax) {
             throw std::invalid_argument(strformat("Wrong number of sequences: expected %ld", ntax));
         }
 
@@ -183,6 +225,7 @@ void Alignment::readAlignment() {
                     nPos = seq.size();
                 }
             }
+            if (options.diskComputing) { dump(true); }
         } while (readline(fp, buf));
 
         if (names.size() != seqs.size()) {
@@ -200,10 +243,10 @@ void Alignment::readAlignment() {
 
         do {
             /* loop over lines */
-            if (qualityLine){
+            if (qualityLine) {
                 //Quality values are ignored
                 qualityLine = false;
-            }else if (buf[0] == '+')
+            } else if (buf[0] == '+')
                 qualityLine = true;
             if (buf[0] == '@') {
                 if (!seqs.empty()) {
@@ -229,6 +272,7 @@ void Alignment::readAlignment() {
                     nPos = seq.size();
                 }
             }
+            if (options.diskComputing) { dump(true); }
         } while (readline(fp, buf));
 
         if (names.size() != seqs.size()) {
@@ -259,6 +303,7 @@ void Alignment::readAlignment() {
 
         int64_t iSeq = 0;
         while (readline(fp, buf)) {
+            if (options.diskComputing) { dump(false); }
             if (buf.empty() && (iSeq == nSeq || iSeq == 0)) {
                 iSeq = 0;
             } else {
@@ -315,18 +360,23 @@ void Alignment::readAlignment() {
     }
     /* Check lengths of sequences */
     for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
+        size_t disk_tmp;
+        if (options.diskComputing) { disk->load(seqs[i], disk_tmp); }
         if ((int64_t) seqs[i].size() != nPos) {
             throw std::invalid_argument(strformat(
                     "Wrong number of characters for %s: expected %ld but have %ld instead.\n"
                     "This sequence may be truncated, or another sequence may be too long.",
                     names[i].c_str(), nPos, seqs[i].size()));
         }
+        if (options.diskComputing) { disk->release(seqs[i], disk_tmp); }
     }
     /* Replace "." with "-" and warn if we find any */
     /* If nucleotide sequences, replace U with T and N with X */
     bool findDot = false;
     #pragma omp parallel for schedule(static), reduction(||:findDot)
     for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {
+        size_t disk_tmp;
+        if (options.diskComputing) { disk->load(seqs[i], disk_tmp); }
         for (int64_t j = 0; j < (int64_t) seqs[i].size(); j++) {
             if (seqs[i][j] == '.') {
                 seqs[i][j] = '-';
@@ -339,6 +389,7 @@ void Alignment::readAlignment() {
                 }
             }
         }
+        if (options.diskComputing) { disk->release(seqs[i], disk_tmp); }
     }
     if (findDot) {
         log << "Warning! Found \".\" character(s). These are treated as gaps" << std::endl;
@@ -351,6 +402,7 @@ void Alignment::readAlignment() {
 
 void Alignment::clearAlignmentSeqs() {
     seqs.resize(0);
+    disk.reset();
 }
 
 void Alignment::clearAlignment() {
@@ -361,7 +413,8 @@ void Alignment::clearAlignment() {
 
 Uniquify::Uniquify(Alignment &aln) {
     int64_t nUniqueSeq = 0;
-    HashTable hashseqs(aln.seqs);
+    std::swap(aln.disk, this->disk);
+    HashTable hashseqs = this->disk ? HashTable(aln.seqs, this->disk) : HashTable(aln.seqs);
 
     uniqueSeq.resize(hashseqs.size());     /* iUnique -> seq */
     uniqueFirst.resize(aln.seqs.size());   /* iUnique -> iFirst in aln */

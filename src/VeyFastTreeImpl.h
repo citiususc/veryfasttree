@@ -41,8 +41,8 @@ namespace veryfasttree {
         /* Convert a constraint alignment to a list of sequences. The returned array is indexed
            by iUnique and points to values in the input alignment
         */
-        void alnToConstraints(std::vector<std::string> &uniqConstraints, Alignment &constraints, Uniquify &unique,
-                              HashTable &hashnames);
+        void alnToConstraints(std::vector<std::string> &uniqConstraints, std::unique_ptr<DiskMemory> &disk,
+                              Alignment &constraints, Uniquify &unique, HashTable &hashnames);
 
         void transMatToDistanceMat(DistanceMatrix<Precision, op_t::ALIGNMENT>& dmat);
     };

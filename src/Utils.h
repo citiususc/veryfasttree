@@ -9,6 +9,7 @@ typedef int8_t ibool;
 
 #include <io.h>
 #include <ciso646>
+#define FILE_SEP '\\'
 
 namespace veryfasttree {
     inline bool isWindows(){return true;}
@@ -22,6 +23,7 @@ namespace veryfasttree {
 #else
 
 #include <unistd.h>
+#define FILE_SEP '/'
 
 namespace veryfasttree {
     inline bool isWindows() { return false; }
@@ -40,6 +42,7 @@ namespace veryfasttree {
 #include <omp.h>
 #include <boost/sort/parallel_stable_sort/parallel_stable_sort.hpp>
 #include <cmath>
+#include <random>
 
 namespace veryfasttree {
     class TeeStream : public std::streambuf {
@@ -89,16 +92,31 @@ namespace veryfasttree {
     }
 
     template<typename T>
-    inline void vecrelease(std::vector<T>&v){
+    inline void vecrelease(std::vector<T> &v) {
         v.resize(0);
         v.shrink_to_fit();
     }
 
-    inline void strrelease(std::string& s){
-        if(s.size() > 0){
+    inline void strrelease(std::string &s) {
+        if (s.size() > 0) {
             s.resize(0);
         }
         s.shrink_to_fit();
+    }
+
+    inline std::string randomString(std::size_t length) {
+        const std::string chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        std::string res(length, 0);
+
+        std::random_device random_device;
+        std::mt19937 generator(random_device());
+        std::uniform_int_distribution<> distribution(0, (int) chars.size() - 1);
+
+        for (std::size_t i = 0; i < length; ++i) {
+            res[i] += chars[(int) distribution(generator)];
+        }
+
+        return res;
     }
 
     template<typename Iter, typename Compare>
@@ -164,7 +182,8 @@ namespace veryfasttree {
 
         typedef std::chrono::high_resolution_clock Clock;
 
-        ProgressReport(const Options &options) : clockStart(Clock::now()), timeLast(Clock::now()), options(options) {}
+        ProgressReport(bool showProgress, int verbose) : clockStart(Clock::now()), timeLast(Clock::now()),
+        showProgress(showProgress) , verbose(verbose){}
 
         inline double clockDiff() {
             auto timeNow = Clock::now();
@@ -174,17 +193,17 @@ namespace veryfasttree {
 
         template<typename ... Args>
         inline void print(const std::string &format, Args ... args) {
-            if (!options.showProgress) {
+            if (!showProgress) {
                 return;
             }
 
             auto timeNow = Clock::now();
             int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeLast).count();
 
-            if (mili > 100 || options.verbose > 1) {
+            if (mili > 100 || verbose > 1) {
                 std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
                 std::cerr << strformat(format, args...);
-                if (options.verbose > 1 || !isattyErr()) {
+                if (verbose > 1 || !isattyErr()) {
                     std::cerr << std::endl;
                 } else {
                     std::cerr << "   \r" << std::flush;
@@ -196,7 +215,8 @@ namespace veryfasttree {
     private:
         const Clock::time_point clockStart;
         Clock::time_point timeLast;
-        const Options &options;
+        bool showProgress;
+        int verbose;
 
     };
 

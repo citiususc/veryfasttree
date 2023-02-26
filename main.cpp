@@ -446,7 +446,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    " rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
                    "performs more computations without preserving sequential order. If level is 4, VeryFastTree "
                    "accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with "
-                   "datasets larger than 2^sprlength). Note: Each level includes the previous ones, and computation at "
+                   "datasets larger than 2^sprlength + 2). Note: Each level includes the previous ones, and computation at "
                    "level 2 and above is performed in a different tree traverse order, so the result may change but is "
                    "still correct.")->
             type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);
@@ -454,15 +454,17 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_option("-threads-mode", options.deterministic,
                    "Changes the mode of parallelization. If level is 0, VeryFastTree uses non-deterministic parts, some"
                    " inspired by FastTree-2 but improved. If level is 1 (default), VeryFastTree only uses deterministic"
-                   " parallelization. Non-deterministic is faster because it requires less computation, but this"
-                   " difference is only notable with very large datasets.")->
+                   " parallelization. Since version 4.0, deterministic algorithms are at least faster than "
+                   "non-deterministic ones, making deterministic the preferred choice.")->
             type_name("mode")->check(CLI::Range(0, 1))->group(optimizations);
 
-    app.add_option("-thread-subtrees", options.threadSubtrees,
-                   "It sets a maximum number of subtrees assigned to the threads. This option could increase the "
-                   "accuracy for small datasets containing large sequences at the expense of reducing the workload "
-                   "balance among threads.")->type_name("n")
-            ->check(Min(1))->group(optimizations);
+    app.add_option("-threads-ptw", options.particioningTendencyWindow,
+                   "(Partitioning Tendency Window) It sets the size of the partitioning tendency window used by the "
+                   "tree partitioning algorithm to determine when to stop searching. The window stores the last "
+                   "solutions and checks if a better solution can be found. Increasing the value allows the algorithm "
+                   "to explore the tree deeper and potentially find better solutions. The default value is 20.")->
+                    type_name("n")
+            ->check(Min(10))->group(optimizations);
 
     app.add_flag("-threads-verbose", options.threadsVerbose,
                  "To show subtrees assigned to the threads and theoretical speedup, only with verbose > 0")->
@@ -478,10 +480,9 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                             "to speed up computations enabling the vector extensions. "
                             "Available: AUTO(default), NONE, SSE, SSE3 , AVX, AVX2 or AVX512")->type_name("name")
             ->group(optimizations)->default_val("AUTO");
-    for (auto &c: options.extension) { c = (char) std::toupper(c); }
 
     app.add_option("-fastexp", options.fastexp,
-                   "to select an alternative implementation for the exponential function exp(x), which has "
+                   "To select an alternative implementation for the exponential function exp(x), which has "
                    "a significant impact on performance. Options: 0 - built-in math library with double precision "
                    "(default), 1 - built-in math library with simple precision (not recommended with "
                    "-double-precision option), 2 - fast implementation to compute an approximation of "
@@ -489,24 +490,13 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "of exp(x) using simple precision (not recommended with -double-precision option)")->
             type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
 
-    app.add_option("-disk-profiles", options.diskProfilesRatio,
-                   "Reduce the amount of memory required using the disk. Some sequence profiles are stored on disk "
-                   "instead of in memory. Ratio between 0 and 1 specifies the number of profiles to be stored on disk. "
-                   "That is, 1 will store all profiles on disk. Storing more profiles on disk increases the running "
-                   "time. Note that even if the disk file is created, profiles will only be saved to disk when the "
-                   "memory is nearly full.")->
-            type_name("ratio")->check(CLI::Range(0, 1))->group(optimizations);
-
-    app.add_option("-disk-profiles-file", options.diskProfilesFile,
-                   "Select an alternative file location for storing profiles with -disk-profiles. The disk must have "
-                   "enough space to store the profiles. By default the path is the working directory.")->
-            type_name("path")->group(optimizations);
-
-    app.add_flag("-disk-profiles-opt", options.diskProfilesOpt,
-                 "This parameter forces that all attributes within the profiles are saved to disk. It saves more memory "
-                 "but the file disk could be huge.")->
+    app.add_flag("-disk-computing", options.diskComputing,
+                 "Reduce the amount of memory required using disk but increases the running time.")->
             group(optimizations);
 
+    app.add_option("-disk-computing-path", options.diskComputingPath,
+                   "Like -disk-computing but using a custom path folder to store files.")->type_name("path")->
+            group(optimizations);
 
     auto deprecated = "Deprecated";
 

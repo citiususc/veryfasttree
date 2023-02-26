@@ -7,6 +7,7 @@
 #include "HashTable.h"
 #include "Alignment.h"
 #include <vector>
+#include <list>
 #include <iostream>
 #include <mutex>
 #include "Knuth.h"
@@ -23,9 +24,8 @@ namespace veryfasttree {
                          std::vector<std::string> &seqs, int64_t nPos,
                          std::vector<std::string> &constraintSeqs,
                          DistanceMatrix<Precision, op_t::ALIGNMENT> &distanceMatrix,
-                         TransitionMatrix<Precision, op_t::ALIGNMENT> &transmat);
-
-        ~NeighbourJoining();
+                         TransitionMatrix<Precision, op_t::ALIGNMENT> &transmat,
+                         std::unique_ptr<DiskMemory> &seq_disk, std::unique_ptr<DiskMemory> &cons_disk);
 
         void printDistances(std::vector<std::string> &names, std::ostream &out);
 
@@ -123,6 +123,7 @@ namespace veryfasttree {
         typedef Precision numeric_t;
 
         struct Profile {
+            int64_t storeLevel;
             /* alignment profile */
             numeric_t *weights;
             char *codes;
@@ -147,11 +148,9 @@ namespace veryfasttree {
 
             int64_t nGaps; /*precalculated in construction*/
 
-            int8_t diskLevel; /*profile stored in disk: 0 disabled; 1: weights and codes; 2: all variables*/
-
             Profile(int64_t nPos, int64_t nConstraints);
 
-            Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool optAttr, bool test = false);
+            Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool test = false);
 
             ~Profile();
 
@@ -265,15 +264,13 @@ namespace veryfasttree {
            with values of '0', '1', or '-' (for missing data)
            Sequences that have no constraint may have a NULL string
         */
-        std::vector<std::string> &constraintSeqs;
+        int64_t nCons;
 
         /* The profile data structures */
         int64_t maxnode;            /* The next index to allocate */
         int64_t maxnodes;            /* Space allocated in data structures below */
         std::vector<Profile> profiles; /* Profiles of leaves and intermediate nodes */
-        int profilesFile; /* Profiles file descriptor */
-        uintptr_t profilesMap; /* Profiles memory mapping */
-        size_t profilesMapSize; /* Profiles memory mapping size*/
+        std::unique_ptr<DiskMemory> diskProfiles;
         std::vector<numeric_t, typename op_t::Allocator> diameter;    /* To correct for distance "up" from children (if any) */
         std::vector<numeric_t, typename op_t::Allocator> varDiameter; /* To correct variances for distance "up" */
         std::vector<numeric_t, typename op_t::Allocator> selfdist;    /* Saved for use in some formulas */
@@ -300,19 +297,16 @@ namespace veryfasttree {
         /* auxilliary data for maximum likelihood (defaults to 1 category of rate=1.0) */
         Rates rates;
 
-        /*SPR auxilliary variables*/
+        /*NNI and SPR auxilliary variables*/
         std::vector<bool> lockedNodes;
-
-        /*treePartition variables*/
-        std::vector<std::vector<int64_t>> chunksPartitionCache;
-        std::vector<int64_t> chunksToRootCache;
 
         double logCorrect(double dist);
 
         /* Print topology using node indices as node names */
         void printNJInternal(std::ostream &out, bool useLen);
 
-        void seqsToProfiles(std::vector<std::string> &seqs);
+        void seqsToProfiles(std::vector<std::string> &seqs, std::vector<std::string> &constraintSeqs,
+                            std::unique_ptr<DiskMemory> &seq_disk, std::unique_ptr<DiskMemory> &cons_disk);
 
         /* This recomputes the criterion, or returns false if the visible node
            is no longer active.
@@ -748,7 +742,7 @@ namespace veryfasttree {
                                      std::vector<double> &site_loglk);
 
         /*
-         * Splits the tree in partitions to perform a parallalel computing
+         * Splits the tree in partitions to perform a parallel computing
          *
          *  readTree                    sequential
          *  reliabilityNJ               level-1
@@ -762,53 +756,41 @@ namespace veryfasttree {
          *  testSplitsMinEvo            level-1
          *  testSplitsML                level-1
         */
-        void treePartition(std::vector<std::vector<int64_t>> &chunks, std::vector<ibool> &traversal, int deepPen);
+        std::vector<int64_t> treePartitioning(int penalty);
 
-        int64_t treeChunks(std::vector<int64_t> &partition, std::vector<int64_t> &weights,
-                           std::vector<std::vector<int64_t>> &chunks);
-
-        int64_t treeWeight(std::vector<int64_t> &partition, std::vector<int64_t> &weights, int64_t rootWeight);
-
-        int64_t treePenWeight(int64_t branch, std::vector<int64_t> &weights, int deep);
-
-        std::vector<int64_t> treeChunksPaths();
+        std::list<std::vector<int64_t>> parallelTraverse();
 
         void printVisualTree(int node, bool isFirst = false, const std::string &prefix = "");
 
 
-        inline int64_t traverseNNI(int64_t iRound, int64_t nRounds, int64_t &nNNIThisRound, bool useML,
+        inline void traverseNNI(int64_t& iDone, int64_t iRound, int64_t nRounds, int64_t &nNNIThisRound, bool useML,
                                    std::vector<NNIStats> &stats, double &dMaxDelta, int64_t node,
-                                   std::unique_ptr<Profile> upProfiles[], std::vector<ibool> &traversal);
+                                   std::unique_ptr<Profile> upProfiles[], std::vector<ibool> &traversal,
+                                   const std::function<void()>& showlog);
 
-        inline int64_t traverseSPR(int64_t iRound, int64_t nRounds, std::unique_ptr<Profile> upProfiles[],
+        inline void traverseSPR(int64_t& iDone, int64_t iRound, int64_t nRounds, std::unique_ptr<Profile> upProfiles[],
                                    std::vector<ibool> &traversal, int64_t branchRoot, double last_tot_len);
 
 
-        inline void traverseRecomputeProfiles(int64_t node, std::vector<ibool> &traversal,
-                                              DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
+        inline void traverseRecomputeProfiles(int64_t node, DistanceMatrix<Precision, op_t::ALIGNMENT> &dmat);
 
-        inline void traverseRecomputeMLProfiles(int64_t node, std::vector<ibool> &traversal);
+        inline void traverseRecomputeMLProfiles(int64_t node);
 
-        inline double traverseTreeLogLk(int64_t node, std::vector<double> &site_likelihood, double n_site_loglk[],
-                                        std::vector<ibool> &traversal);
+        inline double traverseTreeLogLk(int64_t node, std::vector<double> &site_likelihood, double n_site_loglk[]);
 
-        inline int64_t traverseTestSplitsML(int64_t node, SplitCount &splitcount, const std::vector<int64_t> &col,
-                                            std::unique_ptr<Profile> upProfiles[],
-                                            std::vector<ibool> &traversal);
+        inline void traverseTestSplitsML(int64_t& iDone, int64_t& iDoneT, int64_t node, SplitCount &splitcount,
+                                            const std::vector<int64_t> &col, std::unique_ptr<Profile> upProfiles[]);
 
-        inline int64_t traverseOptimizeAllBranchLengths(int64_t node, std::unique_ptr<Profile> upProfiles[],
-                                                        std::vector<ibool> &traversal);
+        inline void traverseOptimizeAllBranchLengths(int64_t& iDone, int64_t& iDoneT, int64_t node,
+                                                        std::unique_ptr<Profile> upProfiles[]);
 
-        inline void traverseUpdateBranchLengths(int64_t node, std::unique_ptr<Profile> upProfiles[],
-                                                std::vector<ibool> &traversal);
+        inline void traverseUpdateBranchLengths(int64_t node, std::unique_ptr<Profile> upProfiles[]);
 
         inline void traverseTestSplitsMinEvo(int64_t node, SplitCount &splitcount,
-                                             std::unique_ptr<Profile> upProfiles[],
-                                             std::vector<ibool> &traversal);
+                                             std::unique_ptr<Profile> upProfiles[]);
 
-        inline int64_t traverseReliabilityNJ(int64_t node, const std::vector<int64_t> &col,
-                                             std::unique_ptr<Profile> upProfiles[],
-                                             std::vector<ibool> &traversal);
+        inline void traverseReliabilityNJ(int64_t& iDone, int64_t& iDoneT, int64_t node,
+                                             const std::vector<int64_t> &col, std::unique_ptr<Profile> upProfiles[]);
 
         /* One-dimensional minimization using brent's function, with
         a fractional and an absolute tolerance */

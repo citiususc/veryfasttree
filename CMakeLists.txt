@@ -39,6 +39,8 @@ set(SOURCE_FILES
         src/Options.h
         src/Constants.h
         src/Debug.h
+        src/DiskMemory.cpp
+        src/DiskMemory.h
         src/Utils.h
         src/HashTable.h
         src/DistanceMatrix.tcc

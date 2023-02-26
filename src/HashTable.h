@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <tsl/robin_map.h>
+#include "DiskMemory.h"
 #include <xxh64.hpp>
 
 namespace veryfasttree {
@@ -14,7 +15,7 @@ namespace veryfasttree {
         HashTable(const std::vector<std::string> &keys, bool checkUnique = false) {
             table.reserve(keys.size());
             if (checkUnique) {
-                for (int64_t i = 0; i < (int64_t)keys.size(); i++) {
+                for (int64_t i = 0; i < (int64_t) keys.size(); i++) {
                     auto it = table.insert({&keys[i], i});
                     if (!it.second) {
                         throw std::invalid_argument("Non-unique name '" + keys[i] + "' in the alignment");
@@ -27,24 +28,44 @@ namespace veryfasttree {
             }
         }
 
+        HashTable(const std::vector<std::string> &seqs, std::unique_ptr<DiskMemory> &disk) :
+                tableDisk(0, HashDisk{disk.get()}, EqualDisk{disk.get()}) {
+            for (int64_t i = seqs.size(); i > 0; i--) {
+                tableDisk.insert_or_assign(&seqs[i - 1], i - 1);
+            }
+        }
+
+
         inline int64_t size() {
-            return table.size();
+            return table.size() + tableDisk.size();
         }
 
         inline int64_t operator[](const std::string &key) const {
-            return table.find(&key)->second;
+            if (!table.empty()) {
+                return table.find(&key)->second;
+            } else {
+                return tableDisk.find(&key)->second;
+            }
         }
 
         inline const int64_t *find(const std::string &key) const {
-            auto entry = table.find(&key);
-            if (entry != table.end()) {
-                return &(entry->second);
+            if (!table.empty()) {
+                auto entry = table.find(&key);
+                if (entry != table.end()) {
+                    return &(entry->second);
+                }
+            } else {
+                auto entry = tableDisk.find(&key);
+                if (entry != tableDisk.end()) {
+                    return &(entry->second);
+                }
             }
             return nullptr;
         }
 
         inline void clear() {
             table = {};
+            tableDisk = {};
         }
 
     private:
@@ -57,7 +78,37 @@ namespace veryfasttree {
             bool operator()(const std::string *x, const std::string *y) const { return *x == *y; }
         };
 
+        struct HashDisk {
+            DiskMemory *disk;
+
+            int64_t operator()(const std::string *p) const noexcept {
+                std::string tmp = *p;
+                size_t id;
+                disk->load(tmp, id);
+                return xxh64::hash(tmp.data(), tmp.size(), 0);
+            }
+        };
+
+        struct EqualDisk {
+            DiskMemory *disk;
+
+            bool operator()(const std::string *x, const std::string *y) const {
+                if (*x == *y) {
+                    return true;
+                }
+                if(x->empty() || y->empty()){
+                    return false;
+                }
+                std::string tmpX = *x, tmpY = *y;
+                size_t idX, idY;
+                disk->load(tmpX, idX);
+                disk->load(tmpY, idY);
+                return tmpX == tmpY;
+            }
+        };
+
         tsl::robin_map<const std::string *, int64_t, Hash, Equal> table;
+        tsl::robin_map<const std::string *, int64_t, HashDisk, EqualDisk> tableDisk;
     };
 }
 

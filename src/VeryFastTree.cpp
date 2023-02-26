@@ -53,6 +53,17 @@ void VeryFastTree::settings(std::ostream &log) {
         options.verbose = 1;
     }
 
+    if (options.diskComputing || !options.diskComputingPath.empty()) {
+        options.diskComputing = true;
+        if (options.diskComputingPath.empty()) {
+            options.diskComputingPath += '.';
+        }
+        if (options.diskComputingPath.back() != FILE_SEP) {
+            options.diskComputingPath += FILE_SEP;
+        }
+        options.diskComputingPath += veryfasttree::randomString(6);
+    }
+
     if(options.useTopHits2nd && options.threads > 1){
         options.useTopHits2nd = false;
         log << "Warning: 2nd-level will be ignored because using at least 2 threads results in the best performance "

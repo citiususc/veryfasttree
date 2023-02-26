@@ -8,16 +8,23 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 
 **Release Notes**:
 
-- v3.3.0 (in development):
-	- Improved performance with new parallel regions (Local bootstraps, ML Lengths, LogLk, ML splits, etc.).
-	- Tree creation (Top hits, TopHitNJSearch, and FastNJSearch, ExhaustiveNJSearch(-slow)) now use threads.
-	- Improved non-deterministic mode and no longer uses mutex. 
-	- Deterministic mode now also parallelizes non-deterministic parts, but require more computation.
-	- New thread levels have been introduced.
-	- Tree partitioning method logging now is hidden by default.
-	- Tree partitioning algorithm is faster and has a cache.
-	- Added FastTree-2.11 changes.
-	- Fastq format and libBZ2 compression is now supported. 
+- v4.0 (in development):
+    - New thread levels have been introduced.
+    - Improved performance with new parallel regions (Local bootstraps, ML Lengths, LogLk, ML splits, etc.).
+    - Tree creation (Top hits, TopHitNJSearch, and FastNJSearch, ExhaustiveNJSearch(-slow)) now use threads.
+    - A new tree partitioning implementation that is several orders of magnitude faster.
+    - The tree partitioning is only used in NNI and SPR.
+    - A new parallel tree traversal implementation is used in the remaining parts.
+    - The storage of profiles on disk was replaced with Disk Computing. 
+    - Improved non-deterministic mode and no longer uses mutex.
+    - Deterministic mode now also parallelizes non-deterministic parts, and it is faster.
+    - Tree partitioning method logging now is hidden by default.
+    - Fastq format and libBZ2 compression is now supported.
+    - Added FastTree-2.11 changes.
+
+- v3.3.0 (merged into 4.0):
+	- Deterministic mode now also parallelizes non-deterministic parts, but it require more computation.
+	- Tree partitioning algorithm is faster and has a partitioning cache.
 
 - v3.2.0 (December 2022):
     - Decrease in the peak memory usage.
@@ -122,7 +129,7 @@ Degree of parallelization:
 	- If level is *1*, VeryFastTree uses parallel blocks that require additional memory for computation. 
 	- If level is *2*, VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method. 
 	- If level is *3* (default), VeryFastTree performs more computations without preserving sequential order.
-	- If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^sprlength). 
+	- If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^sprlength + 2). 
 
     Note: Each level includes the previous ones, and computation at level *2* and above is performed in a different tree traverse order, so the result may change but is still correct.
 
@@ -131,10 +138,10 @@ Changes the mode of parallelization:
 	- If level is *0*, VeryFastTree uses non-deterministic parts, some inspired by FastTree-2 but improved. 
 	- If level is *1* (default), VeryFastTree only uses deterministic parallelization.
 
-    Non-deterministic is faster because it requires less computation, but this difference is only notable with very large datasets.
+    Since version 4.0, deterministic algorithms are at least faster than non-deterministic ones, making deterministic the preferred choice.
 
-- **-thread-subtrees [num\_subtrees]**
-It sets a maximum number of subtrees assigned to the threads. This option could increase the accuracy for small datasets containing large sequences at the expense of reducing the workload balance among threads.
+- **-threads-ptw [n]**
+(Partitioning Tendency Window) It sets the size of the partitioning tendency window used by the tree partitioning algorithm to determine when to stop searching. The window stores the last solutions and checks if a better solution can be found. Increasing the value allows the algorithm to explore the tree deeper and potentially find better solutions. The default value is 20.
 
 - **-threads-verbose**
 To show subtrees assigned to the threads and theoretical speedup, only with verbose > 0
@@ -158,11 +165,9 @@ This option is used to select an alternative implementation for the exponential 
     - **2**: Use a very efficient and fast implementation to compute an accurate approximation of e<sup>x</sup> using double precision arithmetic.
     - **3**: Use a very efficient and fast implementation to compute an accurate approximation of e<sup>x</sup> using simple precision arithmetic (not recommended together with *-double-precision* option).
 
-- **-disk-profiles [0 - 1]**
-Reduce the amount of memory required using the disk. Some sequence profiles are stored on disk instead of in memory. Ratio between 0 and 1 specifies the number of profiles to be stored on disk. That is, 1 will store all profiles on disk. Storing more profiles on disk increases the running time. Note that even if the disk file is created, profiles will only be saved to disk when the memory is nearly full.
+- **-disk-computing**
+Reduce the amount of memory required using disk but increases the running time.
 
-- **-disk-profiles-file [path]**
-Select an alternative file location for storing profiles with **-disk-profiles**. The disk must have enough space to store the profiles. By default the path is the working directory.
+- **-disk-computing-path [path]**
+Like **-disk-computing** but using a custom path folder to store files.
 
-- **-disk-profiles-opt**
-This parameter forces that all attributes within the profiles are saved to disk. It saves more memory but the file disk could be huge.

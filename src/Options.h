@@ -3,6 +3,7 @@
 #define VERYFASTTREE_OPTIONS_H
 
 #include "Constants.h"
+#include "Utils.h"
 #include "Debug.h"
 #include <string>
 #include <ctime>
@@ -98,13 +99,12 @@ namespace veryfasttree {
         bool threadsVerbose = false;
         bool deterministic = true;
         int threadsLevel = 3;
-        int threadSubtrees = (unsigned int)~0 >> 1;
+        int particioningTendencyWindow = 20;
         bool doublePrecision = false;
         int fastexp = 0;
         std::string extension;
-        float diskProfilesRatio = 0;
-        bool diskProfilesOpt = false;
-        std::string diskProfilesFile = "diskprofiles.men";
+        bool diskComputing;
+        std::string diskComputingPath;
 
         /*Precision*/
         double MLMinBranchLengthTolerance;
