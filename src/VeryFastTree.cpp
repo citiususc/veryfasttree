@@ -238,6 +238,7 @@ void VeryFastTree::settings(std::ostream &log) {
 
 void VeryFastTree::configOpenMP() {
     omp_set_num_threads(options.threads);
+    omp_set_nested(0);
 }
 
 void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {

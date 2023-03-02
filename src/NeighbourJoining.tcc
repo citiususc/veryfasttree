@@ -31,7 +31,7 @@ AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints) {
 
 AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool test) {
     storeLevel = 1;
-    size_t space = 10e6; // Just some big number.
+    size_t space = sizeof(Precision) * nPos;
     void *ptr = (void *) men;
 
     weights = (numeric_t *) std::align(op_t::ALIGNMENT, sizeof(Precision), ptr, space);
@@ -354,7 +354,7 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
         for (int64_t i = 0; i < maxnodes; i++) {
             Profile(nPos, nCons, men, options.nCodes, true); //Check profiles size
         }
-        diskProfiles = make_unique<DiskMemory>(options.diskComputingPath + "-profiles.men", men);
+        diskProfiles = make_unique2<DiskMemory>(options.diskComputingPath + "-profiles.men", men);
         men = diskProfiles->get();
 
         for (int64_t i = 0; i < maxnodes; i++) {
@@ -1161,9 +1161,8 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
                     double weight = profile1.weights[i] * profile2.weights[i];
                     denom2 += weight;
                     double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
-                                                    (!profile2.codeDistSize == 0 ? &profile2.codeDist[i *
-                                                                                                      options.nCodes]
-                                                                                 : nullptr));
+                                                    (profile2.codeDistSize == 0 ?
+                                                     nullptr : &profile2.codeDist[i * options.nCodes]));
                     top2 += weight * piece;
                 }
             }
@@ -1182,8 +1181,8 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
                 double weight = profile1.weights[i] * profile2.weights[i];
                 denom += weight;
                 double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
-                                                (!profile2.codeDistSize == 0 ? &profile2.codeDist[i * options.nCodes]
-                                                                             : nullptr));
+                                                (profile2.codeDistSize == 0 ?
+                                                 nullptr : &profile2.codeDist[i * options.nCodes]));
                 top += weight * piece;
             }
         }
@@ -2841,7 +2840,7 @@ AbsNeighbourJoining(void)::fastNJ() {
 
     /* Initialize top-hits or visible set */
     if (m > 0) {
-        tophits = make_unique<TopHits>(options, maxnodes, m);
+        tophits = make_unique2<TopHits>(options, maxnodes, m);
         setAllLeafTopHits(*tophits);
         resetTopVisible((int64_t) nSeqs, *tophits);
     } else if (!options.slow) {
@@ -3392,7 +3391,7 @@ AbsNeighbourJoining(typename veryfasttree::NeighbourJoining<Precision, Operation
             Profile *profiles4[4];
             int64_t nodeABCD[4];
             setupABCD(node, profiles4, upProfiles, nodeABCD, useML);
-            upProfiles[node] = make_unique<Profile>(nPos, nCons);
+            upProfiles[node] = make_unique2<Profile>(nPos, nCons);
             if (useML) {
                 /* If node is a child of root, then the 4th profile is of the 2nd root-sibling of node
                    Otherwise, the 4th profile is the up-profile of the parent of node, and that
@@ -5761,7 +5760,7 @@ AbsNeighbourJoining(void)::copyUpProfile(std::unique_ptr<Profile> source[], std:
     node = parent[node];
     while (node != -1 && !target[node]) {
         if (source[node]) {
-            target[node] = make_unique<Profile>(*(source[node]));
+            target[node] = make_unique2<Profile>(*(source[node]));
         }
         node = parent[node];
     }
@@ -6559,7 +6558,7 @@ AbsNeighbourJoining(void)::updateBranchLengths() {
 
 AbsNeighbourJoining(inline void)::traverseTreeLength(int64_t node) {
     /* nothing to do for leaves or root */
-    if (node >= (int64_t) nSeqs && node != root){
+    if (node >= (int64_t) nSeqs && node != root) {
         setProfile(node, /*noweight*/-1.0);
     }
 }

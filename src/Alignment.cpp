@@ -37,7 +37,7 @@ void Alignment::readAlignment() {
             if (dumpSz < 1024) {
                 dumpSz = 1024 * 1024 * 1024 * (size_t) 10;
             }
-            disk = make_unique<DiskMemory>(fname, dumpSz);
+            disk = make_unique2<DiskMemory>(fname, dumpSz);
         }
         dumpCount += buf.size();
         if (dumpCount > 1024 * 1024 * 100) {

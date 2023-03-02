@@ -2,6 +2,7 @@
 #ifndef VERYFASTTREE_BASICOPERATIONS_H
 #define VERYFASTTREE_BASICOPERATIONS_H
 
+#include <memory>
 
 namespace veryfasttree {
 
@@ -12,7 +13,7 @@ namespace veryfasttree {
          * No alignment required, values less than sizeof(Precision) are ignored,
          * value 0 is not supported by gcc 5 and 6.
          */
-        static constexpr int ALIGNMENT = 2;
+        static constexpr int ALIGNMENT = sizeof(Precision);
         using Allocator = std::allocator<Precision>;
         typedef Precision numeric_t;
 
