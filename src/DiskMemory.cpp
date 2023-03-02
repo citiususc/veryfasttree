@@ -39,16 +39,15 @@ DiskMemory::~DiskMemory() {
 }
 
 size_t DiskMemory::store(size_t offset, std::string &s) {
-    if (!s.empty() && (s.size() != sizeof(size_t) * 2 + 1 || s[0] != 0)) {
+    if (!s.empty()) {
         size_t disp = 0;
         size_t len;
         const char *init;
         if (s[0] == 0) {
             disp = *((size_t *) (s.c_str() + 1 + sizeof(size_t))) - 1;
             len = s.size() - sizeof(size_t) * 2;
-            init = s.c_str() + sizeof(size_t) * 2;
+            init = s.c_str() + 1 + sizeof(size_t) * 2;
         } else {
-            *((size_t *) (s.c_str() + 1)) = offset;
             len = s.size() + 1;
             init = s.c_str();
         }
@@ -56,10 +55,13 @@ size_t DiskMemory::store(size_t offset, std::string &s) {
             throw std::runtime_error("input file has a invalid size for disk computing. If the file is compressed and "
                                      "is not a header file format, it must be decompressed.");
         }
-        memcpy((void *) (map + offset + disp), init, len);
-        s.resize(sizeof(size_t) * 2 + 1);
-        s[0] = 0;
-        *((size_t *) (s.c_str() + 1 + sizeof(size_t))) = disp + len;
+        if(len > 1){
+            memcpy((void *) (map + offset + disp), init, len);
+            s.resize(sizeof(size_t) * 2 + 1);
+            s[0] = 0;
+            *((size_t *) (s.c_str() + 1)) = offset;
+            *((size_t *) (s.c_str() + 1 + sizeof(size_t))) = disp + len;
+        }
         offset += disp + len;
     }
     return offset;

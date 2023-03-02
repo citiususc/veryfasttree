@@ -491,11 +491,13 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
 
     app.add_flag("-disk-computing", options.diskComputing,
-                 "Reduce the amount of memory required using disk but increases the running time.")->
+                 "If there is not enough available RAM to perform the computation, disk will be used to store extra "
+                 "data when it was not needed. Using disk to perform the computation will substantially increase the "
+                 "execution time.")->
             group(optimizations);
 
     app.add_option("-disk-computing-path", options.diskComputingPath,
-                   "Like -disk-computing but using a custom path folder to store files.")->type_name("path")->
+                   "Like -disk-computing but using a custom path folder to store data.")->type_name("path")->
             group(optimizations);
 
     auto deprecated = "Deprecated";

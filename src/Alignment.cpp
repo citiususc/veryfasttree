@@ -13,11 +13,13 @@ Alignment::Alignment(const Options &options, std::istream &fp, std::ostream &log
 
 void Alignment::readAlignment() {
     std::string buf;
-    const std::string fname = options.diskComputingPath + "-" + std::to_string((uintptr_t) this) +"-seqs.men";
-    size_t dumpCount = 0, dumpSecCount = 0;
+    const std::string fname = options.diskComputingPath + "-" + std::to_string((uintptr_t) this) + "-seqs.men";
+    size_t dumpCount = 0;
     size_t dumpSz = 0;
+    bool globalDumpSec;
 
-    auto dump = [&](bool dumpSec) {//TODO
+    auto dump = [&](bool dumpSec) {
+        globalDumpSec = dumpSec;
         if (seqs.size() < 2 || seqs[1].empty()) {
             return;
         }
@@ -33,18 +35,20 @@ void Alignment::readAlignment() {
                 }
             }
             if (dumpSz < 1024) {
-                dumpSz = 1024 * 1024 * 1024;
+                dumpSz = 1024 * 1024 * 1024 * (size_t) 10;
             }
             disk = make_unique<DiskMemory>(fname, dumpSz);
         }
         dumpCount += buf.size();
-        if (dumpCount > 1024 * 10) {
+        if (dumpCount > 1024 * 1024 * 100) {
             dumpCount = 0;
             if (dumpSec) {
-                for (int64_t i = seqs.size() - 1; i > -1; i++) {
-                    if (!seqs[i].empty()) {
-                        disk->store(dumpSecCount, seqs[i]);
+                size_t dumpPad = 0;
+                for (int64_t i = 1; i < (int64_t) seqs.size(); i++) {
+                    if (seqs[i].empty()) {
+                        break;
                     }
+                    dumpPad = disk->store(dumpPad, seqs[i]);
                 }
             } else {
                 size_t dumpPad = dumpSz / seqs.capacity();
@@ -357,6 +361,10 @@ void Alignment::readAlignment() {
         if (iSeq != nSeq && iSeq != 0) {
             throw std::invalid_argument(strformat("Wrong number of sequences: expected %ld", nSeq));
         }
+    }
+    if (options.diskComputing) {
+        dumpCount = SIZE_MAX - buf.size();
+        dump(globalDumpSec);
     }
     /* Check lengths of sequences */
     for (int64_t i = 0; i < (int64_t) seqs.size(); i++) {

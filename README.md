@@ -13,14 +13,16 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
     - Improved performance with new parallel regions (Local bootstraps, ML Lengths, LogLk, ML splits, etc.).
     - Tree creation (Top hits, TopHitNJSearch, and FastNJSearch, ExhaustiveNJSearch(-slow)) now use threads.
     - A new tree partitioning implementation that is several orders of magnitude faster.
-    - The tree partitioning is only used in NNI and SPR.
+    - The tree partitioning is only used in NNI, SPR and upProfiles computing(to save memory).
     - A new parallel tree traversal implementation is used in the remaining parts.
     - The storage of profiles on disk was replaced with Disk Computing. 
+    - Top upProfiles are shared between threads(to save memory) and reused to accelerate the sequential part.
     - Improved non-deterministic mode and no longer uses mutex.
     - Deterministic mode now also parallelizes non-deterministic parts, and it is faster.
     - Tree partitioning method logging now is hidden by default.
     - Fastq format and libBZ2 compression is now supported.
     - Added FastTree-2.11 changes.
+	- Error fixes and Major corrections.
 
 - v3.3.0 (merged into 4.0):
 	- Deterministic mode now also parallelizes non-deterministic parts, but it require more computation.
@@ -166,8 +168,8 @@ This option is used to select an alternative implementation for the exponential 
     - **3**: Use a very efficient and fast implementation to compute an accurate approximation of e<sup>x</sup> using simple precision arithmetic (not recommended together with *-double-precision* option).
 
 - **-disk-computing**
-Reduce the amount of memory required using disk but increases the running time.
+If there is not enough available RAM to perform the computation, disk will be used to store extra data when it was not needed. Using disk to perform the computation will substantially increase the execution time.
 
 - **-disk-computing-path [path]**
-Like **-disk-computing** but using a custom path folder to store files.
+Like **-disk-computing** but using a custom path folder to store data.
 
