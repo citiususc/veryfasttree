@@ -14,7 +14,7 @@ __VA_ARGS__ veryfasttree::VeyFastTreeImpl<Precision, Operations>
 
 AbsFastTreeImpl()::VeyFastTreeImpl(Options &options, std::istream &input, std::ostream &output, std::ostream &log) :
         options(options), input(input), output(output), log(log),
-        progressReport(options.showProgress, options.verbose) {
+        progressReport(options.showProgress, options.verbose, options.relativeProgress) {
     if (!options.matrixPrefix.empty()) {
         if (!options.useMatrix) {
             throw std::invalid_argument("Cannot use both -matrix and -nomatrix arguments!");

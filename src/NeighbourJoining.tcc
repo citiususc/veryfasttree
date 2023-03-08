@@ -5072,7 +5072,10 @@ AbsNeighbourJoining(void)::optimizeAllBranchLengths() {
                     continue;
                 }
                 copyUpProfile(upProfiles.data(), upProfiles2.data(), subtrees[s]);
-                traverseOptimizeAllBranchLengths(iDone, iDoneT, subtrees[s], upProfiles2.data(), traversal);
+                for (int i = 0; i < child[subtrees[s]].nChild; i++) {
+                    traverseOptimizeAllBranchLengths(iDone, iDoneT, child[subtrees[s]].child[i], upProfiles2.data(),
+                                                     traversal);
+                }
                 #pragma omp critical
                 {
                     moveUpProfile(upProfiles2.data(), upProfiles.data(), subtrees[s]);

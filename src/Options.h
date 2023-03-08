@@ -105,6 +105,7 @@ namespace veryfasttree {
         std::string extension;
         bool diskComputing;
         std::string diskComputingPath;
+        bool relativeProgress = false;
 
         /*Precision*/
         double MLMinBranchLengthTolerance;

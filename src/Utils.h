@@ -23,6 +23,7 @@ namespace veryfasttree {
 #else
 
 #include <unistd.h>
+
 #define FILE_SEP '/'
 
 namespace veryfasttree {
@@ -182,8 +183,11 @@ namespace veryfasttree {
 
         typedef std::chrono::high_resolution_clock Clock;
 
-        ProgressReport(bool showProgress, int verbose) : clockStart(Clock::now()), timeLast(Clock::now()),
-        showProgress(showProgress) , verbose(verbose){}
+        ProgressReport(bool showProgress, int verbose, bool relativeProgress) : clockStart(Clock::now()),
+                                                                                timeLast(Clock::now()),
+                                                                                showProgress(showProgress),
+                                                                                verbose(verbose),
+                                                                                relativeProgress(relativeProgress) {}
 
         inline double clockDiff() {
             auto timeNow = Clock::now();
@@ -198,9 +202,11 @@ namespace veryfasttree {
             }
 
             auto timeNow = Clock::now();
-            int64_t mili = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeLast).count();
+            int64_t step = std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - timeLast).count();
+            int64_t mili = (relativeProgress ? step :
+                            std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count());
 
-            if (mili > 100 || verbose > 1) {
+            if (step > 100 || verbose > 1) {
                 std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
                 std::cerr << strformat(format, args...);
                 if (verbose > 1 || !isattyErr()) {
@@ -215,9 +221,9 @@ namespace veryfasttree {
     private:
         const Clock::time_point clockStart;
         Clock::time_point timeLast;
+        bool relativeProgress;
         bool showProgress;
         int verbose;
-
     };
 
 }

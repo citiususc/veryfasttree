@@ -500,6 +500,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "Like -disk-computing but using a custom path folder to store data.")->type_name("path")->
             group(optimizations);
 
+    app.add_flag("-relative-progress", options.relativeProgress,
+                   "To shows relative time to previous step rather than absolute time in  progress report.")->
+                   group(optimizations);
+
     auto deprecated = "Deprecated";
 
     setDeprecated(app.add_flag("-logdist", "use logarithmic distances, now on by default and obsolete")->
