@@ -152,7 +152,7 @@ namespace veryfasttree {
 
             Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool test = false);
 
-            Profile(const Profile& ref);
+            Profile(const Profile &ref);
 
             ~Profile();
 

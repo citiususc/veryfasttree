@@ -6272,6 +6272,14 @@ AbsNeighbourJoining(inline void)::traverseSPR(int64_t &iDone, int64_t iRound, in
             }
         }
     } /* end loop over subtrees to prune & regraft */
+    if (!parallel || options.verbose > 0) {
+        #pragma omp critical
+        {
+            iDone += nodeListLen % 100;
+            progressReport.print("SPR round %3ld of %3ld, %ld of %ld nodes",
+                                 iRound + 1, nRounds, iDone + 1, maxnode);
+        }
+    }
 }
 
 AbsNeighbourJoining(void)::SPR(int64_t iRound, int64_t nRounds) {

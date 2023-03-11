@@ -185,9 +185,9 @@ namespace veryfasttree {
 
         ProgressReport(bool showProgress, int verbose, bool relativeProgress) : clockStart(Clock::now()),
                                                                                 timeLast(Clock::now()),
+                                                                                relativeProgress(relativeProgress),
                                                                                 showProgress(showProgress),
-                                                                                verbose(verbose),
-                                                                                relativeProgress(relativeProgress) {}
+                                                                                verbose(verbose) {}
 
         inline double clockDiff() {
             auto timeNow = Clock::now();
