@@ -320,7 +320,7 @@ AbsFastTreeImpl(void)::run() {
                     bool bConvergedHere = (iMLnni > 0) &&
                                           ((loglk < lastloglk + Constants::treeLogLkDelta) ||
                                            maxDelta < Constants::treeLogLkDelta);
-                    if (options.verbose) {
+                    if (options.verbose > 0) {
                         log << strformat("ML-NNI round %ld: LogLk %s= %.3f NNIs %ld max delta %.2f Time %.2f%s",
                                          iMLnni + 1,
                                          options.exactML || options.nCodes != 20 ? "" : "~",

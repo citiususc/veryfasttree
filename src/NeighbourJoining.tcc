@@ -698,6 +698,12 @@ outProfile(Profile &out, std::vector<Profile_t> &_profiles, int64_t nProfiles) {
             out.nVectors = nPos;
             /* Initialize the frequencies to 0 */
             out.setVectorSize(out.nVectors * nCodeSize, 0);
+
+            if (distanceMatrix) {
+                if (out.codeDistSize == 0) {
+                    out.setCodeDistSize(nPos * options.nCodes);
+                }
+            }
         }
         #pragma omp barrier
 
@@ -2680,7 +2686,7 @@ AbsNeighbourJoining(void)::readTree(Uniquify &unique, HashTable &hashnames, std:
 
         #pragma omp parallel
         {
-            for (auto level: traverse) {
+            for (auto &level: traverse) {
                 #pragma omp for schedule(static, 1)
                 for (int64_t i = 0; i < (int64_t) level.size(); i++) {
                     int64_t node = level[i];
@@ -3475,7 +3481,7 @@ AbsNeighbourJoining(void)::recomputeProfiles(DistanceMatrix <Precision, op_t::AL
 
         #pragma omp parallel
         {
-            for (auto level: traverse) {
+            for (auto &level: traverse) {
                 #pragma omp for schedule(static, 1)
                 for (int64_t i = 0; i < (int64_t) level.size(); i++) {
                     int64_t node = level[i];
@@ -3509,7 +3515,7 @@ AbsNeighbourJoining(void)::recomputeMLProfiles() {
 
         #pragma omp parallel
         {
-            for (auto level: traverse) {
+            for (auto &level: traverse) {
                 #pragma omp for schedule(static, 1)
                 for (int64_t i = 0; i < (int64_t) level.size(); i++) {
                     int64_t node = level[i];
@@ -5160,7 +5166,7 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
             double loglk2 = 0.0;
             std::vector<double> site_likelihood2 = site_likelihood;
             std::vector<double> site_loglk2(site_loglk != nullptr ? nPos : 0, 0.0);
-            for (auto level: traverse) {
+            for (auto &level: traverse) {
                 #pragma omp for schedule(static, 1)
                 for (int64_t i = 0; i < (int64_t) level.size(); i++) {
                     int64_t node = level[i];
@@ -6407,9 +6413,10 @@ AbsNeighbourJoining(double)::GTRNegLogLk(double x, GtrOpt &gtr) {
 AbsNeighbourJoining(void)::setMLGtr(double freq_in[]) {
     assert(options.nCodes == 4);
     GtrOpt gtr;
-    if (freq_in != NULL) {
-        for (int i = 0; i < 4; i++)
+    if (freq_in != nullptr) {
+        for (int i = 0; i < 4; i++) {
             gtr.freq[i] = freq_in[i];
+        }
     } else {
         /* n[] and sum were int in FastTree 2.1.9 and earlier -- this
            caused gtr analyses to fail on analyses with >2e9 positions */
@@ -6431,7 +6438,7 @@ AbsNeighbourJoining(void)::setMLGtr(double freq_in[]) {
     }
     int64_t nRounds = options.mlAccuracy < 2 ? 2 : options.mlAccuracy;
 
-    /*GTRNegLogLk GTRNegLogLk change the transition matrix, to avoid allocate new memory and swap them multiple times,
+    /*GTRNegLogLk change the transition matrix, to avoid allocate new memory and swap them multiple times,
      * the transition matrix is copied and restore at the end */
     auto transmatCpy = transmat;
 
@@ -6581,7 +6588,7 @@ AbsNeighbourJoining(double)::treeLength(bool recomputeProfiles) {
 
             #pragma omp parallel
             {
-                for (auto level: traverse) {
+                for (auto &level: traverse) {
                     #pragma omp for schedule(static, 1)
                     for (int64_t i = 0; i < (int64_t) level.size(); i++) {
                         int64_t node = level[i];
