@@ -94,7 +94,8 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     app.add_option("-intree", options.intreeFile,
                    "read the starting tree in from newickfile. Any branch lengths in the starting trees are ignored."
-                   " -intree with -n will read a separate starting tree for each alignment.")->
+                   " -intree with -n will read a separate starting tree for each alignment. "
+                   "Use * or *name to read the tree in from the NEXUS block trees.")->
             type_name("newick_file")->check(isNotEmpty)->group(io);
 
     app.add_option("-intree1", options.intreeFile, "read the same starting tree for each alignment")->

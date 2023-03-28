@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 #include "HashTable.h"
 
 using namespace veryfasttree;
@@ -62,21 +63,6 @@ void Alignment::readAlignment() {
     readline(fp, buf);
     if (buf.find("#NEXUS") == 0) {
         /* It is a Nexus file */
-        bool characters = false;
-        do {
-            /* loop blocks lines */
-            if (buf[0] == 'b' || buf[0] == 'B') {
-                std::for_each(buf.begin(), buf.end(), [](char &c) { c = std::tolower(c); });
-                if (buf.find("characters") != buf.npos) {
-                    characters = true;
-                    break;
-                }
-            }
-        } while (readline(fp, buf));
-        if (!characters) {
-            throw std::invalid_argument("No characters block found");
-        }
-
         int64_t ntax = -1, nchar = -1;
         bool interleave = false;
         bool matrix = false;
@@ -92,101 +78,188 @@ void Alignment::readAlignment() {
             return pos;
         };
 
-        while (readline(fp, buf)) {
-            /* loop header lines */
-            std::for_each(buf.begin(), buf.end(), [](char &c) { c = std::tolower(c); });
+        auto readTrees = [&]() {
+            std::unordered_map<std::string, std::string> translate;
+            while (readline(fp, buf)) {
+                std::for_each(buf.begin(), buf.end(), [](char &c) { c = std::tolower(c); });
+                if (buf.find("translate") != buf.npos) {
+                    int64_t pos = 0, pos2;
+                    while (readline(fp, buf) && buf.find(";") == buf.npos) {
+                        while (isspace(buf[pos])) { pos++; }
+                        pos2 = pos;
+                        while (!isspace(buf[pos2]) && pos2 < buf.size()) { pos2++; }
+                        std::string key = buf.substr(pos, pos2 - pos);
+                        pos = pos2;
+                        while (isspace(buf[pos])) { pos++; }
+                        pos2 = buf.find(",");
+                        if (pos2 == buf.npos) {
+                            pos2 = buf.size() + 1;
+                        }
+                        pos2--;
+                        while (isspace(buf[pos2])) { pos2--; }
+                        std::string value = buf.substr(pos, pos2 - pos);
+                        if (!key.empty() && !value.empty()) {
+                            translate[key] = value;
+                        }
+                    }
+                } else if (buf.find("tree") != buf.npos && !options.intreeFile.empty() &&
+                           options.intreeFile[0] == '*' && this->tree.empty()) {
+                    int64_t pos = buf.find("tree");
+                    int64_t pos2 = buf.find("=");
+                    if (pos == buf.npos || pos2 == buf.npos) {
+                        continue;
+                    }
+                    pos += 4;
+                    pos2--;
+                    while (isspace(buf[pos])) { pos++; }
+                    while (isspace(buf[pos2])) { pos2--; }
+                    std::string name = buf.substr(pos, pos2 - pos + 1);
+                    if (options.intreeFile.substr(1) != name || options.intreeFile.size() == 1) {
+                        continue;
+                    }
+                    pos = buf.find("(");
+                    pos2 = buf.rfind(")");
+                    if (pos == buf.npos || pos2 == buf.npos) {
+                        continue;
+                    }
+                    std::string tree = buf.substr(pos, pos2 - pos);
+                    if (!translate.empty()) {
+                        for (auto &entry: translate) {
+                            int64_t pos = 0;
+                            while ((pos = tree.find(entry.first, pos + 1)) != tree.npos) {
+                                char prev = tree[pos - 1];
+                                char next = tree[pos + entry.first.size()];
+                                if ((prev == '(' || prev == ',' || prev == ':' || prev == ')') &&
+                                    (next == '(' || next == ',' || next == ':' || next == ')')) {
+                                    tree.replace(pos, entry.first.size(), entry.second);
+                                }
+                            }
+                        }
+                    }
+                    this->tree = tree;
+                } else if (buf.find("end;") != buf.npos) {
+                    break;
+                }
+            }
+        };
 
-            if (buf.find("dimensions") != buf.npos) {
-                int64_t pos;
-                pos = readValue("nchar");
-                if (pos > 0) {
-                    nchar = std::atoll(&buf[pos]);
-                }
-                pos = readValue("ntax");
-                if (pos > 0) {
-                    ntax = std::atoll(&buf[pos]);
-                }
-            } else if (buf.find("format") != buf.npos) {
-                int64_t pos;
-                pos = readValue("interleave");
-                if (pos > 0) {
-                    interleave = buf[pos] == 'y';
-                }
-                pos = readValue("gap");
-                if (pos > 0) {
-                    fgap = buf[pos];
-                }
-                pos = readValue("matchchar");
-                if (pos > 0) {
-                    fmatchchar = buf[pos];
-                }
-            } else if (buf.find("matrix") != buf.npos) {
-                matrix = true;
-                break;
-            } else {
-                log << "Warning! Command  ignored: " << buf << std::endl;
-            }
-        }
-        if (!matrix) {
-            throw std::invalid_argument("No matrix command found in characters block");
-        }
+        auto readSeqs = [&]() {
+            while (readline(fp, buf)) {
+                /* loop header lines */
+                std::for_each(buf.begin(), buf.end(), [](char &c) { c = std::tolower(c); });
 
-        if (ntax > 0) {
-            seqs.reserve(ntax);
-            names.reserve(ntax);
-        }
-        int64_t seqi = 0;
-        while (readline(fp, buf)) {
-            if (options.diskComputing) { dump(false); }
-            /* loop matrix lines */
-            int64_t pos = 0;
-            while (isspace(buf[pos])) { pos++; }
-            if (buf[pos] == ';') {
-                break;
-            }
-            if (pos == '\n') {
-                if (interleave) {
-                    seqi = 0;
+                if (buf.find("dimensions") != buf.npos) {
+                    int64_t pos;
+                    pos = readValue("nchar");
+                    if (pos > 0) {
+                        nchar = std::atoll(&buf[pos]);
+                    }
+                    pos = readValue("ntax");
+                    if (pos > 0) {
+                        ntax = std::atoll(&buf[pos]);
+                    }
+                } else if (buf.find("format") != buf.npos) {
+                    int64_t pos;
+                    pos = readValue("interleave");
+                    if (pos > 0) {
+                        interleave = buf[pos] == 'y';
+                    }
+                    pos = readValue("gap");
+                    if (pos > 0) {
+                        fgap = buf[pos];
+                    }
+                    pos = readValue("matchchar");
+                    if (pos > 0) {
+                        fmatchchar = buf[pos];
+                    }
+                } else if (buf.find("matrix") != buf.npos) {
+                    matrix = true;
+                    break;
+                } else {
+                    log << "Warning! Command  ignored: " << buf << std::endl;
                 }
-                continue;
             }
-            int64_t init = pos;
-            if (buf[pos] == '\'' || buf[pos] == '"') {
-                pos++;
-                while (buf[pos] != buf[init] || pos == (int64_t) buf.size()) { pos++; }
-                init++;
-            } else {
-                while (!isspace(buf[pos]) || pos == (int64_t) buf.size()) { pos++; }
-            }
-            if (pos == (int64_t) buf.size()) {
-                throw std::invalid_argument("Wrong sequence name format: " + buf);
-            }
-            if (seqi == (int64_t) seqs.size()) {
-                names.emplace_back(buf, init, pos - init);
-            }
-            pos++;
-            if (seqi <= (int64_t) seqs.size()) {
-                seqs.emplace_back();
-                if (nchar > 0) {
-                    seqs.back().reserve(nchar);
-                }
+            if (!matrix) {
+                throw std::invalid_argument("No matrix command found in characters block");
             }
 
-            for (; pos < (int64_t) buf.size(); pos++) {
-                if (isspace(buf[pos])) {
+            if (ntax > 0) {
+                seqs.reserve(ntax);
+                names.reserve(ntax);
+            }
+            int64_t seqi = 0;
+            while (readline(fp, buf)) {
+                if (options.diskComputing) { dump(false); }
+                /* loop matrix lines */
+                int64_t pos = 0;
+                while (isspace(buf[pos])) { pos++; }
+                if (buf[pos] == ';') {
+                    break;
+                }
+                if (pos == '\n') {
+                    if (interleave) {
+                        seqi = 0;
+                    }
                     continue;
                 }
-                if (buf[pos] == fgap) {
-                    seqs[seqi].push_back('-');
-                } else if (buf[pos] == fmatchchar && seqi > 0) {
-                    seqs[seqi].push_back(seqs[seqi - 1][seqs[seqi].size()]);
+                int64_t init = pos;
+                if (buf[pos] == '\'' || buf[pos] == '"') {
+                    pos++;
+                    while (buf[pos] != buf[init] || pos == (int64_t) buf.size()) { pos++; }
+                    init++;
                 } else {
-                    seqs[seqi].push_back(buf[pos]);
+                    while (!isspace(buf[pos]) || pos == (int64_t) buf.size()) { pos++; }
+                }
+                if (pos == (int64_t) buf.size()) {
+                    throw std::invalid_argument("Wrong sequence name format: " + buf);
+                }
+                if (seqi == (int64_t) seqs.size()) {
+                    names.emplace_back(buf, init, pos - init);
+                }
+                pos++;
+                if (seqi <= (int64_t) seqs.size()) {
+                    seqs.emplace_back();
+                    if (nchar > 0) {
+                        seqs.back().reserve(nchar);
+                    }
+                }
+
+                for (; pos < (int64_t) buf.size(); pos++) {
+                    if (isspace(buf[pos])) {
+                        continue;
+                    }
+                    if (buf[pos] == fgap) {
+                        seqs[seqi].push_back('-');
+                    } else if (buf[pos] == fmatchchar && seqi > 0) {
+                        seqs[seqi].push_back(seqs[seqi - 1][seqs[seqi].size()]);
+                    } else {
+                        seqs[seqi].push_back(buf[pos]);
+                    }
+                }
+
+                seqi++;
+            }
+        };
+
+        bool characters = false;
+        bool trees = options.inFileName.empty();
+        do {
+            /* loop blocks lines */
+            if (buf[0] == 'b' || buf[0] == 'B') {
+                std::for_each(buf.begin(), buf.end(), [](char &c) { c = std::tolower(c); });
+                if (!characters && (buf.find("characters") != buf.npos || buf.find("data") != buf.npos)) {
+                    characters = true;
+                    readSeqs();
+                } else if (!trees && buf.find("trees") != buf.npos) {
+                    trees = true;
+                    readTrees();
                 }
             }
-
-            seqi++;
+        } while (readline(fp, buf) && (!trees || !characters));
+        if (!characters) {
+            throw std::invalid_argument("No characters block found");
         }
+
         if (!seqs.empty()) {
             nPos = seqs[0].size();
         }

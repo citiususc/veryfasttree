@@ -36,7 +36,7 @@ AbsFastTreeImpl()::VeyFastTreeImpl(Options &options, std::istream &input, std::o
         }
     }
 
-    if (options.intreeFile.empty()) {
+    if (options.intreeFile.empty() || options.intreeFile[0] == '*') {
         fpInTree.setstate(std::ios_base::badbit);
     } else {
         fpInTree.open(options.intreeFile);
@@ -124,12 +124,13 @@ AbsFastTreeImpl(void)::run() {
             }
             vecrelease(unique.uniqueSeq);
             aln.clearAlignmentSeqs(); /*no longer needed*/
-            if (fpInTree) {
-                if (options.intree1) {
+            if (fpInTree || !aln.tree.empty()) {
+                if (fpInTree && options.intree1) {
                     fpInTree.clear();
                     fpInTree.seekg(0, std::ios::beg);
                 }
-                nj.readTree(unique, hashnames, fpInTree);
+                std::stringstream ss(aln.tree);
+                nj.readTree(unique, hashnames, fpInTree ? (std::istream &) fpInTree : (std::istream &) ss);
                 if (options.verbose > 2) {
                     log << "Read tree from " << options.intreeFile << std::endl;
                 }

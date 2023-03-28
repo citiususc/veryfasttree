@@ -21,6 +21,7 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
     - Deterministic mode now also parallelizes non-deterministic parts, and it is faster.
     - Tree partitioning method logging now is hidden by default.
     - Fastq format and libBZ2 compression is now supported.
+    - Tree in can be read from the NEXUS block trees.
     - Added FastTree-2.11 changes.
 	- Error fixes and Major corrections.
 

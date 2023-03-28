@@ -19,6 +19,7 @@ namespace veryfasttree {
         std::unique_ptr<DiskMemory> disk;
         std::vector<std::string> names;
         std::vector<std::string> seqs;
+        std::string tree;
 
         Alignment(const Options &options, std::istream &fp, std::ostream &log);
 
