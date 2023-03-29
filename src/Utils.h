@@ -3,17 +3,16 @@
 #ifndef FASTTREE_UTILS_H
 #define FASTTREE_UTILS_H
 
-typedef int8_t ibool;
+#include <iostream>
 
 #if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64)
 
 #include <io.h>
 #include <ciso646>
 #define FILE_SEP '\\'
+#define VFT_IS_WINDOWS true
 
 namespace veryfasttree {
-    inline bool isWindows(){return true;}
-
     inline bool isattyIn(){return ::_isatty( _fileno( stdin ) );}
 
     inline bool isattyOut(){return ::_isatty( _fileno( stdout ) );}
@@ -25,10 +24,9 @@ namespace veryfasttree {
 #include <unistd.h>
 
 #define FILE_SEP '/'
+#define VFT_IS_WINDOWS false
 
 namespace veryfasttree {
-    inline bool isWindows() { return false; }
-
     inline bool isattyIn() { return ::isatty(STDIN_FILENO); }
 
     inline bool isattyOut() { return ::isatty(STDOUT_FILENO); }
@@ -37,7 +35,6 @@ namespace veryfasttree {
 }
 #endif
 
-#include <iostream>
 #include <chrono>
 #include "cassert"
 #include <omp.h>
@@ -45,7 +42,12 @@ namespace veryfasttree {
 #include <cmath>
 #include <random>
 
+typedef int8_t ibool;
+
 namespace veryfasttree {
+
+    inline bool isWindows() { return VFT_IS_WINDOWS; }
+
     class TeeStream : public std::streambuf {
     public:
         TeeStream(std::ostream &os1, std::ostream &os2) : os1(os1), os2(os2) {}

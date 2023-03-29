@@ -5,21 +5,29 @@
 #include <omp.h>
 #include "operations/BasicOperations.h"
 
+extern template class veryfasttree::VeyFastTreeImpl<float, veryfasttree::BasicOperations>;
+extern template class veryfasttree::VeyFastTreeImpl<double, veryfasttree::BasicOperations>;
 #if (defined __SSE2__) || (defined __AVX__)
 
 #include "operations/SSE128Operations.h"
+extern template class veryfasttree::VeyFastTreeImpl<float, veryfasttree::SSE128Operations>;
+extern template class veryfasttree::VeyFastTreeImpl<double, veryfasttree::SSE128Operations>;
 
 #endif
 
 #ifdef __AVX__
 
 #include "operations/AVX256Operations.h"
+extern template class veryfasttree::VeyFastTreeImpl<float, veryfasttree::AVX256Operations>;
+extern template class veryfasttree::VeyFastTreeImpl<double, veryfasttree::AVX256Operations>;
 
 #endif
 
 #ifdef __AVX512F__
 
 #include "operations/AVX512Operations.h"
+extern template class veryfasttree::VeyFastTreeImpl<float, veryfasttree::AVX512Operations>;
+extern template class veryfasttree::VeyFastTreeImpl<double, veryfasttree::AVX512Operations>;
 
 #endif
 
@@ -154,6 +162,9 @@ void VeryFastTree::settings(std::ostream &log) {
         }
 
         log << "VeryFastTree Version " << Constants::version << " " << Constants::compileFlags;
+        if (options.doublePrecision){
+            log << " Double precision";
+        }
         if (options.extension != "NONE") {
             log << " with " << options.extension;
         }

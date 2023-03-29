@@ -158,7 +158,7 @@ AbsTransitionMatrix(void)::readAATransitionMatrix(const Options &options, /*IN*/
 
 AbsTransitionMatrix(void)::
 createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAXCODES], const double _stat[MAXCODES]) {
-    double sqrtstat[20];
+    alignas(Aligment) double sqrtstat[20];
     auto nCodes = options.nCodes;
 
     for (int i = 0; i < options.nCodes; i++) {
@@ -167,7 +167,7 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
         sqrtstat[i] = std::sqrt(_stat[i]);
     }
 
-    double sym[20 * 20];        /* symmetrized matrix M' */
+    alignas(Aligment) double sym[20 * 20];        /* symmetrized matrix M' */
     /* set diagonals so columns sums are 0 before symmetrization */
     for (int i = 0; i < nCodes; i++) {
         for (int j = 0; j < nCodes; j++) {
@@ -228,18 +228,18 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
     /* save some posterior probabilities for approximating later:
        first, we compute P(B | A, t) for t = approxMLnearT, by using
        V * exp(L*t) * V**-1 */
-    double expvalues[MAXCODES];
+    alignas(Aligment) double expvalues[MAXCODES];
     for (int i = 0; i < nCodes; i++) {
-        expvalues[i] = exp(Constants::approxMLnearT * this->eigenval[i]);
+        expvalues[i] = std::exp(Constants::approxMLnearT * this->eigenval[i]);
     }
-    double LVinv[MAXCODES][MAXCODES]; /* exp(L*t) * V**-1 */
+    alignas(Aligment) double LVinv[MAXCODES][MAXCODES]; /* exp(L*t) * V**-1 */
     for (int i = 0; i < nCodes; i++) {
         for (int j = 0; j < nCodes; j++) {
             LVinv[i][j] = this->eigeninv[i][j] * expvalues[i];
         }
     }
     /* matrix transform for converting A -> B given t: transt[i][j] = P(j->i | t) */
-    double transt[MAXCODES][MAXCODES];
+    alignas(Aligment) double transt[MAXCODES][MAXCODES];
     for (int i = 0; i < nCodes; i++) {
         for (int j = 0; j < nCodes; j++) {
             transt[i][j] = 0;
@@ -250,7 +250,7 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
     }
     /* nearP[i][j] = P(parent = j | both children are i) = P(j | i,i) ~ stat(j) * P(j->i | t)**2 */
     for (int i = 0; i < nCodes; i++) {
-        double _nearP[MAXCODES];
+        alignas(Aligment) double _nearP[MAXCODES];
         double tot = 0;
         for (int j = 0; j < nCodes; j++) {
             assert(transt[j][i] > 0);
@@ -366,7 +366,7 @@ AbsTransitionMatrix(inline double)::pythag(double a, double b) {
        absb * sqrt(1+ (absa/absb)*(absa/absb));
 }
 
-AbsTransitionMatrix(void)::tred2(double a[], const int n, const int np, double d[], double e[]){
+AbsTransitionMatrix(void)::tred2(double a[], int n, int np, double d[], double e[]){
 #define a(i,j) a[(j-1)*np + (i-1)]
 #define e(i)   e[i-1]
 #define d(i)   d[i-1]

@@ -30,15 +30,15 @@ AbsDistanceMatrix(void)::readDistanceMatrix(const Options &options, std::ostream
     if (options.verbose > 1) {
         log << "Read distance matrix from " << options.matrixPrefix << std::endl;
     }
-    setted=true;
+    setted = true;
 }
 
 AbsDistanceMatrix(void)::matrixBLOSUM45() {
     (*this) = _matrixBLOSUM45;
-    setted=true;
+    setted = true;
 }
 
-AbsDistanceMatrix()::operator bool(){
+AbsDistanceMatrix()::operator bool() {
     return setted;
 }
 
@@ -155,6 +155,10 @@ AbsDistanceMatrix(void)::setupDistanceMatrix(const Options &options, std::ostrea
     }
 }
 
+#if VFT_IS_WINDOWS
+#pragma warning(push)
+#pragma warning( disable : 4305 )
+#endif
 
 // @formatter:off
 template<typename Precision, int Aligment>
@@ -213,6 +217,9 @@ const veryfasttree::DistanceMatrix<Precision, Aligment> veryfasttree::DistanceMa
 
 };
 
+#if VFT_IS_WINDOWS
+#pragma warning(pop)
+#endif
 
 #endif
 

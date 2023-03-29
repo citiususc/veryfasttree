@@ -87,12 +87,12 @@ void Alignment::readAlignment() {
                     while (readline(fp, buf) && buf.find(";") == buf.npos) {
                         while (isspace(buf[pos])) { pos++; }
                         pos2 = pos;
-                        while (!isspace(buf[pos2]) && pos2 < buf.size()) { pos2++; }
+                        while (!isspace(buf[pos2]) && pos2 < (int64_t) buf.size()) { pos2++; }
                         std::string key = buf.substr(pos, pos2 - pos);
                         pos = pos2;
                         while (isspace(buf[pos])) { pos++; }
                         pos2 = buf.find(",");
-                        if (pos2 == buf.npos) {
+                        if (pos2 == (int64_t) buf.npos) {
                             pos2 = buf.size() + 1;
                         }
                         pos2--;
@@ -106,7 +106,7 @@ void Alignment::readAlignment() {
                            options.intreeFile[0] == '*' && this->tree.empty()) {
                     int64_t pos = buf.find("tree");
                     int64_t pos2 = buf.find("=");
-                    if (pos == buf.npos || pos2 == buf.npos) {
+                    if (pos == (int64_t) buf.npos || pos2 == (int64_t) buf.npos) {
                         continue;
                     }
                     pos += 4;
@@ -119,14 +119,14 @@ void Alignment::readAlignment() {
                     }
                     pos = buf.find("(");
                     pos2 = buf.rfind(")");
-                    if (pos == buf.npos || pos2 == buf.npos) {
+                    if (pos == (int64_t) buf.npos || pos2 == (int64_t) buf.npos) {
                         continue;
                     }
                     std::string tree = buf.substr(pos, pos2 - pos);
                     if (!translate.empty()) {
                         for (auto &entry: translate) {
                             int64_t pos = 0;
-                            while ((pos = tree.find(entry.first, pos + 1)) != tree.npos) {
+                            while ((pos = tree.find(entry.first, pos + 1)) != (int64_t) tree.npos) {
                                 char prev = tree[pos - 1];
                                 char next = tree[pos + entry.first.size()];
                                 if ((prev == '(' || prev == ',' || prev == ':' || prev == ')') &&

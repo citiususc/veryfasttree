@@ -100,7 +100,7 @@ namespace veryfasttree {
                                     const double stat[MAXCODES]);
 
         /* Numerical recipes code for eigen decomposition (actually taken from RAxML rev_functions.c) */
-        void tred2(double a[], const int n, const int np, double d[], double e[]);
+        void tred2(double a[], int n, int np, double d[], double e[]);
 
         void tqli(double d[], double e[], int n, int np, double z[]);
 

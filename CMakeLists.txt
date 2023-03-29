@@ -34,6 +34,14 @@ set(SOURCE_FILES
         src/operations/AVX256Operations.h
         src/operations/AVX512Operations.tcc
         src/operations/AVX512Operations.h
+        src/impl/VeryFastTreeDouble.cpp
+        src/impl/VeryFastTreeDoubleAVX256.cpp
+        src/impl/VeryFastTreeDoubleAVX512.cpp
+        src/impl/VeryFastTreeDoubleSSE128.cpp
+        src/impl/VeryFastTreeFloat.cpp
+        src/impl/VeryFastTreeFloatAVX256.cpp
+        src/impl/VeryFastTreeFloatAVX512.cpp
+        src/impl/VeryFastTreeFloatSSE128.cpp
         src/Knuth.cpp
         src/Knuth.h
         src/Options.h
