@@ -72,6 +72,9 @@ namespace veryfasttree {
                 ", SSE"
                 #endif
                 #endif
+                #if USE_CUDA
+                ", CUDA"
+                #endif
                 #ifndef NDEBUG
                 ", DEBUG"
                 #endif

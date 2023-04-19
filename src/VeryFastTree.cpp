@@ -31,6 +31,14 @@ extern template class veryfasttree::VeyFastTreeImpl<double, veryfasttree::AVX512
 
 #endif
 
+#if USE_CUDA
+
+#include "operations/CudaOperations.h"
+extern template class veryfasttree::VeyFastTreeImpl<float, veryfasttree::CudaOperations>;
+extern template class veryfasttree::VeyFastTreeImpl<double, veryfasttree::CudaOperations>;
+
+#endif
+
 using namespace veryfasttree;
 
 VeryFastTree::VeryFastTree(const Options &options) : options(options) {}
@@ -287,6 +295,16 @@ void VeryFastTree::run(std::istream &in, std::ostream &out, std::ostream &log) {
             VeyFastTreeImpl<double, AVX512Operations>(options, in, out, log).run();
         } else {
             VeyFastTreeImpl<float, AVX512Operations>(options, in, out, log).run();
+        }
+    }
+            #endif
+            #if USE_CUDA
+    else if (options.extension == "CUDA") {
+        configCuda(options);
+        if (options.doublePrecision) {
+            VeyFastTreeImpl<double, CudaOperations>(options, in, out, log).run();
+        } else {
+            VeyFastTreeImpl<float, CudaOperations>(options, in, out, log).run();
         }
     }
             #endif

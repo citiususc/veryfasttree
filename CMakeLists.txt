@@ -9,6 +9,8 @@ option(USE_SEE4 "enable/disable SSE4.1" OFF)
 option(USE_AVX "enable/disable AVX" OFF)
 option(USE_AVX2 "enable/disable AVX2" OFF)
 option(USE_AVX512 "enable/disable AVX512" OFF)
+option(USE_CUDA "enable/disable CUDA" OFF)
+set(CUDA_ARCH "80" CACHE STRING "change CUDA Architecture")
 
 add_definitions(-DCLI11_BOOST_OPTIONAL=0)
 add_definitions(-DNDEBUG)
@@ -37,10 +39,12 @@ set(SOURCE_FILES
         src/impl/VeryFastTreeDouble.cpp
         src/impl/VeryFastTreeDoubleAVX256.cpp
         src/impl/VeryFastTreeDoubleAVX512.cpp
+        src/impl/VeryFastTreeDoubleCuda.cpp
         src/impl/VeryFastTreeDoubleSSE128.cpp
         src/impl/VeryFastTreeFloat.cpp
         src/impl/VeryFastTreeFloatAVX256.cpp
         src/impl/VeryFastTreeFloatAVX512.cpp
+        src/impl/VeryFastTreeFloatCuda.cpp
         src/impl/VeryFastTreeFloatSSE128.cpp
         src/Knuth.cpp
         src/Knuth.h
@@ -65,10 +69,26 @@ set(SOURCE_FILES
         main.cpp
         )
 
+if (USE_CUDA)
+    set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH})
+    set(USE_CUDA 1)
+    enable_language(CUDA)
+    find_package(CUDAToolkit)
+    set(SOURCE_FILES
+            ${SOURCE_FILES}
+            src/operations/CudaOperations.h
+            src/operations/CudaOperations.cu
+            )
+
+    set(LIBRARIES ${LIBRARIES} CUDA::cublas)
+else ()
+    set(USE_CUDA 0)
+endif ()
+
 if (MSVC)
     ADD_SUBDIRECTORY("libs/mman-win32")
     set(LIBRARIES ${LIBRARIES} mman-win32)
-    set(CMAKE_CXX_FLAGS "/W2 /O2 /EHsc /bigobj")
+    set(CMAKE_CXX_FLAGS "/W2 /O2 /EHsc /bigobj /DUSE_CUDA=${USE_CUDA}")
     if (USE_AVX512)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX512 /D__AVX512F__=1 /D__AVX2__=1 /D__AVX__=1")
     elseif (USE_AVX2)
@@ -81,7 +101,7 @@ if (MSVC)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:SSE2 /D__SSE2__=1")
     endif ()
 else ()
-    set(CMAKE_CXX_FLAGS "-Wall -O3")
+    set(CMAKE_CXX_FLAGS "-Wall -O3 -DUSE_CUDA=${USE_CUDA}")
     if (USE_AVX512)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx512f")
     elseif (USE_AVX2)

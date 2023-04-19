@@ -477,9 +477,9 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                  "Therefore, it is equivalent to compile FastTree-2 with -DUSE_DOUBLE.")->
             group(optimizations);
 
-    app.add_set_ignore_case("-ext", options.extension, {"AUTO", "NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512"},
+    app.add_set_ignore_case("-ext", options.extension, {"AUTO", "NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512", "CUDA"},
                             "to speed up computations enabling the vector extensions. "
-                            "Available: AUTO(default), NONE, SSE, SSE3 , AVX, AVX2 or AVX512")->type_name("name")
+                            "Available: AUTO(default), NONE, SSE, SSE3 , AVX, AVX2, AVX512 or CUDA")->type_name("name")
             ->group(optimizations)->default_val("AUTO");
 
     app.add_option("-fastexp", options.fastexp,

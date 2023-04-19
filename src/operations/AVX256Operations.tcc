@@ -284,7 +284,7 @@ vector_add_mult(float fTot[], float fAdd[], float weight, int64_t n) {
 template<>
 template<int row>
 inline void veryfasttree::AVX256Operations<double>::
-matrixt_by_vector4(double mat[][row], double vec[], double out[]) {
+matrix_by_vector4(double mat[][row], double vec[], double out[]) {
     __m256d o = _mm256_setzero_pd();
     for (int64_t j = 0; j < 4; j++) {
         __m256d m = _mm256_load_pd(&mat[j][0]);
@@ -297,7 +297,7 @@ matrixt_by_vector4(double mat[][row], double vec[], double out[]) {
 template<>
 template<int row>
 inline void veryfasttree::AVX256Operations<float>::
-matrixt_by_vector4(float mat[][row], float vec[], float out[]) {
+matrix_by_vector4(float mat[][row], float vec[], float out[]) {
     __m128 o = _mm_setzero_ps();
     /* result is a sum of vectors: sum(k) v[k] * mat[k][] */
     for (int64_t j = 0; j < 4; j++) {

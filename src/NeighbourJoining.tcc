@@ -2339,7 +2339,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
             }
 
             /* and finally, divide by stat again & rotate to give the new frequencies */
-            operations.matrixt_by_vector4(transmat.eigeninvT, fPost, fOut);
+            operations.matrix_by_vector4(transmat.eigeninvT, fPost, fOut);
         }  /* end loop over position i */
     } else if (options.nCodes == 20) {    /* matrix model on amino acids */
         numeric_t *fGap = &transmat.codeFreq[NOCODE][0];
@@ -6172,21 +6172,27 @@ AbsNeighbourJoining(inline void)::traverseSPR(int64_t &iDone, int64_t iRound, in
     std::vector<int64_t> nodeList(maxnodes);
     int64_t nodeListLen = 0;
     int64_t branchRoot = node;
+    int64_t rootParent = parent[branchRoot];
     while ((node = traversePostorder(node, traversal, /*pUp*/nullptr, branchRoot)) >= 0) {//level-4
         nodeList[nodeListLen++] = node;
     }
-    int64_t branchTop = branchRoot;
-    for (int i = 0; i < options.maxSPRLength; i++) {
-        if (branchTop != -1) {
-            branchTop = parent[branchTop];
-        }
-    }
-
     assert(nodeListLen == maxnode || options.threadsLevel > 3);
     std::vector<SprStep> steps(options.maxSPRLength); /* current chain of SPRs */
 
     for (int64_t i = 0; i < nodeListLen; i++) {
-        int64_t node = nodeList[i];
+        node = nodeList[i];
+        if (rootParent != -1) {
+            int64_t limit = parent[node];
+            for (int j = 0; j < options.maxSPRLength; j++) {
+                if (limit == rootParent) {
+                    break;
+                }
+                limit = parent[limit];
+            }
+            if (limit == rootParent) {
+                continue;
+            }
+        }
         if ((i % 100) == 0 && i > 0) {
             if (!parallel || options.verbose > 0) {
                 #pragma omp critical
@@ -6271,7 +6277,7 @@ AbsNeighbourJoining(inline void)::traverseSPR(int64_t &iDone, int64_t iRound, in
                 upProfiles[j].reset();
             }
             for (int64_t ancestor = parent[node]; ancestor >= 0; ancestor = parent[ancestor]) {
-                if (ancestor == branchTop) {
+                if (ancestor == rootParent) {
                     break;
                 }
                 recomputeProfile(upProfiles, ancestor, /*useML*/false);
@@ -6317,61 +6323,58 @@ AbsNeighbourJoining(void)::SPR(int64_t iRound, int64_t nRounds) {
 
     if (options.threads > 1 && options.threadsLevel > 3) {
 
-        std::vector<int64_t> subtrees = treePartitioning(options.maxSPRLength + 2);
-        std::vector<int64_t> branchRoots;
+        std::vector<int64_t> subtrees = treePartitioning(options.maxSPRLength + 1);
 
         if (options.slow) {
             lockedNodes.resize(maxnodes, false);
             for (int64_t subtreeRoot: subtrees) {
-                lockedNodes[subtreeRoot] = true;
+                if (parent[subtreeRoot] != -1) {
+                    lockedNodes[parent[subtreeRoot]] = true;
+                }
             }
         }
 
         #pragma omp parallel
         {
             std::vector<std::unique_ptr<Profile>> upProfiles2(maxnodes);
-            std::vector<int64_t> branchRoots2;
 
             #pragma omp for schedule(static, 1)
             for (int64_t s = 0; s < (int64_t) subtrees.size(); s++) {
                 if (subtrees[s] == -1) {
                     continue;
                 }
-                std::vector<int64_t> stackA = {subtrees[s]};
-                std::vector<int64_t> stackB;
-
-                for (int i = 0; i < options.maxSPRLength + 2; i++) {
-                    for (int64_t subtreeRoot: stackA) {
-                        for (int j = 0; j < child[subtreeRoot].nChild; j++) {
-                            stackB.push_back(child[subtreeRoot].child[j]);
-                        }
-                    }
-                    stackA = std::move(stackB);
-                    stackB.clear();
-                    if (stackA.empty()) {
-                        break;
-                    }
-                    if (i == 2) {
-                        branchRoots2.insert(branchRoots2.end(), stackA.begin(), stackA.end());
-                    }
-                }
-
-                for (int64_t subtreeRoot: stackA) {
-                    traverseSPR(iDone, iRound, nRounds, upProfiles2.data(), traversal, subtreeRoot, last_tot_len);
-                }
-            }
-            #pragma omp critical
-            {
-                branchRoots.insert(branchRoots.end(), branchRoots2.begin(), branchRoots2.end());
+                traverseSPR(iDone, iRound, nRounds, upProfiles2.data(), traversal, subtrees[s], last_tot_len);
             }
         }
 
-        for (int64_t subtreeRoot: branchRoots) {
+        for (int64_t node: subtrees) {
+            if (node == -1) {
+                continue;
+            }
             for (int64_t j = 0; j < maxnodes; j++) {
                 upProfiles[j].reset();
             }
-            for (int64_t ancestor = parent[subtreeRoot]; ancestor >= 0; ancestor = parent[ancestor]) {
+            for (int64_t ancestor = parent[node]; ancestor >= 0; ancestor = parent[ancestor]) {
                 recomputeProfile(upProfiles.data(), ancestor, /*useML*/false);
+            }
+        }
+
+        std::vector<int64_t> stackA = subtrees;
+        std::vector<int64_t> stackB;
+        for (int i = 0; i < options.maxSPRLength + 1; i++) {
+            for (int64_t node: stackA) {
+                if (node == -1) {
+                    continue;
+                }
+                for (int j = 0; j < child[node].nChild; j++) {
+                    traversal[child[node].child[j]] = false;
+                    stackB.push_back(child[node].child[j]);
+                }
+            }
+            stackA = std::move(stackB);
+            stackB.clear();
+            if (stackA.empty()) {
+                break;
             }
         }
         lockedNodes.resize(0);
@@ -6907,12 +6910,14 @@ AbsNeighbourJoining(inline void)::traverseTestSplitsML(int64_t &iDone, int64_t &
         if (loglk[ACvsBD] > loglk[ADvsBC]) {
             if (options.mlAccuracy > 1 || loglk[ACvsBD] > loglk[ABvsCD] - Constants::closeLogLkLimit) {
                 loglk[ACvsBD] = MLQuartetOptimize(*profiles4[0], *profiles4[2], *profiles4[1], *profiles4[3],
-                                                  lenACvsBD, /*pStarTest*/ nullptr, &site_likelihoods[ACvsBD * nPos]);
+                                                  lenACvsBD, /*pStarTest*/ nullptr,
+                                                  &site_likelihoods[ACvsBD * nPos]);
             }
         } else {
             if (options.mlAccuracy > 1 || loglk[ADvsBC] > loglk[ABvsCD] - Constants::closeLogLkLimit) {
                 loglk[ADvsBC] = MLQuartetOptimize(*profiles4[0], *profiles4[3], *profiles4[2], *profiles4[1],
-                                                  lenADvsBC, /*pStarTest*/ nullptr, &site_likelihoods[ADvsBC * nPos]);
+                                                  lenADvsBC, /*pStarTest*/ nullptr,
+                                                  &site_likelihoods[ADvsBC * nPos]);
             }
         }
 
@@ -7019,7 +7024,8 @@ onedimenmin(double xmin, double xguess, double xmax, Function f, Data &data, dou
         bx = 0.5 * (ax + cx);
     }
     if (options.verbose > 4) {
-        log << strformat("onedimenmin lo %.4f guess %.4f hi %.4f range %.4f %.4f", ax, bx, cx, xmin, xmax) << std::endl;
+        log << strformat("onedimenmin lo %.4f guess %.4f hi %.4f range %.4f %.4f", ax, bx, cx, xmin, xmax)
+            << std::endl;
     }
     /* ideally this range includes the true minimum, i.e.,
        fb < fa and fb < fc
@@ -7067,7 +7073,8 @@ onedimenmin(double xmin, double xguess, double xmax, Function f, Data &data, dou
 #define SIGN(a, b) ((b) >= 0.0 ? fabs(a) : -fabs(a))
 
 AbsNeighbourJoining(template<typename Function, typename Data> double)::
-brent(double ax, double bx, double cx, Function f, Data &data, double ftol, double atol, double &foptx, double &f2optx,
+brent(double ax, double bx, double cx, Function f, Data &data, double ftol, double atol, double &foptx,
+      double &f2optx,
       double fax, double fbx, double fcx) {
     double a, b, d = 0, etemp, fu, fv, fw, fx, p, q, r, tol1, tol2, u, v, w, x, xm;
     double xw, wv, vx;
@@ -7247,8 +7254,9 @@ AbsNeighbourJoining(double)::incompleteGamma(double x, double alpha, double ln_g
     return (gin);
 }
 
-AbsNeighbourJoining()::CompareSeeds::CompareSeeds(const std::vector<numeric_t, typename op_t::Allocator> &outDistances,
-                                                  const std::vector<int64_t> &compareSeedGaps) :
+AbsNeighbourJoining()::CompareSeeds::CompareSeeds(
+        const std::vector<numeric_t, typename op_t::Allocator> &outDistances,
+        const std::vector<int64_t> &compareSeedGaps) :
         outDistances(outDistances), compareSeedGaps(compareSeedGaps) {}
 
 AbsNeighbourJoining(bool)::CompareSeeds::operator()(int64_t seed1, int64_t seed2) const {

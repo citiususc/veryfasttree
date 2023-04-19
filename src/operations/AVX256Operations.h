@@ -30,7 +30,7 @@ namespace veryfasttree {
         inline void vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n);
 
         template <int row>
-        inline void matrixt_by_vector4(numeric_t mat[][row], numeric_t vec[], numeric_t out[]);
+        inline void matrix_by_vector4(numeric_t mat[][row], numeric_t vec[], numeric_t out[]);
 
         inline void fastexp(numeric_t fTot[], int64_t n, int lvl);
 

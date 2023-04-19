@@ -1,16 +1,12 @@
 
-#ifndef FASTTREE_BASICOPERATIONS_TCC
-#define FASTTREE_BASICOPERATIONS_TCC
-
 #include "BasicOperations.h"
 #include <cmath>
 
-#define AbsBasicOperations(...) \
-template<typename Precision> \
-__VA_ARGS__ veryfasttree::BasicOperations<Precision>
 
-AbsBasicOperations(inline void)::vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]) {
-    for (int64_t i = 0; i < n; i+=4) {
+template<typename Precision>
+inline void
+veryfasttree::BasicOperations<Precision>::vector_multiply(numeric_t f1[], numeric_t f2[], int64_t n, numeric_t fOut[]) {
+    for (int64_t i = 0; i < n; i += 4) {
         fOut[i] = f1[i] * f2[i];
         fOut[i + 1] = f1[i + 1] * f2[i + 1];
         fOut[i + 2] = f1[i + 2] * f2[i + 2];
@@ -18,9 +14,11 @@ AbsBasicOperations(inline void)::vector_multiply(numeric_t f1[], numeric_t f2[],
     }
 }
 
-AbsBasicOperations(inline Precision)::vector_multiply_sum(numeric_t f1[], numeric_t f2[], int64_t n) {
+template<typename Precision>
+inline Precision
+veryfasttree::BasicOperations<Precision>::vector_multiply_sum(numeric_t f1[], numeric_t f2[], int64_t n) {
     numeric_t out = 0.0;
-    for (int64_t i = 0; i < n; i+=4) {
+    for (int64_t i = 0; i < n; i += 4) {
         out += f1[i] * f2[i];
         out += f1[i + 1] * f2[i + 1];
         out += f1[i + 2] * f2[i + 2];
@@ -29,9 +27,12 @@ AbsBasicOperations(inline Precision)::vector_multiply_sum(numeric_t f1[], numeri
     return out;
 }
 
-AbsBasicOperations(inline Precision)::vector_multiply3_sum(numeric_t f1[], numeric_t f2[], numeric_t f3[], int64_t n) {
+template<typename Precision>
+inline Precision
+veryfasttree::BasicOperations<Precision>::vector_multiply3_sum(numeric_t f1[], numeric_t f2[], numeric_t f3[],
+                                                               int64_t n) {
     numeric_t sum = 0.0;
-    for (int64_t i = 0; i < n; i+=4) {
+    for (int64_t i = 0; i < n; i += 4) {
         sum += f1[i] * f2[i] * f3[i];
         sum += f1[i + 1] * f2[i + 1] * f3[i + 1];
         sum += f1[i + 2] * f2[i + 2] * f3[i + 2];
@@ -40,10 +41,13 @@ AbsBasicOperations(inline Precision)::vector_multiply3_sum(numeric_t f1[], numer
     return sum;
 }
 
-AbsBasicOperations(inline Precision)::vector_dot_product_rot(numeric_t f1[], numeric_t f2[], numeric_t fBy[], int64_t n) {
+template<typename Precision>
+inline Precision
+veryfasttree::BasicOperations<Precision>::vector_dot_product_rot(numeric_t f1[], numeric_t f2[], numeric_t fBy[],
+                                                                 int64_t n) {
     numeric_t out1 = 0.0;
     numeric_t out2 = 0.0;
-    for (int64_t i = 0; i < n; i+=4) {
+    for (int64_t i = 0; i < n; i += 4) {
         out1 += f1[i] * fBy[i];
         out1 += f1[i + 1] * fBy[i + 1];
         out1 += f1[i + 2] * fBy[i + 2];
@@ -56,8 +60,9 @@ AbsBasicOperations(inline Precision)::vector_dot_product_rot(numeric_t f1[], num
     return out1 * out2;
 }
 
-AbsBasicOperations(inline void)::vector_add(numeric_t fTot[], numeric_t fAdd[], int64_t n){
-    for (int64_t i = 0; i < n; i+=4) {
+template<typename Precision>
+inline void veryfasttree::BasicOperations<Precision>::vector_add(numeric_t fTot[], numeric_t fAdd[], int64_t n) {
+    for (int64_t i = 0; i < n; i += 4) {
         fTot[i] += fAdd[i];
         fTot[i + 1] += fAdd[i + 1];
         fTot[i + 2] += fAdd[i + 2];
@@ -65,9 +70,10 @@ AbsBasicOperations(inline void)::vector_add(numeric_t fTot[], numeric_t fAdd[], 
     }
 }
 
-AbsBasicOperations(inline Precision)::vector_sum(numeric_t f1[], int64_t n) {
+template<typename Precision>
+inline Precision veryfasttree::BasicOperations<Precision>::vector_sum(numeric_t f1[], int64_t n) {
     numeric_t out = 0.0;
-    for (int64_t i = 0; i < n; i+=4) {
+    for (int64_t i = 0; i < n; i += 4) {
         out += f1[i];
         out += f1[i + 1];
         out += f1[i + 2];
@@ -76,8 +82,10 @@ AbsBasicOperations(inline Precision)::vector_sum(numeric_t f1[], int64_t n) {
     return (out);
 }
 
-AbsBasicOperations(inline void)::vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n, numeric_t fOut[]) {
-    for (int64_t i = 0; i < n; i+=4) {
+template<typename Precision>
+inline void veryfasttree::BasicOperations<Precision>::vector_multiply_by(numeric_t f[], numeric_t fBy, int64_t n,
+                                                                         numeric_t fOut[]) {
+    for (int64_t i = 0; i < n; i += 4) {
         fOut[i] = f[i] * fBy;
         fOut[i + 1] = f[i + 1] * fBy;
         fOut[i + 2] = f[i + 2] * fBy;
@@ -85,8 +93,11 @@ AbsBasicOperations(inline void)::vector_multiply_by(numeric_t f[], numeric_t fBy
     }
 }
 
-AbsBasicOperations(inline void)::vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight, int64_t n) {
-    for (int64_t i = 0; i < n; i+=4) {
+template<typename Precision>
+inline void
+veryfasttree::BasicOperations<Precision>::vector_add_mult(numeric_t fTot[], numeric_t fAdd[], numeric_t weight,
+                                                          int64_t n) {
+    for (int64_t i = 0; i < n; i += 4) {
         fTot[i] += fAdd[i] * weight;
         fTot[i + 1] += fAdd[i + 1] * weight;
         fTot[i + 2] += fAdd[i + 2] * weight;
@@ -94,8 +105,10 @@ AbsBasicOperations(inline void)::vector_add_mult(numeric_t fTot[], numeric_t fAd
     }
 }
 
-AbsBasicOperations(template <int row> inline void)::
-matrixt_by_vector4(numeric_t mat[][row], numeric_t vec[], numeric_t out[]) {
+template<typename Precision>
+template<int row>
+inline void veryfasttree::BasicOperations<Precision>::
+matrix_by_vector4(numeric_t mat[][row], numeric_t vec[], numeric_t out[]) {
     for (int64_t j = 0; j < 4; j++) {
         double sum = 0;
         for (int64_t k = 0; k < 4; k++) {
@@ -105,7 +118,8 @@ matrixt_by_vector4(numeric_t mat[][row], numeric_t vec[], numeric_t out[]) {
     }
 }
 
-AbsBasicOperations(inline void)::fastexp(numeric_t fTot[], int64_t n, int lvl) {
+template<typename Precision>
+inline void veryfasttree::BasicOperations<Precision>::fastexp(numeric_t fTot[], int64_t n, int lvl) {
     if (lvl == 0) {
         for (int64_t k = 0; k < n; k++) {
             fTot[k] = (numeric_t) std::exp((double) fTot[k]);
@@ -200,5 +214,3 @@ AbsBasicOperations(inline void)::fastexp(numeric_t fTot[], int64_t n, int lvl) {
         }
     }
 }
-
-#endif

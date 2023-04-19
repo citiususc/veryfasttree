@@ -144,5 +144,5 @@ if(MINGW)
 endif(MINGW)
 
 add_library(zlibstatic STATIC ${ZLIB_SRCS} ${ZLIB_PUBLIC_HDRS} ${ZLIB_PRIVATE_HDRS})
-target_include_directories(zlibstatic PUBLIC .)
+target_include_directories(zlibstatic PUBLIC . ${CMAKE_CURRENT_BINARY_DIR})
 

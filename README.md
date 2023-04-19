@@ -10,6 +10,7 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 
 - v4.0 (in development):
     - New thread levels have been introduced.
+    - Nvidia CUDA GPU computing support.
     - Improved performance with new parallel regions (Local bootstraps, ML Lengths, LogLk, ML splits, etc.).
     - Tree creation (Top hits, TopHitNJSearch, and FastNJSearch, ExhaustiveNJSearch(-slow)) now use threads.
     - A new tree partitioning implementation that is several orders of magnitude faster.
@@ -68,6 +69,7 @@ other basic requirements are:
     * GCC 5+ (GCC 4 is [bugged](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56859))
     * Visual studio 2015 (previous versions with support for C++11 may work)
 * make (linux only)
+* CUDA Toolkit (Cuda only)
 
 ## Configuring
 
@@ -97,6 +99,12 @@ Options can be listed with cmake:
 
     // enable/disable AVX512
     USE_AVX512:BOOL=OFF
+	
+    // enable/disable CUDA
+    USE_CUDA:BOOL=OFF
+    
+	// change CUDA Architecture
+    CUDA_ARCH:STRING=80
 
 Example:
 
@@ -161,6 +169,7 @@ It enables the vector extensions:
     - **AVX**: Arithmetic operations are performed using AVX vector intrinsics. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bits doubles.
     - **AVX2**: Similar to AVX, but some arithmetic operations are performed using  additional AVX2 vector intrinsics not included in the AVX instruction set. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bit doubles).
     - **AVX512**: Arithmetic operations are performed using AVX512 vector intrinsics. Each instruction operates on 512 bit registers, which could contain sixteen 32-bit floats or eight 64-bits doubles.
+    - **CUDA**: Arithmetic operations are performed using NVIDIA CUDA.
 
 - **-fastexp [implementation]**  
 This option is used to select an alternative implementation for the exponential function (e<sup>x</sup>), which has a significant impact on performance:
