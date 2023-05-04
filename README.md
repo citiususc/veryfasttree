@@ -169,9 +169,9 @@ It enables the vector extensions:
     - **AVX**: Arithmetic operations are performed using AVX vector intrinsics. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bits doubles.
     - **AVX2**: Similar to AVX, but some arithmetic operations are performed using  additional AVX2 vector intrinsics not included in the AVX instruction set. Each instruction operates on 256 bit registers, which could contain eight 32-bit floats or four 64-bit doubles).
     - **AVX512**: Arithmetic operations are performed using AVX512 vector intrinsics. Each instruction operates on 512 bit registers, which could contain sixteen 32-bit floats or eight 64-bits doubles.
-    - **CUDA**: Arithmetic operations are performed using NVIDIA CUDA.
+    - **CUDA**: (Experimental) Arithmetic operations are performed using NVIDIA CUDA.
 
-- **-fastexp [implementation]**  
+- **-fastexp [implementation]**
 This option is used to select an alternative implementation for the exponential function (e<sup>x</sup>), which has a significant impact on performance:
     - **0**: (default) Use the *exp* function included in the built-in math library with double precision.
     - **1**: Use the *exp* function included in the built-in math library with simple precision (not recommended together with *-double-precision* option).
@@ -184,3 +184,5 @@ If there is not enough available RAM to perform the computation, disk will be us
 - **-disk-computing-path [path]**
 Like **-disk-computing** but using a custom path folder to store data.
 
+- **-disk-dynamic-computingg**
+By default, disk computing only creates files associated with static data in RAM, which means that there is no significant impact on performance as long as there is available RAM. This option further reduces memory usage by storing dynamic data on disk. However, even if there is enough RAM, it will have a negative impact on performance due to the creation and deletion of files.

@@ -42,6 +42,8 @@ namespace veryfasttree {
         std::vector<std::string> uniqueSeq;    /* indexed by iUniq -- points to strings allocated elsewhere */
 
         Uniquify(Alignment &aln);
+
+        void clearUniqueSeq();
     };
 }
 

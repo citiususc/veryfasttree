@@ -104,6 +104,7 @@ namespace veryfasttree {
         int fastexp = 0;
         std::string extension;
         bool diskComputing;
+        bool diskDynamicComputing = false;
         std::string diskComputingPath;
         bool relativeProgress = false;
 

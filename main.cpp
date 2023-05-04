@@ -501,9 +501,16 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "Like -disk-computing but using a custom path folder to store data.")->type_name("path")->
             group(optimizations);
 
+    app.add_flag("-disk-dynamic-computing", options.diskDynamicComputing,
+                 "By default, disk computing only creates files associated with static data in RAM, which means that "
+                 "there is no significant impact on performance as long as there is available RAM. This option further "
+                 "reduces memory usage by storing dynamic data on disk. However, even if there is enough RAM, it will "
+                 "have a negative impact on performance due to the constant creation and deletion of files.")->
+            group(optimizations);
+
     app.add_flag("-relative-progress", options.relativeProgress,
-                   "To shows relative time to previous step rather than absolute time in  progress report.")->
-                   group(optimizations);
+                 "To shows relative time to previous step rather than absolute time in  progress report.")->
+            group(optimizations);
 
     auto deprecated = "Deprecated";
 

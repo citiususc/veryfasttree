@@ -70,6 +70,7 @@ set(SOURCE_FILES
         )
 
 if (USE_CUDA)
+    message("WARNING!! CUDA is only a experimental feature")
     set(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH})
     set(USE_CUDA 1)
     enable_language(CUDA)

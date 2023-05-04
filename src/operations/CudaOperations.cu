@@ -172,10 +172,6 @@ void veryfasttree::configCuda(Options& options){
     if(nDevices == 0){
         throw std::runtime_error("No CUDA compatible device found");
     }
-
-    if(nDevices < options.threads){
-        std::cerr << "Warning: using more threads than GPU devices" << std::endl;
-    }
 }
 
 

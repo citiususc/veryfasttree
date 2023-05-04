@@ -122,7 +122,7 @@ AbsFastTreeImpl(void)::run() {
                                  nSeq, unSeq, aln.nPos,
                                  aln.names.back().c_str(), unique.uniqueSeq.back().c_str()) << std::endl;
             }
-            vecrelease(unique.uniqueSeq);
+            unique.clearUniqueSeq();
             aln.clearAlignmentSeqs(); /*no longer needed*/
             if (fpInTree || !aln.tree.empty()) {
                 if (fpInTree && options.intree1) {

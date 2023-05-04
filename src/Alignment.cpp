@@ -14,7 +14,6 @@ Alignment::Alignment(const Options &options, std::istream &fp, std::ostream &log
 
 void Alignment::readAlignment() {
     std::string buf;
-    const std::string fname = options.diskComputingPath + "-" + std::to_string((uintptr_t) this) + "-seqs.men";
     size_t dumpCount = 0;
     size_t dumpSz = 0;
     bool globalDumpSec;
@@ -38,7 +37,7 @@ void Alignment::readAlignment() {
             if (dumpSz < 1024) {
                 dumpSz = 1024 * 1024 * 1024 * (size_t) 10;
             }
-            disk = make_unique2<DiskMemory>(fname, dumpSz);
+            disk = make_unique2<DiskMemory>(options.diskComputingPath, "seqs", dumpSz);
         }
         dumpCount += buf.size();
         if (dumpCount > 1024 * 1024 * 100) {
@@ -524,4 +523,9 @@ Uniquify::Uniquify(Alignment &aln) {
         }
     }
     assert((int64_t) nUniqueSeq == (int64_t) uniqueSeq.size());
+}
+
+void Uniquify::clearUniqueSeq(){
+    disk.reset();
+    vecrelease(uniqueSeq);
 }

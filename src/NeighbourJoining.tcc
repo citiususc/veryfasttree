@@ -29,13 +29,13 @@ AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints) {
     reset();
 }
 
-AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool test) {
+AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uintptr_t &mem, uintptr_t vmen, bool test) {
     storeLevel = 1;
     size_t space = sizeof(Precision) * nPos;
-    void *ptr = (void *) men;
+    void *ptr = (void *) mem;
 
-    weights = (numeric_t *) std::align(op_t::ALIGNMENT, sizeof(Precision), ptr, space);
-    ptr = weights + sizeof(Precision) * nPos;
+    weights = (numeric_t *) std::align(sizeof(numeric_t), sizeof(numeric_t), ptr, space);
+    ptr = weights + space;
 
     vectors = nullptr;
     codeDist = nullptr;
@@ -52,9 +52,16 @@ AbsNeighbourJoining()::Profile::Profile(int64_t nPos, int64_t nConstraints, uint
     }
 
     codes = (char *) ptr;
+    if (vmen != 0) {
+        if (!test) {
+            *((uintptr_t *) ptr) = vmen;
+            storeLevel = 2;
+        }
+        codes += sizeof(vmen);//we store vmen before codes
+    }
     ptr = codes + nPos * sizeof(char);
 
-    men = (uintptr_t) ptr;
+    mem = (uintptr_t) ptr;
     if (!test) {
         reset();
     }
@@ -93,31 +100,61 @@ AbsNeighbourJoining()::Profile::~Profile() {
     reset();
 }
 
-AbsNeighbourJoining(void)::Profile::setVectorSize(size_t n, numeric_t val) {
+AbsNeighbourJoining(void)::Profile::setVectorSize(size_t n, numeric_t val, bool fixed) {
     assert(storeLevel != -1);
-    vectorsSize = n;
     typename op_t::Allocator alloc;
-    if (vectors != nullptr) {
-        alloc.deallocate(vectors, vectorsSize);
+    if (storeLevel == 2) {
+        DynDiskMemory *disk = (DynDiskMemory * ) * (((uintptr_t *) codes) - 1);
+        if (disk->inAlloc()) {
+            disk->release();
+        } else if (vectors != nullptr) {
+            alloc.deallocate(vectors, vectorsSize);
+        }
         vectors = nullptr;
     }
-    if (n > 0) {
-        vectors = alloc.allocate(n);
+    if (storeLevel == 2 && fixed) {
+        DynDiskMemory *disk = (DynDiskMemory * ) * (((uintptr_t *) codes) - 1);
+        if (n > 0) {
+            vectors = (numeric_t *) disk->alignAllocate<numeric_t>(nullptr, n, op_t::ALIGNMENT);
+        }
+    } else {
+        if (vectors != nullptr) {
+            alloc.deallocate(vectors, vectorsSize);
+            vectors = nullptr;
+        }
+        if (n > 0) {
+            vectors = alloc.allocate(n);
+        }
     }
+    vectorsSize = n;
     for (size_t i = 0; i < n; i++) { vectors[i] = val; }
 }
 
 AbsNeighbourJoining(void)::Profile::resizeVector(size_t n) {
     assert(vectors != nullptr);
     assert(storeLevel != -1);
-    if (vectorsSize != n) {
-        typename op_t::Allocator alloc;
+    assert(n <= vectorsSize);
+    typename op_t::Allocator alloc;
+    if (storeLevel == 2) {
+        DynDiskMemory *disk = (DynDiskMemory * ) * (((uintptr_t *) codes) - 1);
+        if (!disk->inAlloc()) {
+            numeric_t *tmp = vectors;
+            vectors = (numeric_t *) disk->alignAllocate<numeric_t>(vectors, n, op_t::ALIGNMENT);
+            alloc.deallocate(tmp, vectorsSize);
+        } else {
+            numeric_t *tmp = alloc.allocate(n);
+            std::memcpy(tmp, vectors, n * sizeof(numeric_t));
+            disk->release();
+            vectors = (numeric_t *) disk->alignAllocate<numeric_t>(tmp, n, op_t::ALIGNMENT);
+            alloc.deallocate(tmp, vectorsSize);
+        }
+    } else if (vectorsSize != n) {
         numeric_t *tmp = vectors;
         vectors = alloc.allocate(n);
         std::memcpy(vectors, tmp, n * sizeof(numeric_t));
         alloc.deallocate(tmp, vectorsSize);
-        vectorsSize = n;
     }
+    vectorsSize = n;
 }
 
 
@@ -350,15 +387,23 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
                                           std::unique_ptr<DiskMemory> &cons_disk) {
     profiles.reserve(maxnodes);
     if (options.diskComputing) {
-        uintptr_t men = 0;
-        for (int64_t i = 0; i < maxnodes; i++) {
-            Profile(nPos, nCons, men, options.nCodes, true); //Check profiles size
+        uintptr_t mem = sizeof(numeric_t) - 1; // overheads for alignments
+        Profile(nPos, nCons, mem, options.diskDynamicComputing ? 1 : 0, true); //Check profiles size
+        mem *= maxnodes;
+        if (options.diskDynamicComputing) {
+            for (int64_t i = 0; i < maxnodes; i++) {
+                diskProfileVectors.emplace_back(options.diskComputingPath, "vector" + std::to_string(i));
+            }
         }
-        diskProfiles = make_unique2<DiskMemory>(options.diskComputingPath + "-profiles.men", men);
-        men = diskProfiles->get();
+        diskProfiles = make_unique2<DiskMemory>(options.diskComputingPath, "profiles", mem);
+        mem = diskProfiles->ptr();
 
         for (int64_t i = 0; i < maxnodes; i++) {
-            profiles.emplace_back(nPos, nCons, men, options.nCodes);
+            if (options.diskDynamicComputing) {
+                profiles.emplace_back(nPos, nCons, mem, (uintptr_t) &diskProfileVectors[i]);
+            } else {
+                profiles.emplace_back(nPos, nCons, mem, 0);
+            }
         }
     } else {
         for (int64_t i = 0; i < maxnodes; i++) {
@@ -2099,7 +2144,7 @@ AbsNeighbourJoining(void)::averageProfile(Profile &out, Profile &profile1, Profi
     }
 
     /* Allocate and set the vectors */
-    out.setVectorSize(out.nVectors * nCodeSize, 0);
+    out.setVectorSize(out.nVectors * nCodeSize, 0, true);
 
     options.debug.nProfileFreqAlloc += out.nVectors;
     options.debug.nProfileFreqAvoid += nPos - out.nVectors;
@@ -2158,7 +2203,7 @@ posteriorProfile(Profile &out, Profile &p1, Profile &p2, double len1, double len
     }
 
     out.nVectors = nPos;
-    out.setVectorSize(out.nVectors * nCodeSize, 0);
+    out.setVectorSize(out.nVectors * nCodeSize, 0, false);
 
     int64_t iFreqOut = 0;
     int64_t iFreq1 = 0;

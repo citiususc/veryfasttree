@@ -131,7 +131,7 @@ namespace veryfasttree {
             numeric_t *vectors;
             size_t vectorsSize;
 
-            void setVectorSize(size_t n, numeric_t val);
+            void setVectorSize(size_t n, numeric_t val, bool fixed = true);
 
             void resizeVector(size_t n);
 
@@ -150,7 +150,7 @@ namespace veryfasttree {
 
             Profile(int64_t nPos, int64_t nConstraints);
 
-            Profile(int64_t nPos, int64_t nConstraints, uintptr_t &men, int nCodes, bool test = false);
+            Profile(int64_t nPos, int64_t nConstraints, uintptr_t &mem, uintptr_t vmen, bool test = false);
 
             Profile(const Profile &ref);
 
@@ -271,8 +271,9 @@ namespace veryfasttree {
         /* The profile data structures */
         int64_t maxnode;            /* The next index to allocate */
         int64_t maxnodes;            /* Space allocated in data structures below */
-        std::vector<Profile> profiles; /* Profiles of leaves and intermediate nodes */
         std::unique_ptr<DiskMemory> diskProfiles;
+        std::vector<DynDiskMemory> diskProfileVectors;
+        std::vector<Profile> profiles; /* Profiles of leaves and intermediate nodes */
         std::vector<numeric_t, typename op_t::Allocator> diameter;    /* To correct for distance "up" from children (if any) */
         std::vector<numeric_t, typename op_t::Allocator> varDiameter; /* To correct variances for distance "up" */
         std::vector<numeric_t, typename op_t::Allocator> selfdist;    /* Saved for use in some formulas */
