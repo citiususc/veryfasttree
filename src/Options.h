@@ -106,6 +106,7 @@ namespace veryfasttree {
         bool diskComputing;
         bool diskDynamicComputing = false;
         std::string diskComputingPath;
+        int diskComputingLimit = -1;
         bool relativeProgress = false;
 
         /*Precision*/

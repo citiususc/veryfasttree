@@ -387,11 +387,15 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
                                           std::unique_ptr<DiskMemory> &cons_disk) {
     profiles.reserve(maxnodes);
     if (options.diskComputing) {
+        int64_t dynamicLimit = maxnodes;
+        if(options.diskComputingLimit > 0){
+            dynamicLimit = seqs.size() + options.diskComputingLimit;
+        }
         uintptr_t mem = sizeof(numeric_t) - 1; // overheads for alignments
         Profile(nPos, nCons, mem, options.diskDynamicComputing ? 1 : 0, true); //Check profiles size
         mem *= maxnodes;
         if (options.diskDynamicComputing) {
-            for (int64_t i = 0; i < maxnodes; i++) {
+            for (int64_t i = 0; i < dynamicLimit; i++) {
                 diskProfileVectors.emplace_back(options.diskComputingPath, "vector" + std::to_string(i));
             }
         }
@@ -399,7 +403,7 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
         mem = diskProfiles->ptr();
 
         for (int64_t i = 0; i < maxnodes; i++) {
-            if (options.diskDynamicComputing) {
+            if (options.diskDynamicComputing && i < dynamicLimit) {
                 profiles.emplace_back(nPos, nCons, mem, (uintptr_t) &diskProfileVectors[i]);
             } else {
                 profiles.emplace_back(nPos, nCons, mem, 0);
