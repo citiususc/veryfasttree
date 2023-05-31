@@ -1,7 +1,4 @@
 
-#ifndef FASTTREE_FASTTREEIMPL_TCC
-#define FASTTREE_FASTTREEIMPL_TCC
-
 #include "VeyFastTreeImpl.h"
 #include <sstream>
 #include "NeighbourJoining.h"
@@ -534,4 +531,4 @@ AbsFastTreeImpl(void)::transMatToDistanceMat(DistanceMatrix <Precision, op_t::AL
 }
 
 
-#endif
+#undef AbsFastTreeImpl

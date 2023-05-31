@@ -2,13 +2,8 @@
 #include "AVX256Operations.h"
 #include <cmath>
 
-#if (defined _WIN32 || defined WIN32 || defined WIN64 || defined _WIN64) //Fix windows union operator[]
 #define getf(array, i) ((float*)&array)[i]
 #define getd(array, i) ((double*)&array)[i]
-#else
-#define getf(array, i) array[i]
-#define getd(array, i) array[i]
-#endif
 
 template<>
 inline float veryfasttree::AVX256Operations<float>::mm_sum(__m128 sum) {

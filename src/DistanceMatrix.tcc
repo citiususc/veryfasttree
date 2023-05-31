@@ -1,7 +1,4 @@
 
-#ifndef FASTTREE_DISTANCEMATRIX_TCC
-#define FASTTREE_DISTANCEMATRIX_TCC
-
 #include "DistanceMatrix.h"
 #include <iostream>
 #include <sstream>
@@ -221,5 +218,5 @@ const veryfasttree::DistanceMatrix<Precision, Aligment> veryfasttree::DistanceMa
 #pragma warning(pop)
 #endif
 
-#endif
+#undef AbsDistanceMatrix
 

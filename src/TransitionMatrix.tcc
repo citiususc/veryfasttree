@@ -1,12 +1,11 @@
 
-#ifndef FASTTREE_TRANSITIONMATRIX_TCC
-#define FASTTREE_TRANSITIONMATRIX_TCC
-
 #include "TransitionMatrix.h"
 
 #define AbsTransitionMatrix(...) \
 template<typename Precision, int Aligment> \
 __VA_ARGS__ veryfasttree::TransitionMatrix<Precision, Aligment>
+
+#define double_alignas alignas(Aligment < sizeof(double) ? sizeof(double) : Aligment)
 
 AbsTransitionMatrix()::TransitionMatrix() : setted(false) {}
 
@@ -158,7 +157,7 @@ AbsTransitionMatrix(void)::readAATransitionMatrix(const Options &options, /*IN*/
 
 AbsTransitionMatrix(void)::
 createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAXCODES], const double _stat[MAXCODES]) {
-    alignas(Aligment) double sqrtstat[20];
+    double_alignas double sqrtstat[20];
     auto nCodes = options.nCodes;
 
     for (int i = 0; i < options.nCodes; i++) {
@@ -167,7 +166,7 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
         sqrtstat[i] = std::sqrt(_stat[i]);
     }
 
-    alignas(Aligment) double sym[20 * 20];        /* symmetrized matrix M' */
+    double_alignas double sym[20 * 20];        /* symmetrized matrix M' */
     /* set diagonals so columns sums are 0 before symmetrization */
     for (int i = 0; i < nCodes; i++) {
         for (int j = 0; j < nCodes; j++) {
@@ -228,18 +227,18 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
     /* save some posterior probabilities for approximating later:
        first, we compute P(B | A, t) for t = approxMLnearT, by using
        V * exp(L*t) * V**-1 */
-    alignas(Aligment) double expvalues[MAXCODES];
+    double_alignas double expvalues[MAXCODES];
     for (int i = 0; i < nCodes; i++) {
         expvalues[i] = std::exp(Constants::approxMLnearT * this->eigenval[i]);
     }
-    alignas(Aligment) double LVinv[MAXCODES][MAXCODES]; /* exp(L*t) * V**-1 */
+    double_alignas double LVinv[MAXCODES][MAXCODES]; /* exp(L*t) * V**-1 */
     for (int i = 0; i < nCodes; i++) {
         for (int j = 0; j < nCodes; j++) {
             LVinv[i][j] = this->eigeninv[i][j] * expvalues[i];
         }
     }
     /* matrix transform for converting A -> B given t: transt[i][j] = P(j->i | t) */
-    alignas(Aligment) double transt[MAXCODES][MAXCODES];
+    double_alignas double transt[MAXCODES][MAXCODES];
     for (int i = 0; i < nCodes; i++) {
         for (int j = 0; j < nCodes; j++) {
             transt[i][j] = 0;
@@ -250,7 +249,7 @@ createTransitionMatrix(const Options &options, const double matrix[MAXCODES][MAX
     }
     /* nearP[i][j] = P(parent = j | both children are i) = P(j | i,i) ~ stat(j) * P(j->i | t)**2 */
     for (int i = 0; i < nCodes; i++) {
-        alignas(Aligment) double _nearP[MAXCODES];
+        double_alignas double _nearP[MAXCODES];
         double tot = 0;
         for (int j = 0; j < nCodes; j++) {
             assert(transt[j][i] > 0);
@@ -521,4 +520,5 @@ AbsTransitionMatrix(void)::tqli(double d[], double e[], int n, int np, double z[
 
 }
 
-#endif
+#undef  double_alignas
+#undef AbsTransitionMatrix

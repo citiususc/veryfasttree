@@ -27,7 +27,7 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 	- Nvidia CUDA GPU computing support. (Experimental)
 	- Introduced parallel compilation.
 	- Incorporation of changes from FastTree-2.11.
-	- Resolution of errors and significant corrections.
+	- Clang Support
 	- Addressed critical errors and implemented substantial corrections.
 
 - v3.3.0 (merged into 4.0):
@@ -71,6 +71,7 @@ other basic requirements are:
 * C++11 compiler
     * GCC 5+ (GCC 4 is [bugged](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56859))
     * Visual studio 2015 (previous versions with support for C++11 may work)
+    * Clang (requires minimal support for C++11 and OpenMP)
 * make (linux only)
 * CUDA Toolkit (Cuda only)
 

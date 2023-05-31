@@ -1,7 +1,4 @@
 
-#ifndef FASTTREE_NEIGHBOURJOINING_TCC
-#define FASTTREE_NEIGHBOURJOINING_TCC
-
 #include "NeighbourJoining.h"
 #include <list>
 #include <unordered_map>
@@ -6117,7 +6114,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
             iDone += iDone2;
             iDone2 = 0;
             if (dMaxDelta2 > dMaxDelta) {
-                dMaxDelta = dMaxDelta;
+                dMaxDelta = dMaxDelta2;
             }
             nNNIThisRound += nNNIThisRound2;
             nNNIThisRound2 = 0;
@@ -7338,4 +7335,4 @@ AbsNeighbourJoining(bool)::CompareHitsByIJ::operator()(const Besthit &hit1, cons
     return (hit1.i != hit2.i ? hit1.i - hit2.i : hit1.j - hit2.j) <= 0;
 }
 
-#endif
+#undef AbsNeighbourJoining

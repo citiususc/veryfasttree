@@ -5,6 +5,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <cerrno>
 
 using namespace veryfasttree;
 
@@ -16,11 +17,11 @@ DiskMemory::DiskMemory(const std::string &path, const std::string &name, size_t 
     }
     lseek(fd, size, SEEK_SET);
     if (write(fd, "", 1) == -1) {
-        throw std::runtime_error("disk memory truncation error");
+        throw std::runtime_error("disk memory truncation error: " + std::string(std::strerror(errno)));
     }
-    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    void *mem = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (mem == MAP_FAILED) {
-        throw std::runtime_error("memory mapping fails");
+        throw std::runtime_error("memory mapping fails: " + std::string(std::strerror(errno)));
     }
     close(fd);
     map = (uintptr_t) mem;
@@ -100,7 +101,7 @@ DynDiskMemory::DynDiskMemory(const std::string &path, const std::string &name) :
 
 uintptr_t DynDiskMemory::menAllocate(void *src, size_t size) {
     allocated = true;
-    if (!disk || disk->getSize() < size){
+    if (!disk || disk->getSize() < size) {
         disk = make_unique2<DiskMemory>(path, name, size);
     }
 
