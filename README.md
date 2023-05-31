@@ -7,25 +7,28 @@ Regarding the performance, for example, **VeryFastTree** (v3.0 - May 2020) is ab
 To facilitate the adoption from the research community, VeryFastTree keeps exactly the same command line arguments than FastTree-2. In this way, it is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options to increase the overall performance.
 
 **Release Notes**:
-
-- v4.0 (in development):
-    - New thread levels have been introduced.
-    - Nvidia CUDA GPU computing support.
-    - Improved performance with new parallel regions (Local bootstraps, ML Lengths, LogLk, ML splits, etc.).
-    - Tree creation (Top hits, TopHitNJSearch, and FastNJSearch, ExhaustiveNJSearch(-slow)) now use threads.
-    - A new tree partitioning implementation that is several orders of magnitude faster.
-    - The tree partitioning is only used in NNI, SPR and upProfiles computing(to save memory).
-    - A new parallel tree traversal implementation is used in the remaining parts.
-    - The storage of profiles on disk was replaced with Disk Computing. 
-    - Top upProfiles are shared between threads(to save memory) and reused to accelerate the sequential part.
-    - Improved non-deterministic mode and no longer uses mutex.
-    - Deterministic mode now also parallelizes non-deterministic parts, and it is faster.
-    - Tree partitioning method logging now is hidden by default.
-    - Fastq format and libBZ2 compression is now supported.
-    - Tree in can be read from the NEXUS block trees.
-	- Parallel compilation.
-    - Added FastTree-2.11 changes.
-	- Error fixes and Major corrections.
+	
+- v4.0:
+    - Introduction of new thread levels for improved parallelization.
+	- Enhanced performance through new parallel regions (e.g., ML Lengths, ML splits, LogLk, etc.).
+    - Threads used in tree creation: Top hits, TopHitNJSearch, FastNJSearch, and ExhaustiveNJSearch(-slow).
+    - Implementation of a faster tree partitioning approach with significant speed improvements.
+    - Tree partitioning limited to NNI, SPR, and upProfiles computations for memory conservation.
+	- Parallel tree traversal implemented for remaining parts. 
+    - Replacement of disk storage for profiles with Disk Computing.
+    - Shared and reused Top upProfiles among threads for memory efficiency and accelerated sequential parts.
+    - Improved non-deterministic mode with removal of mutex usage.
+    - Optimized performance by parallelizing non-deterministic parts in deterministic mode.
+	- Also implemented non-deterministic parts in deterministic mode for improved performance.
+	- Deterministic mode now outperforms non-deterministic mode in terms of speed.
+	- Tree partitioning method logging now hidden by default.
+	- Support for Fastq format and libBZ2 compression.
+	- Support for reading trees from NEXUS block trees.
+	- Nvidia CUDA GPU computing support. (Experimental)
+	- Introduced parallel compilation.
+	- Incorporation of changes from FastTree-2.11.
+	- Resolution of errors and significant corrections.
+	- Addressed critical errors and implemented substantial corrections.
 
 - v3.3.0 (merged into 4.0):
 	- Deterministic mode now also parallelizes non-deterministic parts, but it require more computation.
