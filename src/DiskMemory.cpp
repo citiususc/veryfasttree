@@ -100,10 +100,9 @@ DynDiskMemory::DynDiskMemory(const std::string &path, const std::string &name) :
 
 uintptr_t DynDiskMemory::menAllocate(void *src, size_t size) {
     allocated = true;
-    if (disk && disk->getSize() > size){
-        return disk->ptr();
+    if (!disk || disk->getSize() < size){
+        disk = make_unique2<DiskMemory>(path, name, size);
     }
-    disk = make_unique2<DiskMemory>(path, name, size);
 
     if (src != nullptr) {
         memcpy((void *) (disk->ptr()), src, size);
@@ -112,7 +111,6 @@ uintptr_t DynDiskMemory::menAllocate(void *src, size_t size) {
 }
 
 void DynDiskMemory::release() {
-    disk.reset();
     allocated = false;
 }
 

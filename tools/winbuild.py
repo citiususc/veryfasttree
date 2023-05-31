@@ -12,10 +12,11 @@ binaries = {
 }
 
 
-def main(version):
+def main():
+    version = sys.argv[1]
     for name, options in binaries.items():
         shutil.rmtree("win-build", ignore_errors=True)
-        shutil.copytree(os.getcwd(), "win-build")
+        shutil.copytree(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "win-build")
         os.chdir("win-build")
         subprocess.call(["cmake", "."] + options)
         subprocess.call(["cmake", "--build", "."])
@@ -34,4 +35,4 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("version required")
         exit(-1)
-    main(sys.argv[1])
+    main()

@@ -388,7 +388,7 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
     profiles.reserve(maxnodes);
     if (options.diskComputing) {
         int64_t dynamicLimit = maxnodes;
-        if(options.diskComputingLimit > 0){
+        if (options.diskComputingLimit > 0) {
             dynamicLimit = seqs.size() + options.diskComputingLimit;
         }
         uintptr_t mem = sizeof(numeric_t) - 1; // overheads for alignments
@@ -6232,7 +6232,7 @@ AbsNeighbourJoining(inline void)::traverseSPR(int64_t &iDone, int64_t iRound, in
         node = nodeList[i];
         if (rootParent != -1) {
             int64_t limit = parent[node];
-            for (int j = 0; j < options.maxSPRLength; j++) {
+            for (int j = 0; j < options.maxSPRLength + 1; j++) {
                 if (limit == rootParent) {
                     break;
                 }
@@ -6392,7 +6392,9 @@ AbsNeighbourJoining(void)::SPR(int64_t iRound, int64_t nRounds) {
                 if (subtrees[s] == -1) {
                     continue;
                 }
-                traverseSPR(iDone, iRound, nRounds, upProfiles2.data(), traversal, subtrees[s], last_tot_len);
+                for (int i = 0; i < child[s].nChild; i++) {
+                    traverseSPR(iDone, iRound, nRounds, upProfiles2.data(), traversal, child[s].child[i], last_tot_len);
+                }
             }
         }
 

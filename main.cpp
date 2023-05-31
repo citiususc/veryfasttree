@@ -447,7 +447,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    " rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
                    "performs more computations without preserving sequential order. If level is 4, VeryFastTree "
                    "accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with "
-                   "datasets larger than 2^sprlength + 1). Note: Each level includes the previous ones, and computation at "
+                   "datasets larger than 2^sprlength + 2). Note: Each level includes the previous ones, and computation at "
                    "level 2 and above is performed in a different tree traverse order, so the result may change but is "
                    "still correct.")->
             type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);

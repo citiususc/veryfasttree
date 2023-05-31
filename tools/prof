@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+if [ "$#" -lt 3 ]; then
+  echo "Usage: FREQ FILE CMD [ARGS]" >&2
+  exit 1
+fi
+
+freq=$1
+file=$2
+
+${@:3} & 
+PID=$!
+
+printf "" > $file
+while out="$(top -b -n 2 -d 0.2 -p $PID 2>/dev/null)"; do
+	if ps -p $PID > /dev/null; then
+		echo "$out" | tail -1 | awk '{print $5" "$6" "$7" "$10" "$9}' >> $file
+		sleep $freq
+	else
+		break
+	fi
+done
+wait
