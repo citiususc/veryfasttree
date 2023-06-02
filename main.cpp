@@ -58,6 +58,10 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     description << padd << "[ -constraints constraintAlignment [ -constraintWeight 100.0 ] ]" << std::endl;
     description << padd << "[-log logfile]" << std::endl;
     description << padd << "[ alignment_file ]" << std::endl;
+    description << padd << "[ -threads 1 ] [ -threads-level 3 [ -threads-ptw 20 ] [-threads-verbose]" << std::endl;
+    description << padd << "[ -double-precision ] [ -ext AUTO ] [ -fastexp 0 ]" << std::endl;
+    description << padd << "[ -disk-computing ] [ -disk-computing-path ./ ] [ -disk-dynamic-limit inf ]" << std::endl;
+    description << padd << "[ -relative-progress ]" << std::endl;
     description << padd << "[ -out output_newick_file | > newick_tree]" << std::endl;
     description << std::endl;
     description << name << " [-nt] [-matrix Matrix | -nomatrix] [-rawdist] -makematrix [alignment]" << std::endl;
@@ -133,6 +137,13 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     std::stringstream dist_description;
     dist_description << "Distances:" << std::endl;
     dist_description << "  Default: For protein sequences, log-corrected distances and an" << std::endl;
+    dist_description << "    amino acid dissimilarity matrix derived from BLOSUM45" << std::endl;
+    dist_description << "  or for nucleotide sequences, Jukes-Cantor distances" << std::endl;
+    dist_description << "  To specify a different matrix, use -matrix FilePrefix or -nomatri" << std::endl;
+    dist_description << "  Use -rawdist to turn the log-correction off" << std::endl;
+    dist_description << "  or to use %different instead of Jukes-Cantor" << std::endl;
+    dist_description << "  (These options affect minimum-evolution computations only;" << std::endl;
+    dist_description << "  use -trans to affect maximum-likelihoood computations)" << std::endl;
     dist_description << "    or for nucleotide sequences, Jukes-Cantor distances" << std::endl;
 
     auto dist = dist_description.str();
@@ -175,17 +186,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
 
     auto topo = topo_description.str();
 
-    app.add_option("-nni", [&options](CLI::results_t in) {
-        if (!CLI::detail::lexical_cast(in[0], options.nni)) {
-            throw CLI::ConversionError(in[0], "-nni");
-        }
-        if (options.nni == 0) {
-            options.spr = 0;
-        }
-        return true;
-    }, "to set the number of rounds of min. evo. NNIs")->group(topo);
-
-
+    app.add_option("-nni", options.nni, "to set the number of rounds of min. evo. NNIs")->group(topo);
     app.add_option("-spr", options.spr, "to set the rounds of SPRs")->group(topo);
 
     app.add_flag_function("-noml", [&options](size_t) {
@@ -219,8 +220,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     app.add_flag_function("-slownni", [&options](size_t) {
                               options.fastNNI = false;
                           },
-                          "to optimize branch lengths without ML NNIs. Use -mllen -nome with -intree to optimize"
-                          " branch lengths on a fixed topology ")->group(topo);
+                          "to optimize branch lengths without ML NNIs")->group(topo);
 
 
     auto model = "Maximum likelihood model options";
@@ -434,14 +434,14 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
     auto optimizations = "Optimizations";
 
     app.add_option("-threads", options.threads,
-                   "Number of threads (n) used in the parallel execution. If this option is not set, the "
+                   "number of threads (n) used in the parallel execution. If this option is not set, the "
                    "corresponding value will be obtained from the environment variable OMP_NUM_THREADS. "
                    "This is the same approach followed by FastTree-2. If n=1, VeryFastTree behaves in the same way "
-                   "than FastTree-2 compiled without the -DOPENMP flag.")->
+                   "than FastTree-2 compiled without the -DOPENMP flag")->
             type_name("n")->check(Min(1))->envname("OMP_NUM_THREADS")->group(optimizations);
 
     app.add_option("-threads-level", options.threadsLevel,
-                   "Degree of parallelization. If level is 0, VeryFastTree uses the same parallelization strategy as "
+                   "degree of parallelization. If level is 0, VeryFastTree uses the same parallelization strategy as "
                    "FastTree-2 with some new parallel blocks. If level is 1, VeryFastTree uses parallel blocks that "
                    "require additional memory for computation. If level is 2, VeryFastTree accelerates the"
                    " rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
@@ -449,14 +449,14 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with "
                    "datasets larger than 2^sprlength + 2). Note: Each level includes the previous ones, and computation at "
                    "level 2 and above is performed in a different tree traverse order, so the result may change but is "
-                   "still correct.")->
+                   "still correct")->
             type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);
 
     app.add_option("-threads-mode", options.deterministic,
-                   "Changes the mode of parallelization. If level is 0, VeryFastTree uses non-deterministic parts, some"
+                   "changes the mode of parallelization. If level is 0, VeryFastTree uses non-deterministic parts, some"
                    " inspired by FastTree-2 but improved. If level is 1 (default), VeryFastTree only uses deterministic"
                    " parallelization. Since version 4.0, deterministic algorithms are at least faster than "
-                   "non-deterministic ones, making deterministic the preferred choice.")->
+                   "non-deterministic ones, making deterministic the preferred choice")->
             type_name("mode")->check(CLI::Range(0, 1))->group(optimizations);
 
     app.add_option("-threads-ptw", options.particioningTendencyWindow,
@@ -468,13 +468,13 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             ->check(Min(10))->group(optimizations);
 
     app.add_flag("-threads-verbose", options.threadsVerbose,
-                 "To show subtrees assigned to the threads and theoretical speedup, only with verbose > 0")->
+                 "to show subtrees assigned to the threads and theoretical speedup, only with verbose > 0")->
             group(optimizations);
 
 
     app.add_flag("-double-precision", options.doublePrecision,
-                 "To use double precision arithmetic. "
-                 "Therefore, it is equivalent to compile FastTree-2 with -DUSE_DOUBLE.")->
+                 "to use double precision arithmetic. "
+                 "Therefore, it is equivalent to compile FastTree-2 with -DUSE_DOUBLE")->
             group(optimizations);
 
     app.add_set_ignore_case("-ext", options.extension, {"AUTO", "NONE", "SSE", "SSE3", "AVX", "AVX2", "AVX512", "CUDA"},
@@ -483,7 +483,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             ->group(optimizations)->default_val("AUTO");
 
     app.add_option("-fastexp", options.fastexp,
-                   "To select an alternative implementation for the exponential function exp(x), which has "
+                   "to select an alternative implementation for the exponential function exp(x), which has "
                    "a significant impact on performance. Options: 0 - built-in math library with double precision "
                    "(default), 1 - built-in math library with simple precision (not recommended with "
                    "-double-precision option), 2 - fast implementation to compute an approximation of "
@@ -492,31 +492,31 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             type_name("lvl")->check(CLI::Range(0, 3))->group(optimizations);
 
     app.add_flag("-disk-computing", options.diskComputing,
-                 "If there is not enough available RAM to perform the computation, disk will be used to store extra "
+                 "if there is not enough available RAM to perform the computation, disk will be used to store extra "
                  "data when it was not needed. Using disk to perform the computation will substantially increase the "
-                 "execution time.")->
+                 "execution time")->
             group(optimizations);
 
     app.add_option("-disk-computing-path", options.diskComputingPath,
-                   "Like -disk-computing but using a custom path folder to store data.")->type_name("path")->
+                   "like -disk-computing but using a custom path folder to store data")->type_name("path")->
             group(optimizations);
 
     app.add_flag("-disk-dynamic-computing", options.diskDynamicComputing,
-                 "By default, disk computing only creates files associated with static data in RAM, which means that "
+                 "by default, disk computing only creates files associated with static data in RAM, which means that "
                  "there is no significant impact on performance as long as there is available RAM. This option further "
                  "reduces memory usage by storing dynamic data on disk. However, even if there is enough RAM, it will "
-                 "have a negative impact on performance due to the constant creation and deletion of files.")->
+                 "have a negative impact on performance due to the constant creation and deletion of files")->
             group(optimizations);
 
     app.add_option("-disk-dynamic-limit", options.diskComputingLimit,
                    "-disk-dynamic-computing can exceed the limit of memory-mapped file system. If 'memory mapping "
                    "fails' errors occur, setting a limit will solve the problem. In Linux, the limit can be checked "
                    "with 'sysctl vm.max_map_count'. It is important not to use the exact value and leave a small "
-                   "margin for other operations that require this feature.")->type_name("n")->check(Min(1))->
+                   "margin for other operations that require this feature")->type_name("n")->check(Min(1))->
             group(optimizations);
 
     app.add_flag("-relative-progress", options.relativeProgress,
-                 "To shows relative time to previous step rather than absolute time in  progress report.")->
+                 "to shows relative time to previous step rather than absolute time in  progress report")->
             group(optimizations);
 
     auto deprecated = "Deprecated";
@@ -548,7 +548,7 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
     description << "  " << name << " -nt nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " -nt -gtr < nucleotide_alignment > tree" << std::endl;
     description << "  " << name << " < nucleotide_alignment > tree" << std::endl;
-    description << "  " << name << "accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats"
+    description << "  " << name << " accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats"
                                    " compressed with ZLib and libBZ2." << std::endl;
     app.description(description.str());
 
@@ -588,7 +588,7 @@ void basicCli(CLI::App &app, std::string &name, std::string &version, std::strin
             "to constrain the topology search constraintAlignment should have 1s or 0s to indicates splits")->
             type_name("constraintAlignment")->group(common);
 
-    app.get_option("-threads")->description("Number of threads (n) used in the parallel execution.")->
+    app.get_option("-threads")->description("number of threads (n) used in the parallel execution.")->
             group(common);
 
     app.get_option("-double-precision")->group(common);

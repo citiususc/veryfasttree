@@ -69,6 +69,10 @@ void VeryFastTree::settings(std::ostream &log) {
         options.verbose = 1;
     }
 
+    if (options.nni == 0) {
+        options.spr = 0;
+    }
+
     if (options.diskComputing || !options.diskComputingPath.empty()) {
         options.diskComputing = true;
         if (options.diskComputingPath.empty()) {
