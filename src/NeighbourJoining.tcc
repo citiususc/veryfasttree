@@ -195,7 +195,7 @@ AbsNeighbourJoining(void)::Rates::reset(int64_t nRateCategories, int64_t nPos) {
 AbsNeighbourJoining()::TopHits::TopHits() {}
 
 AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnodes, int64_t _m) :
-        m(_m), q((int64_t) (0.5 + options.tophits2Mult * std::sqrt(m))),
+        m(_m), q((int64_t)(0.5 + options.tophits2Mult * std::sqrt(m))),
         maxnodes(_maxnodes), topvisibleAge(0) {
     assert(m > 0);
     if (!options.useTopHits2nd || q >= m) {
@@ -203,7 +203,7 @@ AbsNeighbourJoining()::TopHits::TopHits(const Options &options, int64_t _maxnode
     }
     topHitsLists.resize(maxnodes, {{}, -1, 0});
     visible.resize(maxnodes, {-1, (numeric_t) 1e20});
-    int64_t nTopVisible = (int64_t) (0.5 + options.topvisibleMult * m);
+    int64_t nTopVisible = (int64_t)(0.5 + options.topvisibleMult * m);
     topvisible.resize(nTopVisible, -1);
 }
 
@@ -401,7 +401,7 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
 
         for (int64_t i = 0; i < maxnodes; i++) {
             if (options.diskDynamicComputing && i < dynamicLimit) {
-                profiles.emplace_back(nPos, nCons, mem, (uintptr_t) &diskProfileVectors[i]);
+                profiles.emplace_back(nPos, nCons, mem, (uintptr_t) & diskProfileVectors[i]);
             } else {
                 profiles.emplace_back(nPos, nCons, mem, 0);
             }
@@ -699,7 +699,7 @@ AbsNeighbourJoining(void)::resampleColumns(std::vector<int64_t> &col) {
     col.resize(nPos * options.nBootstrap);
     for (int64_t i = 0; i < options.nBootstrap; i++) {
         for (int64_t j = 0; j < nPos; j++) {
-            int64_t pos = (int64_t) (knuth_rand() * nPos);
+            int64_t pos = (int64_t)(knuth_rand() * nPos);
             if (pos < 0) {
                 pos = 0;
             } else if (pos == nPos) {
@@ -1081,7 +1081,7 @@ AbsNeighbourJoining(void)::setCriterion(int64_t nActive, Besthit &join) {
     assert(nOutDistActive[join.i] >= nActive);
     assert(nOutDistActive[join.j] >= nActive);
 
-    int64_t nDiffAllow = options.tophitsMult > 0 ? (int64_t) (nActive * options.staleOutLimit) : 0;
+    int64_t nDiffAllow = options.tophitsMult > 0 ? (int64_t)(nActive * options.staleOutLimit) : 0;
     if (nOutDistActive[join.i] - nActive > nDiffAllow) {
         setOutDistance(join.i, nActive);
     }
@@ -1160,87 +1160,21 @@ AbsNeighbourJoining(void)::profileDist(Profile &profile1, Profile &profile2, Bes
     double denom = 0;
     int64_t iFreq1 = 0;
     int64_t iFreq2 = 0;
-    if (!omp_in_parallel() && options.threads > 1 && options.threadsLevel > 0) {
-        std::vector<int64_t> hasFreq1(nPos, 0);
-        std::vector<int64_t> hasFreq2(nPos, 0);
-        std::vector<int64_t> found1(options.threads, 0);
-        std::vector<int64_t> found2(options.threads, 0);
-
-        #pragma omp parallel firstprivate(iFreq1, iFreq2)
-        {
-            double top2 = top;
-            double denom2 = denom;
-            int id = omp_get_thread_num();
-            #pragma omp for schedule(static, (nPos / options.threads) + 1)
-            for (int64_t i = 0; i < nPos; i++) {
-                hasFreq1[i] = getFreq(profile1, i, iFreq1) != nullptr ? 1 : 0;
-                hasFreq2[i] = getFreq(profile2, i, iFreq2) != nullptr ? 1 : 0;
-            }
-
-            found1[id] = iFreq1;
-            found2[id] = iFreq2;
-            #pragma omp barrier
-            iFreq1 = 0;
-            iFreq2 = 0;
-            for (int i = 0; i < id; i++) {
-                iFreq1 += found1[i];
-                iFreq2 += found2[i];
-            }
-
-            #pragma omp for schedule(static, (nPos / options.threads) + 1)
-            for (int64_t i = 0; i < nPos; i++) {
-                if (hasFreq1[i] > 0) {
-                    hasFreq1[i] = iFreq1++;
-                }
-                if (hasFreq2[i] > 0) {
-                    hasFreq2[i] = iFreq2++;
-                }
-            }
-
-            #ifndef NDEBUG
-            found1[id] = iFreq1;
-            found2[id] = iFreq2;
-                #pragma omp barrier
-            assert(found1.back() == profile1.nVectors);
-            assert(found2.back() == profile2.nVectors);
-            #endif
-
-            #pragma omp for schedule(dynamic)
-            for (int64_t i = 0; i < nPos; i++) {
-                if (profile1.weights[i] > 0 && profile2.weights[i] > 0) {
-                    numeric_t *f1 = getFreq(profile1, i, hasFreq1[i]);
-                    numeric_t *f2 = getFreq(profile2, i, hasFreq2[i]);
-                    double weight = profile1.weights[i] * profile2.weights[i];
-                    denom2 += weight;
-                    double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
-                                                    (profile2.codeDistSize == 0 ?
-                                                     nullptr : &profile2.codeDist[i * options.nCodes]));
-                    top2 += weight * piece;
-                }
-            }
-
-            #pragma omp critical
-            {
-                denom += denom2;
-                top += top2;
-            }
+    for (int64_t i = 0; i < nPos; i++) {
+        numeric_t *f1 = getFreq(profile1, i, iFreq1);
+        numeric_t *f2 = getFreq(profile2, i, iFreq2);
+        if (profile1.weights[i] > 0 && profile2.weights[i] > 0) {
+            double weight = profile1.weights[i] * profile2.weights[i];
+            denom += weight;
+            double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
+                                            (profile2.codeDistSize == 0 ?
+                                             nullptr : &profile2.codeDist[i * options.nCodes]));
+            top += weight * piece;
         }
-    } else {
-        for (int64_t i = 0; i < nPos; i++) {
-            numeric_t *f1 = getFreq(profile1, i, iFreq1);
-            numeric_t *f2 = getFreq(profile2, i, iFreq2);
-            if (profile1.weights[i] > 0 && profile2.weights[i] > 0) {
-                double weight = profile1.weights[i] * profile2.weights[i];
-                denom += weight;
-                double piece = profileDistPiece(profile1.codes[i], profile2.codes[i], f1, f2,
-                                                (profile2.codeDistSize == 0 ?
-                                                 nullptr : &profile2.codeDist[i * options.nCodes]));
-                top += weight * piece;
-            }
-        }
-        assert(iFreq1 == profile1.nVectors);
-        assert(iFreq2 == profile2.nVectors);
     }
+    assert(iFreq1 == profile1.nVectors);
+    assert(iFreq2 == profile2.nVectors);
+
     hit.weight = denom > 0 ? denom : 0.01; /* 0.01 is an arbitrarily low value of weight (normally >>1) */
     hit.dist = denom > 0 ? top / denom : 1;
     options.debug.profileOps++;
@@ -2876,7 +2810,7 @@ AbsNeighbourJoining(void)::fastNJ() {
     std::unique_ptr<TopHits> tophits;
     int64_t m = 0;            /* maximum length of a top-hits list */
     if (options.tophitsMult > 0) {
-        m = (int64_t) (0.5 + options.tophitsMult * sqrt(nSeqs));
+        m = (int64_t)(0.5 + options.tophitsMult * sqrt(nSeqs));
         if (m < 4 || 2 * m >= (int64_t) nSeqs) {
             m = 0;
             if (options.verbose > 1) {
@@ -2908,7 +2842,7 @@ AbsNeighbourJoining(void)::fastNJ() {
     for (int64_t nActive = nSeqs; nActive > 3; nActive--) {
         int64_t nJoinsDone = nSeqs - nActive;
         if (nJoinsDone > 0 && (nJoinsDone % 100) == 0) {
-            progressReport.print("Joined %6ld of %6ld", nJoinsDone, (int64_t) (nSeqs - 3));
+            progressReport.print("Joined %6ld of %6ld", nJoinsDone, (int64_t)(nSeqs - 3));
         }
 
         Besthit join;        /* the join to do */
@@ -3215,7 +3149,7 @@ AbsNeighbourJoining(void)::traverseReliabilityNJ(int64_t &iDone, int64_t &iDoneT
                     iDone += iDoneT;
                     iDoneT = 0;
                     progressReport.print("Local bootstrap for %6ld of %6ld internal splits", iDone,
-                                         (int64_t) (nSeqs - 3));
+                                         (int64_t)(nSeqs - 3));
                 }
             }
         }
@@ -3801,7 +3735,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
     std::vector<int64_t> nGaps(nSeqs);
 
     for (int64_t iNode = 0; iNode < (int64_t) nSeqs; iNode++) {
-        nGaps[iNode] = (int64_t) (0.5 + nPos - selfweight[iNode]);
+        nGaps[iNode] = (int64_t)(0.5 + nPos - selfweight[iNode]);
     }
 
     std::vector<int64_t> seeds(nSeqs);
@@ -4093,7 +4027,7 @@ AbsNeighbourJoining(void)::setAllLeafTopHits(TopHits &tophits_g) {
        of i are represented in j (if they should be)
      */
     int64_t lReplace = 0;
-    int64_t nCheck = tophits.q > 0 ? tophits.q : (int64_t) (0.5 + 2.0 * sqrt(tophits.m));
+    int64_t nCheck = tophits.q > 0 ? tophits.q : (int64_t)(0.5 + 2.0 * sqrt(tophits.m));
     for (int64_t iNode = 0; iNode < (int64_t) nSeqs; iNode++) {
         if ((iNode % 100) == 0) {
             progressReport.print("Checking top hits for %6ld of %6ld seqs", iNode + 1, (int64_t) nSeqs);
@@ -4384,7 +4318,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
        limit of log2(m) would mean a refresh after
        m joins, which is about what we want.
     */
-    int64_t tophitAgeLimit = std::max((int64_t) 1, (int64_t) (0.5 + std::log((double) tophits.m) / std::log(2.0)));
+    int64_t tophitAgeLimit = std::max((int64_t) 1, (int64_t)(0.5 + std::log((double) tophits.m) / std::log(2.0)));
 
     /* Either use the merged list as candidate top hits, or
        move from 2nd level to 1st level, or do a refresh
@@ -4397,8 +4331,8 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
     bool bSecondLevel = lChild[0]->hitSource >= 0 && lChild[1]->hitSource >= 0;
     bool bUseUnique = nUnique == nActive - 1
                       || (lNew.age <= tophitAgeLimit
-                          && nUnique >= (bSecondLevel ? (int64_t) (0.5 + options.tophits2Refresh * tophits.q)
-                                                      : (int64_t) (0.5 + tophits.m * options.tophitsRefresh)));
+                          && nUnique >= (bSecondLevel ? (int64_t)(0.5 + options.tophits2Refresh * tophits.q)
+                                                      : (int64_t)(0.5 + tophits.m * options.tophitsRefresh)));
     if (bUseUnique && options.verbose > 2) {
         log << strformat("Top hits for %ld from combined %ld nActive=%ld tophitsage %ld %s",
                          newnode, nUnique, nActive, lNew.age, bSecondLevel ? "2ndlevel" : "1stlevel") << std::endl;
@@ -4444,7 +4378,7 @@ AbsNeighbourJoining(void)::topHitJoin(int64_t newnode, int64_t nActive, TopHits 
             mergeList.reserve(0);
 
             assert(nUnique > 0);
-            bUseUnique = nUnique >= (int64_t) (0.5 + tophits.m * options.tophitsRefresh);
+            bUseUnique = nUnique >= (int64_t)(0.5 + tophits.m * options.tophitsRefresh);
             bSecondLevel = false;
 
             if (bUseUnique && options.verbose > 2) {
@@ -5048,7 +4982,7 @@ AbsNeighbourJoining(inline void)::traverseOptimizeAllBranchLengths(int64_t &iDon
                     {
                         iDone += iDoneT;
                         iDoneT = 0;
-                        progressReport.print("ML Lengths %ld of %ld splits", iDone + 1, (int64_t) (maxnode - nSeqs));
+                        progressReport.print("ML Lengths %ld of %ld splits", iDone + 1, (int64_t)(maxnode - nSeqs));
                     }
                 }
             }
@@ -5295,7 +5229,7 @@ AbsNeighbourJoining(double)::gammaLogLk(Siteratelk &s, double gamma_loglk_sites[
         /* The probability density for each rate is approximated by the total
            density between the midpoints */
         double pMin = iRate == 0 ? 0.0 : pGamma(s.mult * (s.rates[iRate - 1] + s.rates[iRate]) / 2.0, s.alpha);
-        double pMax = iRate == (int64_t) (rates.rates.size() - 1) ? 1.0 :
+        double pMax = iRate == (int64_t)(rates.rates.size() - 1) ? 1.0 :
                       pGamma(s.mult * (s.rates[iRate] + s.rates[iRate + 1]) / 2.0, s.alpha);
         dRate[iRate] = pMax - pMin;
     }
@@ -6106,7 +6040,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
     int64_t iDone = 0;
     std::string buf = useML ? "ML" : "ME";
     buf += " NNI round %ld of %ld, %ld splits";
-    progressReport.print(buf, iRound + 1, nRounds, (int64_t) (maxnode - nSeqs));
+    progressReport.print(buf, iRound + 1, nRounds, (int64_t)(maxnode - nSeqs));
 
     auto showlog = [&](int64_t &iDone2, int64_t &nNNIThisRound2, double &dMaxDelta2) {
         #pragma omp critical
@@ -6129,7 +6063,7 @@ AbsNeighbourJoining(int64_t)::DoNNI(int64_t iRound, int64_t nRounds, bool useML,
             if (nNNIThisRound > 0) {
                 buf += strformat(" (max delta %.3f)", dMaxDelta);
             }
-            progressReport.print(buf, iRound + 1, nRounds, iDone + 1, (int64_t) (maxnode - nSeqs));
+            progressReport.print(buf, iRound + 1, nRounds, iDone + 1, (int64_t)(maxnode - nSeqs));
         }
     };
 
@@ -6898,7 +6832,7 @@ AbsNeighbourJoining(inline void)::traverseTestSplitsML(int64_t &iDone, int64_t &
                     iDone += iDoneT;
                     iDoneT = 0;
                     progressReport.print("ML split tests for %6ld of %6ld internal splits", iDone,
-                                         (int64_t) (nSeqs - 3));
+                                         (int64_t)(nSeqs - 3));
                 }
             }
         }
