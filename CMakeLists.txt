@@ -127,3 +127,5 @@ endif()
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_link_libraries(${PROJECT_NAME} OpenMP::OpenMP_CXX ${LIBRARIES})
+
+install(TARGETS ${PROJECT_NAME} DESTINATION bin)

@@ -188,5 +188,5 @@ If there is not enough available RAM to perform the computation, disk will be us
 - **-disk-computing-path [path]**
 Like **-disk-computing** but using a custom path folder to store data.
 
-- **-disk-dynamic-computingg**
+- **-disk-dynamic-computing**
 By default, disk computing only creates files associated with static data in RAM, which means that there is no significant impact on performance as long as there is available RAM. This option further reduces memory usage by storing dynamic data on disk. However, even if there is enough RAM, it will have a negative impact on performance due to the creation and deletion of files.
