@@ -5138,7 +5138,7 @@ AbsNeighbourJoining(double)::treeLogLk(double site_loglk[]) {
         }
     }
 
-    if (options.threads > 1 && options.threadsLevel > 2) {//level-3
+    if (!omp_in_parallel() && options.threads > 1 && options.threadsLevel > 2) {//level-3
         auto traverse = parallelTraverse();
 
         #pragma omp parallel
@@ -6568,7 +6568,7 @@ AbsNeighbourJoining(inline void)::traverseTreeLength(int64_t node) {
 
 AbsNeighbourJoining(double)::treeLength(bool recomputeProfiles) {
     if (recomputeProfiles) {
-        if (options.threads > 1 && options.threadsLevel > 0) { //level-1
+        if (!omp_in_parallel() && options.threads > 1 && options.threadsLevel > 0) { //level-1
             auto traverse = parallelTraverse();
 
             #pragma omp parallel
