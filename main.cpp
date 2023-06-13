@@ -453,8 +453,8 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
             type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);
 
     app.add_option("-threads-mode", options.deterministic,
-                   "changes the mode of parallelization. If level is 0, VeryFastTree uses non-deterministic parts, some"
-                   " inspired by FastTree-2 but improved. If level is 1 (default), VeryFastTree only uses deterministic"
+                   "changes the mode of parallelization. If mode is 0, VeryFastTree uses non-deterministic parts, some"
+                   " inspired by FastTree-2 but improved. If mode is 1 (default), VeryFastTree only uses deterministic"
                    " parallelization. Since version 4.0, deterministic algorithms are at least faster than "
                    "non-deterministic ones, making deterministic the preferred choice")->
             type_name("mode")->check(CLI::Range(0, 1))->group(optimizations);
