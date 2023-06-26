@@ -3,6 +3,7 @@ project(VeryFastTree)
 
 set(CMAKE_CXX_STANDARD 11)
 
+option(USE_SHARED "enable/disable linking of system shared libraries" OFF)
 option(USE_NATIVE "enable/disable system's processor architecture optimization (linux)" ON)
 option(USE_SEE2 "enable/disable SSE2 in windows (linux default)" ON)
 option(USE_SEE4 "enable/disable SSE4.1" OFF)
@@ -21,11 +22,16 @@ ADD_SUBDIRECTORY("libs/xxhash")
 ADD_SUBDIRECTORY("libs/boost-core")
 ADD_SUBDIRECTORY("libs/boost-sort")
 ADD_SUBDIRECTORY("libs/boost-align")
-ADD_SUBDIRECTORY("libs/zlib")
-ADD_SUBDIRECTORY("libs/bzip2")
 ADD_SUBDIRECTORY("libs/bxzstr")
+if (USE_SHARED AND NOT MSVC)
+    set(LIBRARIES z bz2)
+else ()
+    ADD_SUBDIRECTORY("libs/zlib")
+    ADD_SUBDIRECTORY("libs/bzip2")
+    set(LIBRARIES zlibstatic bzip2static)
+endif ()
 
-set(LIBRARIES CLI11 robin-map xxhash boost-core boost-sort boost-align zlibstatic bzip2static bxzstr)
+set(LIBRARIES CLI11 robin-map xxhash boost-core boost-sort boost-align bxzstr ${LIBRARIES} )
 
 set(SOURCE_FILES
         src/operations/BasicOperations.tcc
