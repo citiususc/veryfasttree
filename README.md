@@ -8,7 +8,7 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 
 **Release Notes**:
 	
-- v4.0:
+- v4.0 (July 2023):
     - Introduction of new thread levels for improved parallelization.
 	- Enhanced performance through new parallel regions (e.g., ML Lengths, ML splits, LogLk, etc.).
     - Threads used in tree creation: Top hits, TopHitNJSearch, FastNJSearch, and ExhaustiveNJSearch(-slow).
