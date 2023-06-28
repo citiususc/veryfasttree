@@ -1,37 +1,47 @@
 # VeryFastTree
 
-**VeryFastTree** is a highly-tuned implementation of the [FastTree-2](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490) tool that takes advantage of parallelization and vectorization strategies to speed up the inference of phylogenies for huge alignments. It is important to highlight that **VeryFastTree** keeps unchanged the phases, methods and heuristics used by FastTree-2 to estimate the phylogenetic tree. In this way, it produces trees with the same topological accuracy than FastTree-2. In addition, unlike the parallel version of FastTree-2, VeryFastTree is deterministic.
+**VeryFastTree** is a new tool designed for efficient phylogenetic tree inference, specifically tailored to handle massive taxonomic datasets. It is a highly-tuned implementation based on the [FastTree-2](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490) tool that takes advantage of parallelization and vectorization strategies to speed up the inference of phylogenies for huge alignments.
 
-Regarding the performance, for example, **VeryFastTree** (v3.0 - May 2020) is able to construct a tree on a standard server (12-core Intel Xeon E5-2680v3 processor and 128 GiB of memory) using double precision arithmetic from an [ultra-large 330k alignment](http://www.microbesonline.org/fasttree/) in only 4.5 hours, which is 7.8× and 3.5× faster than the sequential and best parallel FastTree-2 times, respectively.
+Regarding the performance, for example, **VeryFastTree** (v4.0 - July 2023) is able to construct a tree on one server (two 32-core Intel Xeon Ice Lake 8352Y processors) using double precision arithmetic from an [ultra-large one million taxa alignment](https://kim.bio.upenn.edu/software/csd.shtml) in only 2 days, while our previous version (v3.0) requires 11 days and FastTree-2 about 20 days. That is, **VeryFastTree-4.0 is 5x and 10x times faster than VeryFastTree-3.0 and FastTree-2, respectively**.
+
+It is important to highlight that **VeryFastTree** keeps unchanged the phases, methods and heuristics used by FastTree-2 to estimate the phylogenetic tree. In this way, it produces trees with the same topological accuracy than FastTree-2. In addition, unlike the parallel version of FastTree-2, VeryFastTree is deterministic.
 
 To facilitate the adoption from the research community, VeryFastTree keeps exactly the same command line arguments than FastTree-2. In this way, it is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options to increase the overall performance.
+
+**VeryFastTree** is now included as package in [Bioconda](https://anaconda.org/bioconda/veryfasttree).
+
+If you use **VeryFastTree**, please cite:
+
+[VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies](https://doi.org/10.1093/bioinformatics/btaa582)  
+César Piñeiro, José M. Abuín and Juan C. Pichel.  
+Bioinformatics, vol. 36, no. 17, pages 4658-4659, 2020.
 
 **Release Notes**:
 	
 - v4.0 (July 2023):
     - Introduction of new thread levels for improved parallelization.
-	- Enhanced performance through new parallel regions (e.g., ML Lengths, ML splits, LogLk, etc.).
-    - Threads used in tree creation: Top hits, TopHitNJSearch, FastNJSearch, and ExhaustiveNJSearch(-slow).
+    - Enhanced performance through new parallel regions (e.g., ML Lengths, ML splits, LogLk, etc.).
+    - Threads used in tree creation: Top hits, TopHitNJSearch, FastNJSearch, and ExhaustiveNJSearch (-slow).
     - Implementation of a faster tree partitioning approach with significant speed improvements.
-    - Tree partitioning limited to NNI, SPR, and upProfiles computations for memory conservation.
-	- Parallel tree traversal implemented for remaining parts. 
+    - Tree partitioning limited to NNI, SPR, and upProfiles computations for memory conservation:
+    - Parallel tree traversal implemented for remaining parts. 
     - Replacement of disk storage for profiles with Disk Computing.
     - Shared and reused Top upProfiles among threads for memory efficiency and accelerated sequential parts.
     - Improved non-deterministic mode with removal of mutex usage.
-    - Optimized performance by parallelizing non-deterministic parts in deterministic mode.
-	- Also implemented non-deterministic parts in deterministic mode for improved performance.
-	- Deterministic mode now outperforms non-deterministic mode in terms of speed.
-	- Tree partitioning method logging now hidden by default.
-	- Support for Fastq format and libBZ2 compression.
-	- Support for reading trees from NEXUS block trees.
-	- Nvidia CUDA GPU computing support. (Experimental)
-	- Introduced parallel compilation.
-	- Incorporation of changes from FastTree-2.11.
-	- Clang Support
-	- Addressed critical errors and implemented substantial corrections.
+    - Optimized performance by parallelizing non-deterministic parts in deterministic mode:
+    - Also implemented non-deterministic parts in deterministic mode for improved performance.
+    - Deterministic mode now outperforms non-deterministic mode in terms of speed.
+    - Tree partitioning method logging now hidden by default.
+    - Support for Fastq format and libBZ2 compression.
+    - Support for reading trees from NEXUS block trees.
+    - Nvidia CUDA GPU computing support (experimental)
+    - Introduced parallel compilation.
+    - Incorporation of changes from FastTree-2.11.
+    - Clang Support
+    - Addressed critical errors and implemented substantial corrections.
 
 - v3.3.0 (merged into 4.0):
-	- Deterministic mode now also parallelizes non-deterministic parts, but it require more computation.
+	- Deterministic mode now also parallelizes non-deterministic parts, but it requires more computation.
 	- Tree partitioning algorithm is faster and has a partitioning cache.
 
 - v3.2.0 (December 2022):
@@ -52,14 +62,6 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
     - Parallel computation of posterior distributions for each internal node.
     - Deterministic result.
 
-**VeryFastTree** is now included as package in [Bioconda](https://anaconda.org/bioconda/veryfasttree).
-
-If you use **VeryFastTree**, please cite:
-
-[VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies](https://doi.org/10.1093/bioinformatics/btaa582)  
-César Piñeiro, José M. Abuín and Juan C. Pichel.  
-Bioinformatics, vol. 36, no. 17, pages 4658-4659, 2020.
-
 # Getting started #
 
 ## Requirements
@@ -72,8 +74,8 @@ other basic requirements are:
     * GCC 5+ (GCC 4 is [bugged](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=56859))
     * Visual studio 2015 (previous versions with support for C++11 may work)
     * Clang (requires minimal support for C++11 and OpenMP)
-* make (linux only)
-* CUDA Toolkit (Cuda only)
+* make (Linux only)
+* CUDA Toolkit (CUDA only)
 
 ## Configuring
 
