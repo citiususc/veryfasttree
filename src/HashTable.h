@@ -1,11 +1,12 @@
 
 #ifndef VERYFASTTREE_HASHTABLE_H
 #define VERYFASTTREE_HASHTABLE_H
+#define XXH_INLINE_ALL
 
 #include <vector>
 #include <tsl/robin_map.h>
 #include "DiskMemory.h"
-#include <xxh64.hpp>
+#include <xxhash.h>
 
 namespace veryfasttree {
 
@@ -70,8 +71,15 @@ namespace veryfasttree {
 
     private:
 
+        union HashResult {
+            XXH64_hash_t x;
+            int64_t r;
+        };
+
         struct Hash {
-            int64_t operator()(const std::string *p) const noexcept { return xxh64::hash(p->data(), p->size(), 0); }
+            int64_t operator()(const std::string *p) const noexcept {
+                return HashResult{XXH64(p->data(), p->size(), 0)}.r;
+            }
         };
 
         struct Equal {
@@ -85,7 +93,7 @@ namespace veryfasttree {
                 std::string tmp = *p;
                 size_t id;
                 disk->load(tmp, id);
-                return xxh64::hash(tmp.data(), tmp.size(), 0);
+                return HashResult{XXH64(tmp.data(), tmp.size(), 0)}.r;
             }
         };
 
@@ -96,7 +104,7 @@ namespace veryfasttree {
                 if (*x == *y) {
                     return true;
                 }
-                if(x->empty() || y->empty()){
+                if (x->empty() || y->empty()) {
                     return false;
                 }
                 std::string tmpX = *x, tmpY = *y;
