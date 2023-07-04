@@ -632,7 +632,9 @@ int main(int argc, char *argv[]) {
     veryfasttree::TeeStream tee(log, std::cerr);
     std::ostream teelog(&tee);
 
-    if (!options.inFileName.empty()) {
+    if (options.inFileName.empty()) {
+        finput.setstate(std::ios_base::badbit);
+    } else {
         finput.open(options.inFileName);
         if (finput.fail()) {
             std::cerr << "Couldn't open the input file! " << options.inFileName << std::endl;
