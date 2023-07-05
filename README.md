@@ -36,7 +36,7 @@ Bioinformatics, vol. 36, no. 17, pages 4658-4659, 2020.
     - Support for reading trees from NEXUS block trees.
     - Nvidia CUDA GPU computing support (experimental)
     - Introduced parallel compilation.
-    - Incorporation of changes from FastTree-2.11.
+    - Incorporation of changes from FastTree-2.1.11.
     - Clang Support
     - Addressed critical errors and implemented substantial corrections.
 
