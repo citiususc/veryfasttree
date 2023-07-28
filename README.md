@@ -2,7 +2,7 @@
 
 **VeryFastTree** is a new tool designed for efficient phylogenetic tree inference, specifically tailored to handle massive taxonomic datasets. It is a highly-tuned implementation based on the [FastTree-2](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490) tool that takes advantage of parallelization and vectorization strategies to speed up the inference of phylogenies for huge alignments.
 
-Regarding the performance, for example, **VeryFastTree** (v4.0 - July 2023) is able to construct a tree on one server (two 32-core Intel Xeon Ice Lake 8352Y processors) using double precision arithmetic from an [ultra-large one million taxa alignment](https://kim.bio.upenn.edu/software/csd.shtml) in only 2 days, while our previous version (v3.0) requires 11 days and FastTree-2 about 20 days. That is, **VeryFastTree-4.0 is 5x and 10x times faster than VeryFastTree-3.0 and FastTree-2, respectively**.
+Regarding the performance, for example, **VeryFastTree** (v4.0 - July 2023) is able to construct a tree on one server (two 32-core Intel Xeon Ice Lake 8352Y processors) using double precision arithmetic from an [ultra-large one million taxa alignment](https://kim.bio.upenn.edu/software/csd.shtml) in only 2 days, while our previous version (v3.0) requires 10 days and FastTree-2 about 12 days. That is, **VeryFastTree-4.0 is 5x and 6x times faster than VeryFastTree-3.0 and FastTree-2, respectively**.
 
 It is important to highlight that **VeryFastTree** keeps unchanged the phases, methods and heuristics used by FastTree-2 to estimate the phylogenetic tree. In this way, it produces trees with the same topological accuracy than FastTree-2. In addition, unlike the parallel version of FastTree-2, VeryFastTree is deterministic.
 
@@ -17,7 +17,7 @@ César Piñeiro, José M. Abuín and Juan C. Pichel.
 Bioinformatics, vol. 36, no. 17, pages 4658-4659, 2020.
 
 **Release Notes**:
-	
+
 - v4.0 (July 2023):
     - Introduction of new thread levels for improved parallelization.
     - Enhanced performance through new parallel regions (e.g., ML Lengths, ML splits, LogLk, etc.).
@@ -41,8 +41,8 @@ Bioinformatics, vol. 36, no. 17, pages 4658-4659, 2020.
     - Addressed critical errors and implemented substantial corrections.
 
 - v3.3.0 (merged into 4.0):
-	- Deterministic mode now also parallelizes non-deterministic parts, but it requires more computation.
-	- Tree partitioning algorithm is faster and has a partitioning cache.
+    - Deterministic mode now also parallelizes non-deterministic parts, but it requires more computation.
+    - Tree partitioning algorithm is faster and has a partitioning cache.
 
 - v3.2.0 (December 2022):
     - Decrease in the peak memory usage.
@@ -105,11 +105,11 @@ Options can be listed with cmake:
 
     // enable/disable AVX512
     USE_AVX512:BOOL=OFF
-	
+
     // enable/disable CUDA
     USE_CUDA:BOOL=OFF
     
-	// change CUDA Architecture
+    // change CUDA Architecture
     CUDA_ARCH:STRING=80
 
 Example:
@@ -143,18 +143,18 @@ Number of threads (*n*) used in the parallel execution. If this option is not se
 
 - **-threads-level [level]**
 Degree of parallelization: 
-	- If level is *0*, VeryFastTree uses the same parallelization strategy as FastTree-2 with some new parallel blocks. 
-	- If level is *1*, VeryFastTree uses parallel blocks that require additional memory for computation. 
-	- If level is *2*, VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method. 
-	- If level is *3* (default), VeryFastTree performs more computations without preserving sequential order.
-	- If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^sprlength + 2). 
+    - If level is *0*, VeryFastTree uses the same parallelization strategy as FastTree-2 with some new parallel blocks. 
+    - If level is *1*, VeryFastTree uses parallel blocks that require additional memory for computation. 
+    - If level is *2*, VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method. 
+    - If level is *3* (default), VeryFastTree performs more computations without preserving sequential order.
+    - If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^sprlength + 2). 
 
     Note: Each level includes the previous ones, and computation at level *2* and above is performed in a different tree traverse order, so the result may change but is still correct.
 
 - **-threads-mode [mode]**
 Changes the mode of parallelization: 
-	- If mode is *0*, VeryFastTree uses non-deterministic parts, some inspired by FastTree-2 but improved. 
-	- If mode is *1* (default), VeryFastTree only uses deterministic parallelization.
+    - If mode is *0*, VeryFastTree uses non-deterministic parts, some inspired by FastTree-2 but improved. 
+    - If mode is *1* (default), VeryFastTree only uses deterministic parallelization.
 
     Since version 4.0, deterministic algorithms are at least faster than non-deterministic ones, making deterministic the preferred choice.
 
