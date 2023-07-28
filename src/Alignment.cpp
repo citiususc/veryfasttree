@@ -264,7 +264,7 @@ void Alignment::readAlignment() {
         }
 
         if (ntax > 0 && (int64_t) seqs.size() != ntax) {
-            throw std::invalid_argument(strformat("Wrong number of sequences: expected %ld", ntax));
+            throw std::invalid_argument(strformat("Wrong number of sequences: expected %" PRId64, ntax));
         }
 
     } else if (buf[0] == '>') {
@@ -411,7 +411,7 @@ void Alignment::readAlignment() {
                     if (buf[j] != ' ') {
                         if ((int64_t) seqs[iSeq].size() >= nPos) {
                             throw std::invalid_argument(strformat(
-                                    "Too many characters (expected %ld) for sequence named %s\nSo far have:\n%s",
+                                    "Too many characters (expected %" PRId64 ") for sequence named %s\nSo far have:\n%s",
                                     nPos, names[iSeq].c_str(), seqs[iSeq].c_str()));
                         }
                         if (seqs[iSeq].empty()) {
@@ -421,7 +421,7 @@ void Alignment::readAlignment() {
                     }
                 }
                 if (options.verbose > 10) {
-                    log << strformat("Read iSeq %ld name %s seqsofar %s",
+                    log << strformat("Read iSeq %" PRId64 " name %s seqsofar %s",
                                      iSeq, names[iSeq].c_str(), seqs[iSeq].c_str()) << std::endl;
                 }
                 iSeq++;
@@ -431,7 +431,7 @@ void Alignment::readAlignment() {
             }/* end else non-empty phylip line */
         }
         if (iSeq != nSeq && iSeq != 0) {
-            throw std::invalid_argument(strformat("Wrong number of sequences: expected %ld", nSeq));
+            throw std::invalid_argument(strformat("Wrong number of sequences: expected %" PRId64 "", nSeq));
         }
     }
     if (options.diskComputing) {
@@ -444,7 +444,7 @@ void Alignment::readAlignment() {
         if (options.diskComputing) { disk->load(seqs[i], disk_tmp); }
         if ((int64_t) seqs[i].size() != nPos) {
             throw std::invalid_argument(strformat(
-                    "Wrong number of characters for %s: expected %ld but have %ld instead.\n"
+                    "Wrong number of characters for %s: expected %" PRId64 " but have %" PRId64 " instead.\n"
                     "This sequence may be truncated, or another sequence may be too long.",
                     names[i].c_str(), nPos, seqs[i].size()));
         }

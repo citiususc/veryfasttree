@@ -193,7 +193,7 @@ void VeryFastTree::settings(std::ostream &log) {
         log << "Alignment: " << (options.inFileName.empty() ? "standard input" : options.inFileName);
 
         if (options.nAlign > 1) {
-            log << strformat(" (%ld alignments)", options.nAlign) << std::endl;
+            log << strformat(" (%" PRId64 " alignments)", options.nAlign) << std::endl;
         }
         log << std::endl << strformat(
                 "%s distances: %s Joins: %s Support: %s",
@@ -252,7 +252,7 @@ void VeryFastTree::settings(std::ostream &log) {
                 std::endl;
         }
         if (options.pseudoWeight > 0) {
-            log << strformat("Pseudocount weight for comparing sequences with little overlap: %.3lf",
+            log << strformat("Pseudocount weight for comparing sequences with little overlap: %.3f",
                              options.pseudoWeight) << std::endl;
         }
         log.flush();

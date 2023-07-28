@@ -41,6 +41,7 @@ namespace veryfasttree {
 #include <boost/sort/parallel_stable_sort/parallel_stable_sort.hpp>
 #include <cmath>
 #include <random>
+#include <cinttypes>
 
 typedef int8_t ibool;
 
@@ -209,7 +210,7 @@ namespace veryfasttree {
                             std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - clockStart).count());
 
             if (step > 100 || verbose > 1) {
-                std::cerr << strformat("%7i.%2.2i seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
+                std::cerr << strformat("%7d.%2.2d seconds: ", (int) (mili / 1000), (int) ((mili % 1000) / 10));
                 std::cerr << strformat(format, args...);
                 if (verbose > 1 || !isattyErr()) {
                     std::cerr << std::endl;
