@@ -3154,7 +3154,7 @@ AbsNeighbourJoining(void)::traverseReliabilityNJ(int64_t &iDone, int64_t &iDoneT
     int64_t branchRoot = node;
     while ((node = traversePostorder(node, traversal, /*pUp*/nullptr, branchRoot)) >= 0) {
         if (node < (int64_t) nSeqs || node == root) {
-            return; /* nothing to do for leaves or root */
+            continue; /* nothing to do for leaves or root */
         }
 
         if (iDoneT > 0 && (iDoneT % 100) == 0) {
@@ -6639,7 +6639,7 @@ AbsNeighbourJoining(inline void)::traverseTestSplitsMinEvo(int64_t node, SplitCo
         const double tolerance = 1e-6;
 
         if (node < (int64_t) nSeqs || node == root) {
-            return; /* nothing to do for leaves or root */
+            continue; /* nothing to do for leaves or root */
         }
 
         Profile *profiles4[4];
@@ -6858,7 +6858,7 @@ AbsNeighbourJoining(inline void)::traverseTestSplitsML(int64_t &iDone, int64_t &
         std::vector<double> site_likelihoods(3 * nPos);
 
         if (node < (int64_t) nSeqs || node == root) {
-            return; /* nothing to do for leaves or root */
+            continue; /* nothing to do for leaves or root */
         }
 
         if (iDoneT > 0 && (iDoneT % 100) == 0) {
