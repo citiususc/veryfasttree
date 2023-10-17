@@ -2,13 +2,13 @@
 
 **VeryFastTree** is a new tool designed for efficient phylogenetic tree inference, specifically tailored to handle massive taxonomic datasets. It is a highly-tuned implementation based on the [FastTree-2](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0009490) tool that takes advantage of parallelization and vectorization strategies to speed up the inference of phylogenies for huge alignments.
 
-Regarding the performance, for example, **VeryFastTree** (v4.0 - July 2023) is able to construct a tree on one server (two 32-core Intel Xeon Ice Lake 8352Y processors) using double precision arithmetic from an [ultra-large one million taxa alignment](https://kim.bio.upenn.edu/software/csd.shtml) in only 2 days, while our previous version (v3.0) requires 10 days and FastTree-2 about 12 days. That is, **VeryFastTree-4.0 is 5x and 6x times faster than VeryFastTree-3.0 and FastTree-2, respectively**.
+Regarding the performance, for example, **VeryFastTree** (v4.0 - July 2023) is able to construct a tree on one server (two 32-core Intel Xeon Ice Lake 8352Y processors) using single precision arithmetic from an [ultra-large one million taxa alignment](https://kim.bio.upenn.edu/software/csd.shtml) in 36 hours, while our previous version (v3.0) and FastTree-2 require more than 5 days. That is, **VeryFastTree-4.0 is more than 3x times faster than VeryFastTree-3.0 and FastTree-2, respectively**.
 
 It is important to highlight that **VeryFastTree** keeps unchanged the phases, methods and heuristics used by FastTree-2 to estimate the phylogenetic tree. In this way, it produces trees with the same topological accuracy than FastTree-2. In addition, unlike the parallel version of FastTree-2, VeryFastTree is deterministic.
 
 To facilitate the adoption from the research community, VeryFastTree keeps exactly the same command line arguments than FastTree-2. In this way, it is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options to increase the overall performance.
 
-**VeryFastTree** is now included as package in [Bioconda](https://anaconda.org/bioconda/veryfasttree).
+**VeryFastTree** is now included as package in [Bioconda](https://anaconda.org/bioconda/veryfasttree), [MacPorts](https://ports.macports.org/port/veryfasttree) and all Debian-based Linux distributions.
 
 If you use **VeryFastTree**, please cite:
 
