@@ -1,0 +1,402 @@
+.TH "veryfasttree" "1" "June 2023" "Univ. of Santiago de Compostela" "User Commands"
+.SH NAME
+VeryFastTree \- Speeding up the estimation of phylogenetic trees for large alignments 
+through parallelization and vectorization strategies 
+.SH DESCRIPTION
+VeryFastTree is a highly efficient implementation inspired by the FastTree-2 
+tool, designed to expedite the inference of approximately-maximum-likelihood
+phylogenetic trees from nucleotide or protein sequence alignments. It is an 
+optimized implementation designed to accelerate the estimation of phylogenies
+for large alignments. By leveraging parallelization and vectorization 
+strategies, VeryFastTree significantly improves the performance and 
+scalability of phylogenetic analysis, allowing it to construct phylogenetic 
+trees in a fraction of the time previously required.
+ 
+Maintaining the integrity of FastTree-2, VeryFastTree retains the same phases,
+methods, and heuristics used for estimating phylogenetic trees. This ensures 
+that the topological accuracy of the trees produced by VeryFastTree remains 
+equivalent to that of FastTree-2. Moreover, unlike the parallel version of 
+FastTree-2, VeryFastTree guarantees deterministic results, eliminating any 
+potential variations in the output.
+ 
+To facilitate a seamless transition for users, VeryFastTree adopts the exact
+same command line arguments as FastTree-2. This means that by simply 
+substituting FastTree-2 with VeryFastTree, and using the same set of options,
+users can significantly enhance the overall performance of their phylogenetic 
+analyses.
+
+VeryFastTree is more accurate than PhyML 3 with default settings, and much
+more accurate than the distance-matrix methods that are traditionally
+used for large alignments. VeryFastTree uses the Jukes-Cantor or generalized
+time-reversible (GTR) models of nucleotide evolution and the JTT
+(Jones-Taylor-Thornton 1992) model of amino acid evolution. To account
+for the varying rates of evolution across sites, VeryFastTree uses a single
+rate for each site (the "CAT" approximation). To quickly estimate the
+reliability of each split in the tree, VeryFastTree computes local support
+values with the Shimodaira-Hasegawa test (these are the same as PhyML
+3's "SH-like local supports").
+.SH SYNOPSIS
+.PP
+.B VeryFastTree protein_alignment > tree
+.PP
+.B VeryFastTree \fB\-nt\fR nucleotide_alignment > tree
+.PP
+.B VeryFastTree \fB\-nt\fR \fB\-gtr\fR < nucleotide_alignment > tree
+.PP
+accepts alignments in NEXUS, Fasta, Fastq or Phylip interleaved formats 
+compressed with ZLib and libBZ2.
+.SS "Common options:"
+.HP
+\fB\-quiet\fR to suppress reporting information
+.HP
+\fB\-nopr\fR to suppress progress indicator
+.HP
+\fB\-log\fR logfile \fB\-\-\fR save intermediate trees, settings, and model details
+.HP
+\fB\-fastest\fR \fB\-\-\fR speed up the neighbor joining phase & reduce memory usage
+(recommended for >50,000 sequences)
+.HP
+\fB\-n\fR <number> to analyze multiple alignments (phylip format only)
+(use for global bootstrap, with seqboot and CompareToBootstrap.pl)
+.HP
+\fB\-nosupport\fR to not compute support values
+.HP
+\fB\-intree\fR newick_file to set the starting tree(s)
+.HP
+\fB\-intree1\fR newick_file to use this starting tree for all the alignments
+(for faster global bootstrap on huge alignments)
+.HP
+\fB\-pseudo\fR to use pseudocounts (recommended for highly gapped sequences)
+.HP
+\fB\-gtr\fR \fB\-\-\fR generalized time\-reversible model (nucleotide alignments only)
+.HP
+\fB\-wag\fR \fB\-\-\fR Whelan\-And\-Goldman 2001 model (amino acid alignments only)
+.HP
+sequence names and quote names in the output tree (fasta input only;
+VeryFastTree will not be able to read these trees back in
+.HP
+\fB\-noml\fR \fB\-\-\fR to turn off maximum\-likelihood
+.HP
+\fB\-nome\fR \fB\-\-\fR to turn off minimum\-evolution NNIs and SPRs
+(recommended if running additional ML NNIs with \fB\-intree\fR)
+.HP
+\fB\-nome\fR \fB\-mllen\fR with \fB\-intree\fR to optimize branch lengths for a fixed topology
+.HP
+\fB\-cat\fR # to specify the number of rate categories of sites (default 20)
+or \fB\-nocat\fR to use constant rates
+.HP
+\fB\-gamma\fR \fB\-\-\fR after optimizing the tree under the CAT approximation,
+rescale the lengths to optimize the Gamma20 likelihood
+.HP
+\fB\-constraints\fR constraintAlignment to constrain the topology search
+constraintAlignment should have 1s or 0s to indicates splits
+\fB\-threads\fR <number> (Env:OMP_NUM_THREADS) number of threads (n)
+used in the parallel execution
+.HP
+\fB\-double-precision\fR \fB\-\-\fR to use double precision arithmetic.
+Therefore, it is equivalent to compile FastTree-2 with -DUSE_DOUBLE.
+.HP
+\fB\-ext name\fR to speed up computations enabling 
+the vector extensions. Available: AUTO(default), NONE, SSE, SSE3 , AVX, 
+AVX2, AVX512 or CUDA
+.HP
+\fB\-expert\fR \fB\-\-\fR see more options
+.PP
+.SS Detailed usage for VeryFastTree:
+VeryFastTree [\-nt] [\-n 100] [\-quote] [\-pseudo | \-pseudo 1.0]
+[\-boot 1000 | \-nosupport]
+[\-intree starting_trees_file | \-intree1 starting_tree_file]
+[\-quiet | \-nopr]
+[\-nni 10] [\-spr 2] [\-noml | \-mllen | \-mlnni 10]
+[\-mlacc 2] [\-cat 20 | \-nocat] [\-gamma]
+[\-slow | \-fastest] [\-2nd | \-no2nd] [\-slownni] [\-seed 1253]
+[\-top | \-notop] [\-topm 1.0 [\-close 0.75] [\-refresh 0.8]]
+[\-gtr] [\-gtrrates ac ag at cg ct gt] [\-gtrfreq A C G T]
+[ \-lg | \-wag | \-trans transitionmatrixfile ]
+[\-matrix Matrix | \-nomatrix] [\-nj | \-bionj]
+[ \-constraints constraintAlignment [ \-constraintWeight 100.0 ] ]
+[\-log logfile]
+[ alignment_file ]
+[ \-threads 1 ] [ \-threads\-level 3 [ \-threads\-ptw 20 ] [\-threads\-verbose]
+[ \-double\-precision ] [ \-ext AUTO ] [ \-fastexp 0 ]
+[ \-disk\-computing ] [ \-disk\-computing\-path ./ ] [ \-disk\-dynamic\-limit inf ]
+[ \-relative\-progress ]
+[ \-out output_newick_file | > newick_tree]
+
+.PP
+or
+.PP
+VeryFastTree [\-nt] [\-matrix Matrix | \fB\-nomatrix]\fR [\-rawdist] \fB\-makematrix\fR [alignment]
+[\-n 100] > phylip_distance_matrix
+.PP
+.B VeryFastTree supports NEXUS, Fasta, Fastq or Phylip interleaved formats
+.PP
+.B VeryFastTree supports files compressed with ZLib and libBZ2
+.PP
+.B By default VeryFastTree expects protein alignments,  use -nt for nucleotides
+.PP
+.B VeryFastTree reads standard input if no alignment file is given
+.PP
+.SS "Input/output options:"
+.HP
+\fB\-out\fR file print tree in output file instead of stdout
+.HP
+\fB\-n\fR <number> read in multiple alignments in. This only
+works with phylip interleaved format. For example, you can
+use it with the output from phylip's seqboot. If you use \fB\-n\fR, VeryFastTree
+will write 1 tree per line to standard output.
+.HP
+\fB\-nt\fR \fB\-\-\fR nucleotides instead of protein alignments
+.HP
+\fB\-intree\fR newickfile read the starting tree in from newickfile.
+Any branch lengths in the starting trees are ignored.
+.HP
+\fB\-intree\fR with \fB\-n\fR will read a separate starting tree for each alignment.
+.HP
+\fB\-intree1\fR newickfile read the same starting tree for each alignment
+.HP
+\fB\-verbose\fR lvl level of details during normal operation
+.HP
+\fB\-quiet\fR \fB\-\-\fR do not write to standard error during normal operation (no progress
+indicator, no options summary, no likelihood values, etc.)
+.HP
+\fB\-nopr\fR \fB\-\-\fR do not write the progress indicator to stderr
+.HP
+\fB\-log\fR logfile \fB\-\-\fR save intermediate trees so you can extract
+the trees and restart long\-running jobs if they crash
+\fB\-log\fR also reports the per\-site rates (1 means slowest category)
+.HP
+\fB\-quote\fR \fB\-\-\fR quote sequence names in the output and allow spaces, commas,
+parentheses, and colons in them but not ' characters (fasta files only)
+.SS "Distances:"
+.IP
+Default: For protein sequences, log-corrected distances and an
+amino acid dissimilarity matrix derived from BLOSUM45
+or for nucleotide sequences, Jukes-Cantor distances
+.IP
+To specify a different matrix, use -matrix FilePrefix or -nomatrix
+.IP
+Use -rawdist to turn the log-correction off
+or to use %different instead of Jukes-Cantor
+(These options affect minimum-evolution computations only;
+use -trans to affect maximum-likelihoood computations)
+.HP
+\fB\-makematrix\fR \fB\-\-\fR print distance matrix
+.HP
+\fB\-rawdist\fR \fB\-\-\fR to turn the log-correction off
+.HP
+\fB\-matrix\fR file to turn the log-correction off
+.HP
+\fB\-nomatrix\fR \fB\-\-\fR to turn the log-correction off
+.HP
+\fB\-pseudo\fR [weight] Use pseudocounts to estimate distances between
+sequences with little or no overlap. (Off by default.) Recommended
+if analyzing the alignment has sequences with little or no overlap.
+If the weight is not specified, it is 1.0
+.SS "Topology refinement:"
+.IP
+By default, VeryFastTree tries to improve the tree with up to 4*log2(N)
+rounds of minimum\-evolution nearest\-neighbor interchanges (NNI),
+where N is the number of unique sequences, 2 rounds of
+subtree\-prune\-regraft (SPR) moves (also min. evo.), and
+up to 2*log(N) rounds of maximum\-likelihood NNIs.
+.HP
+\fB\-nni\fR <number> to set the number of rounds of min. evo. NNIs
+.HP
+\fB\-spr\fR <number> to set the rounds of SPRs
+.HP
+\fB\-noml\fR \fB\-\-\fR  to turn off both min-evo NNIs and SPRs 
+(useful if refining an approximately maximum-likelihood tree with further NNIs)
+.HP
+\fB\-sprlength\fR <number> set the maximum length of a SPR move (default 10)
+.HP
+\fB\-mlnni\fR <number> to set the number of rounds of maximum-likelihood NNIs
+.HP
+\fB\-mlacc\fR <number> Use -mlacc 2 or -mlacc 3 to always optimize all 5
+branches at each NNI, and to optimize all 5 branches in 2 or 3 rounds
+.HP
+\fB\-mllen\fR \fB\-\-\fR to optimize branch lengths without ML NNIs. Use
+-mllen -nome with -intree to optimize branch lengths on a fixed topology
+.HP
+\fB\-approxml,-mlapprox\fR \fB\-\-\fR approximate posterior distributions 
+for a.a.s
+.HP
+\fB\-slownni\fR \fB\-\-\fR to optimize branch lengths without ML NNIs.
+.SS "Maximum likelihood model options:"
+.HP
+\fB\-lg\fR \fB\-\-\fR Le-Gascuel 2008 model instead of (default) 
+Jones-Taylor-Thorton 1992 model (a.a. only)
+.HP
+\fB\-wag\fR \fB\-\-\fR Whelan\-And\-Goldman 2001 model instead of (default) Jones\-Taylor\-Thorton 1992 model (a.a. only)
+.HP
+\fB\-gtr\fR \fB\-\-\fR generalized time\-reversible instead of (default) Jukes\-Cantor (nt only)
+.HP
+\fB\-gtrrates\fR rates set the gtr rates
+.HP
+\fB\-gtrfreq\fR seqs set the gtr frequences
+.HP
+\fB\-cat\fR # \fB\-\-\fR specify the number of rate categories of sites (default 20)
+.HP
+\fB\-nocat\fR \fB\-\-\fR no CAT model (just 1 category)
+.HP
+\fB\-trans\fR filename use the transition matrix from filename.This is supported 
+for amino acid alignments only.The file must be tab-delimited with columns in the 
+order ARNDCQEGHILKMFPSTWYV*.The additional column named * is for the stationary 
+distribution.Each row must have a row name in the same order ARNDCQEGHILKMFPSTWYV
+.HP
+\fB\-gamma\fR \fB\-\-\fR after the final round of optimizing branch lengths with the CAT model,
+report the likelihood under the discrete gamma model with the same
+number of categories. VeryFastTree uses the same branch lengths but
+optimizes the gamma shape parameter and the scale of the lengths.
+The final tree will have rescaled lengths. Used with \fB\-log\fR, this
+also generates per\-site likelihoods for use with CONSEL, see
+GammaLogToPaup.pl and documentation on the VeryFastTree web site.
+.SS "Support value options:"
+.IP
+By default, VeryFastTree computes local support values by resampling the site
+likelihoods 1,000 times and the Shimodaira Hasegawa test. If you specify \fB\-nome\fR,
+it will compute minimum\-evolution bootstrap supports instead
+In either case, the support values are proportions ranging from 0 to 1
+.HP
+\fB\-nome\fR \fB\-\-\fR to compute minimum-evolution bootstrap supports
+.HP
+\fB\-nosupport\fR \fB\-\-\fR to turn off support values
+.HP
+\fB\-boot\fR <number> to use just n resamples
+.HP
+\fB\-noboot\fR \fB\-\-\fR  to no use resamples
+.HP
+\fB\-seed\fR <number> to initialize the random number generator
+.SS "Searching for the best join:"
+By default, VeryFastTree combines the 'visible set' of fast neighbor\-joining with
+local hill\-climbing as in relaxed neighbor\-joining
+.HP
+\fB\-slow\fR \fB\-\-\fR exhaustive search (like NJ or BIONJ, but different gap handling)
+-slow takes half an hour instead of 8 seconds for 1,250 proteins
+.HP
+\fB\-fastest\fR \fB\-\-\fR search the visible set (the top hit for each node) only
+Unlike the original fast neighbor\-joining, \fB\-fastest\fR updates visible(C)
+after joining A and B if join(AB,C) is better than join(C,visible(C))
+\fB\-fastest\fR also updates out\-distances in a very lazy way,
+\fB\-fastest\fR sets \fB\-2nd\fR on as well, use \fB\-fastest\fR \fB\-no2nd\fR to avoid this
+.SS "Top-hit heuristics:"
+.IP
+By default, VeryFastTree uses a top\-hit list to speed up search
+.HP
+\fB\-top\fR 0.01 set the top-hit list size to 1.0 if it is less than 0.01
+-notop \fB\-\-\fR (or -slow) to turn this feature off and compare all leaves to 
+each other, and all new joined nodes to each other
+.HP
+\fB\-topm\fR 1.0 \fB\-\-\fR set the top\-hit list size to parameter*sqrt(N)
+VeryFastTree estimates the top m hits of a leaf from the
+top 2*m hits of a 'close' neighbor, where close is
+defined as d(seed,close) < 0.75 * d(seed, hit of rank 2*m),
+and updates the top\-hits as joins proceed
+.HP
+\fB\-close\fR 0.75 \fB\-\-\fR modify the close heuristic, lower is more conservative
+.HP
+\fB\-refresh\fR 0.8 \fB\-\-\fR compare a joined node to all other nodes if its
+top\-hit list is less than 80% of the desired length,
+or if the age of the top\-hit list is log2(m) or greater
+.HP
+\fB\-2nd\fR or \fB\-no2nd\fR to turn 2nd\-level top hits heuristic on or off
+This reduces memory usage and running time but may lead to
+marginal reductions in tree quality.
+(By default, \fB\-fastest\fR turns on \fB\-2nd\fR.)
+.SS "Join options:"
+.HP
+\fB\-nj\fR: regular (unweighted) neighbor\-joining (default)
+.HP
+\fB\-bionj\fR: weighted joins as in BIONJ
+VeryFastTree will also weight joins during NNIs
+.SS "Constrained topology search options:"
+.HP
+\fB\-constraints\fR alignmentfile an alignment with values of 0, 1, and \-
+Not all sequences need be present. A column of 0s and 1s defines a
+constrained split. Some constraints may be violated
+(see 'violating constraints:' in standard error).
+.HP
+\fB\-constraintWeight\fR w how strongly to weight the constraints. A value of 1
+means a penalty of 1 in tree length for violating a constraint
+Default: 100.0
+.SS "Optimizations:"
+.HP
+\fB\-threads\fR <number> (Env:OMP_NUM_THREADS) number of threads used in the 
+parallel execution. If this option is not set, the corresponding value will be 
+obtained from the environment variable OMP_NUM_THREADS. This is the same approach 
+followed by FastTree-2. If n=1, VeryFastTree behaves in the same way than 
+FastTree-2 compiled without the -DOPENMP flag
+.HP
+\fB\-threads-level\fR <number> in [0 - 4] degree of parallelization. If level is 0,
+VeryFastTree uses the same parallelization strategy as FastTree-2 with some new 
+parallel blocks. If level is 1, VeryFastTree uses parallel blocks that require 
+additional memory for computation. If level is 2, VeryFastTree accelerates the 
+rounds of ML NNIs using its tree partitioning method. If level is 3 (default), 
+VeryFastTree performs more computations without preserving sequential order. If 
+level is 4, VeryFastTree accelerates the rounds of SPR steps using its tree 
+partitioning method (it can only be used with datasets larger than 2^sprlength + 2).
+.PP
+Note: Each level includes the previous ones, and computation at level 2 and above is 
+performed in a different tree traverse order, so the result may change but is still 
+correct
+.HP
+\fB\-threads-mode\fR <number> in [0 - 1] changes the mode of parallelization. If level 
+is 0, VeryFastTree uses non-deterministic parts, some inspired by FastTree-2 but 
+improved. If level is 1 (default), VeryFastTree only uses deterministic parallelization. 
+Since version 4.0, deterministic algorithms are at least faster than non-deterministic 
+ones, making deterministic the preferred choice
+.HP
+\fB\-threads-ptw\fR <number> (Partitioning Tendency Window) It sets the size of the 
+partitioning tendency window used by the tree partitioning algorithm to determine when to 
+stop searching. The window stores the last solutions and checks if a better solution can 
+be found. Increasing the value allows the algorithm to explore the tree deeper and 
+potentially find better solutions. The default value is 20.
+.HP
+\fB\-threads-verbose\fR \fB\-\-\fR to show subtrees assigned to the threads and theoretical
+ speedup, only with verbose > 0
+.HP
+\fB\-double-precision\fR \fB\-\-\fR to use double precision arithmetic. Therefore, it is 
+equivalent to compile FastTree-2 with -DUSE_DOUBLE
+.HP
+\fB\-ext\fR name to speed up computations enabling the vector extensions. 
+Available: AUTO(default), NONE, SSE, SSE3, AVX, AVX2, AVX512 or CUDA
+.HP
+\fB\-fastexp\fR <number> in [0 - 3] to select an alternative implementation for the 
+exponential function exp(x), which has a significant impact on performance. 
+Options: 0 - built-in math library with double precision (default), 1 - built-in math library 
+with simple precision (not recommended with -double-precision option), 2 - fast implementation 
+to compute an approximation of exp(x) using double precision, and 3 - fast implementation to 
+compute an approximation of exp(x) using simple precision (not recommended with 
+-double-precision option)
+.HP
+\fB\-disk-computing\fR \fB\-\-\fR if there is not enough available RAM to perform the computation, 
+disk will be used to store extra data when it was not needed. Using disk to perform the computation 
+will substantially increase the execution time
+.HP
+\fB\-disk-computing-path\fR path like -disk-computing but using a custom path folder to store data
+.HP
+\fB\-disk-dynamic-computing\fR \fB\-\-\fR by default, disk computing only creates files associated 
+with static data in RAM, which means that there is no significant impact on performance as long as 
+there is available RAM. This option further reduces memory usage by storing dynamic data on disk. 
+However, even if there is enough RAM, it will have a negative impact on performance due to the 
+constant creation and deletion of files
+.HP
+\fB\-disk-dynamic-limit\fR <number> -disk-dynamic-computing can exceed the limit of memory-mapped 
+file system. If 'memory mapping fails' errors occur, setting a limit will solve the problem. In Linux, 
+the limit can be checked with 'sysctl vm.max_map_count'. It is important not to use the exact value 
+and leave a small margin for other operations that require this feature
+.HP
+\fB\-relative-progress\fR \fB\-\-\fR to shows relative time to previous step rather than absolute 
+time in  progress report
+
+.SS "Deprecated:"
+.HP
+\fB\-logdist\fR \fB\-\-\fR use logarithmic distances, now on by default and obsolete
+.HP
+\fB\-exactml\fR \fB\-\-\fR Exact  posterior distributions, now on by default and obsolete
+.HP
+\fB\-mlexact\fR \fB\-\-\fR Exact posterior distributions, now on by default and obsolete          
+
+.PP
+For more information, see https://github.com/citiususc/veryfasttree or
+http://www.microbesonline.org/fasttree/
