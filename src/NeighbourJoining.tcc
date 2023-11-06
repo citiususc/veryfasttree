@@ -3595,11 +3595,10 @@ AbsNeighbourJoining(void)::setBestHit(int64_t node, int64_t nActive, Besthit &be
         bestjoin.dist = (numeric_t) 1e20;
         bestjoin.criterion = (numeric_t) 1e20;
 
-        Besthit tmp;
-
         #pragma omp parallel
         {
             Besthit bestjoin2 = bestjoin;
+            Besthit tmp;
             #pragma omp for schedule(dynamic)
             for (int64_t j = 0; j < maxnode; j++) {
                 Besthit &sv = allhits != nullptr ? allhits[j] : tmp;

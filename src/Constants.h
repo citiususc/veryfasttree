@@ -54,7 +54,7 @@ namespace veryfasttree {
         const std::string codesStringNT = "ACGT";
 
         const std::string name = "VeryFastTree";
-        const std::string version = "4.0.3";
+        const std::string version = "4.0.4";
         const std::string compileFlags =
                 "(OpenMP"
                 #ifdef __AVX__
