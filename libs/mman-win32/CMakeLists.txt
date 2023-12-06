@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
-
+cmake_minimum_required(VERSION 3.5...3.27)
 project(mman-win32 C)
 
 add_library(mman-win32 STATIC src/sys/mman.c)
