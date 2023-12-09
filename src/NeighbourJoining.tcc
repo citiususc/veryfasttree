@@ -420,6 +420,7 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
     }
     for (int i = 0; options.codesString[i]; i++) {
         charToCode[static_cast<int>(options.codesString[i])] = static_cast<uint8_t>(i);
+        charToCode[std::tolower(options.codesString[i])] = static_cast<uint8_t>(i);
     }
     charToCode['-'] = NOCODE;
 
@@ -501,18 +502,23 @@ AbsNeighbourJoining(void)::seqsToProfiles(std::vector<std::string> &seqs, std::v
     }
 
     /* warnings about unknown characters */
+    std::string codesString = options.codesString + options.codesString;
+    for (int i = (int) options.codesString.size(); i < (int) codesString.size(); i++) {
+        codesString[i] = static_cast<char>(std::tolower(codesString[i]));
+    }
     for (int i = 0; i < 256; i++) {
         if (counts[i] == 0 || i == '-') {
             continue;
         }
 
-        if (options.codesString.find(static_cast<uint8_t>(i)) == std::string::npos) {
+        if (codesString.find(static_cast<uint8_t>(i)) == std::string::npos) {
             log << strformat("Ignored unknown character %c (seen %" PRId64 " times)", i, counts[i]) << std::endl;
         }
     }
 
     /* warnings about the counts */
-    double fACGTUN = (counts['A'] + counts['C'] + counts['G'] + counts['T'] + counts['U'] + counts['N'])
+    double fACGTUN = (counts['A'] + counts['C'] + counts['G'] + counts['T'] + counts['U'] + counts['N']
+                      + counts['a'] + counts['c'] + counts['g'] + counts['t'] + counts['u'] + counts['n'])
                      / (double) (totCount - counts['-'] - counts['.']);
     if (options.nCodes == 4 && fACGTUN < 0.9) {
         log << strformat("WARNING! ONLY %.1f%% NUCLEOTIDE CHARACTERS -- IS THIS REALLY A NUCLEOTIDE ALIGNMENT?",
