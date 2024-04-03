@@ -447,7 +447,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    " rounds of ML NNIs using its tree partitioning method. If level is 3 (default), VeryFastTree "
                    "performs more computations without preserving sequential order. If level is 4, VeryFastTree "
                    "accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with "
-                   "datasets larger than 2^sprlength + 2). Note: Each level includes the previous ones, and computation at "
+                   "datasets larger than 2^(sprlength + 2)). Note: Each level includes the previous ones, and computation at "
                    "level 2 and above is performed in a different tree traverse order, so the result may change but is "
                    "still correct")->
             type_name("lvl")->check(CLI::Range(0, 4))->group(optimizations);
@@ -463,7 +463,7 @@ void cli(CLI::App &app, std::string &name, std::string &version, std::string &fl
                    "(Partitioning Tendency Window) It sets the size of the partitioning tendency window used by the "
                    "tree partitioning algorithm to determine when to stop searching. The window stores the last "
                    "solutions and checks if a better solution can be found. Increasing the value allows the algorithm "
-                   "to explore the tree deeper and potentially find better solutions. The default value is 20.")->
+                   "to explore the tree deeper and potentially find better solutions. The default value is 50.")->
                     type_name("n")
             ->check(Min(10))->group(optimizations);
 

@@ -5646,11 +5646,11 @@ AbsNeighbourJoining(std::vector<int64_t>)::treePartitioning(int penalty) {
         if (solution.size() < (size_t) options.threads) {
             return false;
         }
-        if (solutionSpeedUp != bestSolutionSpeedUp && tendency.size() > (size_t) options.particioningTendencyWindow) {
-            int64_t balance = tendency.size();
+        if (tendency.size() > (size_t) options.particioningTendencyWindow) {
+            int64_t balance = 0;
             for (auto it = tendency.begin(); it != tendency.end(); it++) {
                 for (auto it2 = it; it2 != tendency.end(); it2++) {
-                    if (*it < *it2) {
+                    if (*it <= *it2) {
                         balance++;
                     } else if (*it > *it2) {
                         balance--;

@@ -99,7 +99,7 @@ namespace veryfasttree {
         bool threadsVerbose = false;
         bool deterministic = true;
         int threadsLevel = 3;
-        int particioningTendencyWindow = 20;
+        int particioningTendencyWindow = 50;
         bool doublePrecision = false;
         int fastexp = 0;
         std::string extension;

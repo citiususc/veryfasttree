@@ -147,7 +147,7 @@ Degree of parallelization:
     - If level is *1*, VeryFastTree uses parallel blocks that require additional memory for computation. 
     - If level is *2*, VeryFastTree accelerates the rounds of ML NNIs using its tree partitioning method. 
     - If level is *3* (default), VeryFastTree performs more computations without preserving sequential order.
-    - If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^sprlength + 2). 
+    - If level is *4*, VeryFastTree accelerates the rounds of SPR steps using its tree partitioning method (it can only be used with datasets larger than 2^(sprlength + 2)). 
 
     Note: Each level includes the previous ones, and computation at level *2* and above is performed in a different tree traverse order, so the result may change but is still correct.
 
@@ -159,7 +159,7 @@ Changes the mode of parallelization:
     Since version 4.0, deterministic algorithms are at least faster than non-deterministic ones, making deterministic the preferred choice.
 
 - **-threads-ptw [n]**
-(Partitioning Tendency Window) It sets the size of the partitioning tendency window used by the tree partitioning algorithm to determine when to stop searching. The window stores the last solutions and checks if a better solution can be found. Increasing the value allows the algorithm to explore the tree deeper and potentially find better solutions. The default value is 20.
+(Partitioning Tendency Window) It sets the size of the partitioning tendency window used by the tree partitioning algorithm to determine when to stop searching. The window stores the last solutions and checks if a better solution can be found. Increasing the value allows the algorithm to explore the tree deeper and potentially find better solutions. The default value is 50.
 
 - **-threads-verbose**
 To show subtrees assigned to the threads and theoretical speedup, only with verbose > 0
