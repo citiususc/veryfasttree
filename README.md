@@ -10,6 +10,8 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 
 **VeryFastTree** is now included as package in [Bioconda](https://anaconda.org/bioconda/veryfasttree), [MacPorts](https://ports.macports.org/port/veryfasttree) and all Debian-based Linux distributions.
 
+**VeryFastTree** has also Python bindings [here](https://pypi.org/project/veryfasttree/).
+
 If you use **VeryFastTree**, please cite:
 
 [VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies](https://doi.org/10.1093/bioinformatics/btaa582)  
