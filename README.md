@@ -12,9 +12,13 @@ To facilitate the adoption from the research community, VeryFastTree keeps exact
 
 **VeryFastTree** has also Python bindings [here](https://pypi.org/project/veryfasttree/).
 
-If you use **VeryFastTree**, please cite:
+If you use **VeryFastTree**, please cite the following works:
 
-[VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies](https://doi.org/10.1093/bioinformatics/btaa582)  
+* [Efficient phylogenetic tree inference for massive taxonomic datasets: harnessing the power of a server to analyze 1 million taxa](https://doi.org/10.1093/gigascience/giae055)  
+César Piñeiro and Juan C. Pichel.  
+GigaScience, vol. 13, pages 1-12, 2024.
+
+* [VeryFastTree: speeding up the estimation of phylogenies for large alignments through parallelization and vectorization strategies](https://doi.org/10.1093/bioinformatics/btaa582)  
 César Piñeiro, José M. Abuín and Juan C. Pichel.  
 Bioinformatics, vol. 36, no. 17, pages 4658-4659, 2020.
 
