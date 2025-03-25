@@ -120,7 +120,6 @@ AbsFastTreeImpl(void)::run() {
                                  nSeq, unSeq, aln.nPos,
                                  aln.names.back().c_str(), unique.uniqueSeq.back().c_str()) << std::endl;
             }
-            unique.clearUniqueSeq();
             aln.clearAlignmentSeqs(); /*no longer needed*/
             if (fpInTree || !aln.tree.empty()) {
                 if (fpInTree && options.intree1) {
@@ -135,7 +134,9 @@ AbsFastTreeImpl(void)::run() {
                 if (options.verbose > 2) {
                     nj.printNJ(log, aln.names, unique, false);
                 }
+                unique.clearUniqueSeq();
             } else {
+                unique.clearUniqueSeq();
                 nj.fastNJ();
             }
             hashnames.clear();
