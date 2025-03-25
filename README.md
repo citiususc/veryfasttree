@@ -8,7 +8,7 @@ It is important to highlight that **VeryFastTree** keeps unchanged the phases, m
 
 To facilitate the adoption from the research community, VeryFastTree keeps exactly the same command line arguments than FastTree-2. In this way, it is only necessary to replace the call to FastTree-2 by a call to VeryFastTree using the same options to increase the overall performance.
 
-**VeryFastTree** is now included as package in [Bioconda](https://anaconda.org/bioconda/veryfasttree), [MacPorts](https://ports.macports.org/port/veryfasttree) and all Debian-based Linux distributions.
+**VeryFastTree** is now included as package in [Bioconda](https://anaconda.org/bioconda/veryfasttree), [Homebrew](https://formulae.brew.sh/formula/veryfasttree#default), [MacPorts](https://ports.macports.org/port/veryfasttree) and all Debian-based Linux distributions.
 
 **VeryFastTree** has also Python bindings [here](https://pypi.org/project/veryfasttree/).
 
