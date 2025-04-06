@@ -6,6 +6,7 @@
 #include "TransitionMatrix.h"
 #include "HashTable.h"
 #include "Alignment.h"
+#include <cstdint>
 #include <vector>
 #include <list>
 #include <iostream>

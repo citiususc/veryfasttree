@@ -3,6 +3,7 @@
 #ifndef VERYFASTTREE_DISKMEMORY_H
 #define VERYFASTTREE_DISKMEMORY_H
 
+#include <cstdint>
 #include <fcntl.h>
 #include <memory>
 #include <sys/mman.h>
